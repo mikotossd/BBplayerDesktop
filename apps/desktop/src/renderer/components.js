@@ -237,6 +237,93 @@
 	}
 
 	/**
+	 * 曲目卡（音乐库 › 歌单详情与搜索结果用）。
+	 *
+	 * ⚠️ 为什么不再用曲目表：用户明确要求「两个按钮不该是两个完全不同的
+	 * 播放列表页面，只保留播放详情页里那种圆角卡片样式」。曲目表是上一版
+	 * 的形态 —— 与歌单卡（`mediaCard`）、正在播放里的歌曲列表**三种长相**。
+	 * 现在全应用只有**一张曲目卡**：1:1 圆角封面 + 标题 + 副标题
+	 * （歌手 · 时长）+ 右上角「⋯」。
+	 *
+	 * 卡片本体是 `<button>`（键盘可达、有 hover/active 反馈，见
+	 * `components.css` 的 `.track-card`），所以**必须**用按钮语义，
+	 * 而不是像曲目表那样给 `<tr>` 挂 click —— 那正是"鼠标能用、键盘不能用"
+	 * 的根源。
+	 *
+	 * @param {object} options
+	 * @param {string} [options.title]
+	 * @param {string} [options.sub] 副标题（歌手 · 时长）
+	 * @param {number} [options.index] 列表里的下标（写进 dataset，拖拽/探针用）
+	 * @param {string|null} [options.coverUrl]
+	 * @param {string} [options.testid]
+	 * @param {string} [options.coverClass] 封面位额外类（曲目卡用 `media-card__art`）
+	 * @param {boolean} [options.playing] 当前正在播放这一首
+	 * @param {boolean} [options.active]
+	 * @param {HTMLElement[]} [options.trailing] 右上角的动作（通常是一个「⋯」）
+	 * @param {(event: MouseEvent) => void} [options.onClick]
+	 * @param {() => void} [options.onActivate] 双击播放
+	 */
+	function trackCard({
+		title,
+		sub,
+		index,
+		coverUrl = null,
+		testid,
+		coverClass = '',
+		playing = false,
+		active = false,
+		trailing = [],
+		onClick,
+		onActivate,
+	} = {}) {
+		const card = document.createElement('button')
+		card.className = 'media-card track-card'
+		if (active) card.classList.add('is-active')
+		if (playing) card.classList.add('is-playing')
+		if (testid) card.dataset.testid = testid
+		if (index != null) card.dataset.trackIndex = String(index)
+
+		const artBox = document.createElement('span')
+		artBox.className = 'track-card__art'
+		artBox.appendChild(
+			art({
+				title,
+				coverUrl,
+				tag: 'span',
+				extraClass: coverClass || 'list-row__art--card',
+			}),
+		)
+		card.appendChild(artBox)
+
+		const titleNode = document.createElement('span')
+		titleNode.className = 'media-card__title'
+		titleNode.textContent = title ?? ''
+		card.appendChild(titleNode)
+
+		if (sub) {
+			const subNode = document.createElement('span')
+			subNode.className = 'media-card__sub'
+			const subText = document.createElement('span')
+			subText.className = 'track-card__sub-text'
+			subText.textContent = sub
+			subNode.appendChild(subText)
+			card.appendChild(subNode)
+		}
+
+		if (trailing.length > 0) {
+			const box = document.createElement('span')
+			box.className = 'track-card__trailing'
+			for (const node of trailing) box.appendChild(node)
+			card.appendChild(box)
+		}
+
+		if (onClick) card.addEventListener('click', onClick)
+		if (onActivate) card.addEventListener('dblclick', onActivate)
+
+		return card
+	}
+
+	/**
 	 * 空状态：淡图标 + 标题 + 一句说明 +（可选）动作。
 	 *
 	 * @param {object} options
@@ -495,6 +582,7 @@
 		art,
 		listRow,
 		mediaCard,
+		trackCard,
 		empty,
 		toast,
 		menu,

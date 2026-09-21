@@ -49,6 +49,26 @@
 		)
 	}
 
+	/**
+	 * 目标自身是否能被 Enter/Space **激活**（按钮、链接、role=button…）。
+	 *
+	 * ⚠️ 为什么要有这条：全局注册了 `enter`（"播放队列首项"），而
+	 * `handleKeydown` 会无条件 `preventDefault()` —— 于是**焦点在任意按钮上
+	 * 按 Enter 都不会激活按钮**，而是跑去播队列第一首。用户实测：
+	 * 在设置分类 / 「登录」按钮上按 Enter 全都没反应。
+	 *
+	 * 浏览器默认行为（激活聚焦的按钮）本来就该赢；我们只让**没有聚焦控件**
+	 * 时的 Enter 走队列快捷方式。
+	 */
+	function isActivatable(target) {
+		if (!target?.closest) return false
+		return Boolean(
+			target.closest(
+				'button, a[href], summary, [role="button"], [role="tab"], [role="menuitem"], [role="option"]',
+			),
+		)
+	}
+
 	const bindings = new Map()
 	const log = []
 
@@ -124,6 +144,19 @@
 
 		if (binding.scope === 'input' && !typing) return
 		if (binding.scope !== 'input' && typing && !binding.allowInInput) return
+		/*
+		 * ⚠️ 焦点在按钮/链接上时，Enter 与 Space 是**激活它**的原生手势 ——
+		 * 全局快捷键不能抢。抢了的后果是"在设置分类、「登录」这类按钮上按
+		 * Enter 完全没反应"（用户实测）。
+		 *
+		 * 只对这两个键让路：其它组合（Ctrl+… / Alt+…）在按钮上仍然照常生效。
+		 */
+		if (
+			(combo === 'enter' || combo === 'space') &&
+			isActivatable(event.target)
+		) {
+			return
+		}
 
 		event.preventDefault()
 		log.push({ combo, at: Date.now() })

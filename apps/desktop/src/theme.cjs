@@ -144,6 +144,16 @@ function buildCssVars(mode, tokens, colors) {
 	for (const [name, value] of Object.entries(tokens.motion)) {
 		lines.push(`\t--motion-${kebab(name)}: ${value}ms;`)
 	}
+	/*
+	 * 图标尺寸。
+	 *
+	 * ⚠️ 以前**没有这个循环**：`--icon-sm/md/lg` 的唯一来源是
+	 * `style.css` 兜底块里的三个字面量，等于"改令牌包完全不影响图标"。
+	 * 现在由令牌包下发，style.css 只保留同值兜底（首帧用）。
+	 */
+	for (const [name, value] of Object.entries(tokens.iconSize ?? {})) {
+		lines.push(`\t--icon-${kebab(name)}: ${value}px;`)
+	}
 
 	// ── 旧变量别名（迁移期并存，逐块替换后删除）──
 	//

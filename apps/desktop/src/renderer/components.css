@@ -42,6 +42,22 @@
 	background: var(--surface-container-high);
 }
 
+/*
+ * ⚠️ **选中行也要有 hover 反馈。**
+ *
+ * `.list-row:hover`(0-2-0) 与 `.list-row.is-active`(0-2-0) 特异性相同，
+ * 后者在后面 → 选中那一行的 hover 底色被完全吃掉。而"当前选中的歌单"
+ * 恰恰是用户最常再点一次的那一行：实测悬停前后
+ * `rgb(229,229,230) → rgb(229,229,230)`（毫无变化）。
+ *
+ * 修法：给选中行一条自己的 hover 规则（换成更亮的容器色），
+ * 而不是去调 hover 或 is-active 的先后 —— 那两者都各自有用。
+ */
+.list-row.is-active:hover {
+	background: var(--surface-container-highest);
+	color: var(--on-surface);
+}
+
 /* 当前项：与导航胶囊同一套选中态令牌，全工程只有一种"选中" */
 .list-row.is-active {
 	background: var(--secondary-container);
@@ -201,7 +217,17 @@
  * 封面位：复用列表行的 `.list-row__art`（同一套「有封面用封面、
  * 没有就用首字 + 渐变」逻辑），只把尺寸从固定的 44px 改成**撑满卡片**。
  */
+/*
+ * ⚠️ 这个修饰类要同时顶住两种父级：网格里的 `.media-card`（flex column，
+ * 高度由网格行决定）与窄窗口下堆叠的 `.nowplaying__card`（也是 flex column）。
+ * 只写 `aspect-ratio` 会输给 flex 的默认拉伸（`align-items: stretch`），
+ * 封面被拉成一条横片。所以三件事一起写：
+ * `order` 让它保持最上、`flex` 禁止拉伸/收缩、`align-self` 靠左。
+ */
 .list-row__art--card {
+	order: -1;
+	flex: 0 0 auto;
+	align-self: flex-start;
 	width: 100%;
 	height: auto;
 	aspect-ratio: 1;
@@ -244,6 +270,132 @@
 	flex: none;
 }
 
+/* ── 曲目卡（音乐库 › 歌单详情 / 搜索结果）─────────────────
+ *
+ * 复用 `.media-card`（同一张圆角卡、同一套 hover/active 令牌），只补三处：
+ *   1. 右上角的「⋯」浮在封面上（曲目卡比歌单卡多一个行内动作）；
+ *   2. `is-playing` 用与左栏/队列一致的选中态令牌；
+ *   3. 多选态：与曲目表同语义的 `is-checked`。
+ *
+ * ⚠️ 卡片是 `<button>`，内部只能用短语内容（`span`）。「⋯」本身也是按钮，
+ * 用绝对定位叠在封面上而不是塞进流里 —— 塞进去会把封面挤扁。
+ */
+.track-card {
+	position: relative;
+}
+
+.track-card__art {
+	position: relative;
+	display: block;
+	width: 100%;
+	min-width: 0;
+}
+
+/*
+ * 曲目卡的封面用 `.media-card__art`（不是 `.list-row__art--card`）。
+ *
+ * ⚠️ `.media-card__art` 继承 `.list-row__art` 的 `height: 44px`（那是**列表行**
+ * 的尺寸），而卡片网格要的是"撑满卡宽的正方形"。只写 `aspect-ratio: 1` 不够 ——
+ * 高度已经被 44px 钉住了，实测封面变成 168×44 的一条横片（用户看到的
+ * "封面被压扁"）。所以这里必须把 `height` 一起改回 `auto`。
+ */
+.track-card .media-card__art {
+	order: -1;
+	flex: 0 0 auto;
+	align-self: flex-start;
+	width: 100%;
+	height: auto;
+	aspect-ratio: 1;
+	border-radius: var(--r-md);
+	font-size: var(--fs-headline-small);
+}
+
+/* 没有副标题时让封面吃掉剩余高度（搜索结果里偶尔会有无时长的曲目） */
+.track-card:not(:has(.media-card__sub)) {
+	justify-content: flex-start;
+}
+
+.track-card__trailing {
+	position: absolute;
+	top: calc(var(--sp-xs) + 4px);
+	right: calc(var(--sp-xs) + 4px);
+	display: flex;
+	gap: var(--sp-xxs);
+	/* 平时淡出，悬停/聚焦/正在播放时显形 —— 卡片本身才是主体 */
+	opacity: 0;
+	transition: opacity var(--motion-duration-fast) ease;
+}
+
+.track-card:hover .track-card__trailing,
+.track-card:focus-within .track-card__trailing,
+.track-card.is-playing .track-card__trailing,
+.track-card.is-checked .track-card__trailing {
+	opacity: 1;
+}
+
+/* 叠在封面上的动作按钮要有自己的底，否则压在图上读不清 */
+.track-card__trailing .track-action {
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border-radius: var(--r-full);
+	background: color-mix(in srgb, var(--surface-container-highest) 84%, transparent);
+	backdrop-filter: blur(4px);
+}
+
+.track-card__trailing .track-action:hover {
+	background: var(--surface-container-highest);
+}
+
+.track-card.is-playing {
+	background: var(--secondary-container);
+	color: var(--on-secondary-container);
+}
+
+.track-card.is-playing .media-card__sub {
+	color: color-mix(in srgb, var(--on-secondary-container) 76%, transparent);
+}
+
+/* 多选选中：与曲目表的 `tr.is-checked` 同一语义，用主色淡底 */
+.track-card.is-checked {
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.track-card.is-checked::after {
+	content: 'check_circle';
+	font-family: 'Material Symbols Rounded';
+	font-size: var(--icon-lg);
+	position: absolute;
+	top: calc(var(--sp-xs) + 4px);
+	left: calc(var(--sp-xs) + 4px);
+	color: var(--primary);
+	/* 与「⋯」同一套：作为卡片的叠加标记，不参与布局 */
+	pointer-events: none;
+}
+
+/* 多选态下「⋯」让位给勾选标记 */
+.track-card.is-select-mode .track-card__trailing {
+	opacity: 0;
+	pointer-events: none;
+}
+
+/* 拖拽重排的可视反馈（与曲目表同一组类名） */
+.track-card[draggable='true'] {
+	cursor: grab;
+}
+
+.track-card.is-dragging {
+	opacity: 0.5;
+}
+
+.track-card.is-drop-before {
+	box-shadow: -3px 0 0 0 var(--primary);
+}
+
+.track-card.is-drop-after {
+	box-shadow: 3px 0 0 0 var(--primary);
+}
+
 /*
  * 卡片网格。
  *
@@ -276,7 +428,13 @@
 
 .heatmap {
 	display: block;
-	max-width: 100%;
+	/*
+	 * ⚠️ 这里**没有** `max-width: 100%`。
+	 *
+	 * 有它的时候，`.heatmap-box { overflow-x: auto }` 那个兜底**永远不会触发**：
+	 * SVG 被压到容器宽度以内，只剩高度按 viewBox 等比缩放 —— 窄窗口下整张
+	 * 日历被压扁、右侧留一大片空白，而不是预期中的横向滚动。
+	 */
 	overflow: visible;
 }
 
@@ -287,15 +445,15 @@
 }
 
 .heatmap__cell--l1 {
-	fill: color-mix(in srgb, var(--primary) 20%, transparent);
+	fill: color-mix(in srgb, var(--primary) 45%, transparent);
 }
 
 .heatmap__cell--l2 {
-	fill: color-mix(in srgb, var(--primary) 40%, transparent);
+	fill: color-mix(in srgb, var(--primary) 65%, transparent);
 }
 
 .heatmap__cell--l3 {
-	fill: color-mix(in srgb, var(--primary) 60%, transparent);
+	fill: color-mix(in srgb, var(--primary) 82%, transparent);
 }
 
 .heatmap__cell--l4 {
@@ -830,6 +988,33 @@
 }
 
 /*
+ * ⚠️ 窄窗口下把三栏**堆成一列并允许纵向滚动**。
+ *
+ * 不这么做的后果（实测）：三栏的最小宽度合计 900px（280+320+260+2×20 间距），
+ * 而默认窗口 1100×760 在 125% 显示缩放下**真实视口只有 ~782px** ——
+ * 于是队列列整块落在窗口外（x=900 > 782），`.nowplaying{overflow:hidden}`
+ * 又把它裁掉、没有横向滚动。用户点播放条上的「呼出/收起播放列表」，
+ * 看到的是"切到播放页了、按钮也高亮了，但播放列表根本没出现"。
+ *
+ * 断点取 1180px：列区可用宽度 = 视口 − 左栏(240) − 两侧内边距(40)，
+ * 要放下 900px 就需要视口 ≥ 1180。
+ */
+@media (max-width: 1180px) {
+	.nowplaying {
+		overflow-y: auto;
+	}
+
+	.nowplaying__columns,
+	.nowplaying__columns.is-queue-hidden {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.nowplaying__card--queue {
+		max-height: 60vh;
+	}
+}
+
+/*
  * 卡片本体（所有栏共用）。
  *
  * 与设置/音乐库的"功能区卡片"是**同一套令牌**：
@@ -1089,6 +1274,22 @@
 /* 播放条的封面与标题区可点：展开「正在播放」（阶段 4b） */
 .is-clickable {
 	cursor: pointer;
+	transition: background var(--motion-duration-fast) ease;
+}
+
+/*
+ * ⚠️ 只有 `cursor: pointer` 是不够的：它是进入「正在播放」的**主入口**，
+ * 而紧挨着它的播放条队列按钮有悬停高亮 —— 一个亮一个不亮，用户会以为
+ * 「封面/标题点不开」。这里补一层悬停/聚焦底色（`renderer.js:359-368`
+ * 只给这三个元素加了 `is-clickable`）。
+ */
+.is-clickable:hover {
+	background: color-mix(in srgb, var(--on-surface) 8%, transparent);
+}
+
+.is-clickable:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
 }
 
 /* ── 弹出菜单（阶段 6c）───────────────────────────────── */
@@ -1467,6 +1668,13 @@
 .empty__title {
 	font-size: var(--fs-title-medium);
 	color: var(--on-surface);
+	/*
+	 * 空状态标题里会**原样嵌进用户输入**（「没有与 <关键词> 相关的结果」）。
+	 * 粘一个长 BV 号或 URL 进来时，那个不可断的长串会把整块内容撑出横向
+	 * 滚动条，空状态还会偏到一边。这里允许任意位置换行。
+	 */
+	max-width: 100%;
+	overflow-wrap: anywhere;
 }
 
 .empty__hint {

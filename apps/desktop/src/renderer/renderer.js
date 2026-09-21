@@ -365,6 +365,21 @@
 		if (!node) continue
 		node.classList.add('is-clickable')
 		node.addEventListener('click', () => setNowPlaying(true))
+		/*
+		 * ⚠️ 它们原本是**普通 div**：只能鼠标点，键盘用户进不了「正在播放」
+		 * （那是整个应用里唯一能看到大封面 + 歌词的地方）。补上按钮语义
+		 * 与 Enter/Space 激活 —— 不改外观，只让它能被 Tab 到、能被按下去。
+		 */
+		if (!node.hasAttribute('tabindex')) node.tabIndex = 0
+		if (!node.hasAttribute('role')) node.setAttribute('role', 'button')
+		if (!node.hasAttribute('aria-label')) {
+			node.setAttribute('aria-label', '打开正在播放')
+		}
+		node.addEventListener('keydown', (event) => {
+			if (event.key !== 'Enter' && event.key !== ' ') return
+			event.preventDefault()
+			setNowPlaying(true)
+		})
 	}
 	document
 		.getElementById('nowplaying-close')
@@ -443,6 +458,16 @@
 	keys.register('ctrl+m', { description: '静音切换' }, () => {
 		const audio = player.getAudio()
 		audio.muted = !audio.muted
+		/*
+		 * ⚠️ 静音必须有**看得见的反馈**：原来只改 `audio.muted`，
+		 * 图标、aria-pressed、状态行全都不动 —— 连按两次在界面上完全一样。
+		 * 状态胶囊 + `aria-pressed` 是最小的可行反馈（`volume_off` 不在
+		 * 图标子集里，重建字体要联网）。
+		 */
+		setStatus(audio.muted ? '已静音' : '已取消静音', 'idle')
+		for (const button of document.querySelectorAll('[data-testid="volume"]')) {
+			button.setAttribute('aria-valuetext', audio.muted ? '已静音' : '')
+		}
 	})
 
 	// —— 模式 ——
@@ -450,7 +475,13 @@
 		player.cycleMode()
 	})
 
-	// —— 视图 ——
+	/*
+	 * `Ctrl+1/2` 切到音乐库 / 搜索；`Ctrl+3/4` 切到音乐库里的**收藏夹 / 合集**。
+	 *
+	 * ⚠️ 原来 `Ctrl+3/4` 点的是 `[data-view="favorites"]` / `[data-view="collection"]`
+	 * —— 这两个元素**从来不存在**（左栏只有 home/library/search/settings），
+	 * 于是它们是完全无声的死键，而快捷键帮助面板还在宣传它们。
+	 */
 	keys.register('ctrl+1', { description: '切到音乐库' }, () => {
 		document.querySelector('[data-view="library"]')?.click()
 	})
@@ -458,10 +489,10 @@
 		document.querySelector('[data-view="search"]')?.click()
 	})
 	keys.register('ctrl+3', { description: '切到收藏夹' }, () => {
-		document.querySelector('[data-view="favorites"]')?.click()
+		window.bbUI?.setLibraryTab?.('favorites')
 	})
 	keys.register('ctrl+4', { description: '切到合集' }, () => {
-		document.querySelector('[data-view="collection"]')?.click()
+		window.bbUI?.setLibraryTab?.('collection')
 	})
 	// 登录：Ctrl+Shift+A（`Ctrl+L` 在很多系统上是地址栏语义，避开）
 	keys.register('ctrl+shift+a', { description: '打开登录面板' }, () => {
@@ -522,11 +553,55 @@
 			input.select()
 		},
 	)
-	keys.register('escape', { description: '清空搜索', scope: 'input' }, () => {
+	/*
+	 * Escape：**先关最上面那一层**。
+	 *
+	 * ⚠️ 原来它注册成 `scope: 'input'`（只在输入框里有意义，只清搜索框），
+	 * 于是登录弹窗、快捷键提示、正在播放页、右栏**都没有键盘关闭路径** ——
+	 * `keyboard.js` 的全局分发会把焦点在非输入框时的 Escape 直接丢掉。
+	 * 现在改成全局作用域，按"层"的顺序处理（弹窗 → 提示 → 播放页 → 右栏），
+	 * 处理了才 `preventDefault`，没处理就让别的监听器（如多选的 Esc）接手。
+	 */
+	keys.register('escape', { description: '关闭当前浮层' }, (event) => {
+		// 1) 登录弹窗 / 自绘对话框（它们各自的捕获监听器会处理 Esc，
+		//    这里只兜底：把 `hidden` 状态收回来）
+		const modal = document.querySelector('.modal.is-open')
+		if (modal) {
+			const close = modal.querySelector(
+				'[data-testid$="-close"], .modal__close',
+			)
+			if (close) {
+				close.click()
+				event.preventDefault?.()
+				return
+			}
+		}
+		// 2) 快捷键提示
+		const hint = document.getElementById('hint')
+		if (hint && !hint.hidden) {
+			hint.hidden = true
+			event.preventDefault?.()
+			return
+		}
+		// 3) 「正在播放」页 → 回到进入前的目的地
+		if (currentView === 'nowplaying') {
+			setNowPlaying(false)
+			event.preventDefault?.()
+			return
+		}
+		// 4) 展开中的右栏 → 收起
+		const shell = document.querySelector('.app')
+		if (shell && !shell.classList.contains('is-rightbar-collapsed')) {
+			shell.classList.add('is-rightbar-collapsed')
+			event.preventDefault?.()
+			return
+		}
+		// 5) 输入框：清空并失焦（保留原来的行为）
 		const input = document.getElementById('search-input')
-		if (input) {
+		if (input && document.activeElement === input) {
 			input.value = ''
 			input.blur()
+			return
 		}
 	})
 	keys.register('enter', { description: '播放列表首项' }, () => {
@@ -744,7 +819,11 @@
 	player.on((event) => {
 		if (event.type === 'track-changed') {
 			log(`开始播放：${event.track.title}`)
-			for (const row of document.querySelectorAll('.track-table tbody tr')) {
+			// 曲目列表现在有两种形态：整页是**曲目卡**（`.track-card`），
+			// 收藏夹预览那张内嵌表仍是 `<tr>`。都带 `data-bvid`，按属性选。
+			for (const row of document.querySelectorAll(
+				'.track-card[data-bvid], .track-table tbody tr[data-bvid]',
+			)) {
 				row.classList.toggle(
 					'is-playing',
 					row.dataset.bvid === event.track.bvid,

@@ -24,7 +24,8 @@
 		panelsBox: document.getElementById('settings-panels'),
 		categoryButtons: document.querySelectorAll('[data-settings-category]'),
 		back: document.getElementById('settings-back'),
-		back2: document.getElementById('settings-close'),
+		// ⚠️ `settings-close` 在整个应用里不存在（历史遗留的绑定）。
+		// 保留这个字段只会让人以为"关闭设置"有两条路径 —— 删掉。
 		/**
 		 * 分类名列表（用于校验 `switchCategory` 收到的是个真分类）。
 		 *
@@ -44,6 +45,8 @@
 		downloadTasks: document.getElementById('settings-download-tasks'),
 		downloadList: document.getElementById('settings-download-list'),
 		downloadStatus: document.getElementById('settings-download-status'),
+		// 通用（存储位置 / 快捷键）
+		generalStatus: document.getElementById('settings-general-status'),
 
 		// 备份
 		webdavUrl: document.getElementById('settings-webdav-url'),
@@ -214,7 +217,9 @@
 				lyricsAuto.checked = currentSettings.lyricsAutoMatch !== false
 			}
 		} catch (error) {
-			setStatus(els.backupStatus, error.message, 'bad')
+			// ⚠️ 这一条属于「读取设置」全局失败，不能写进**备份面板**的状态行 ——
+			// 用户当时在主题/外观页，那个面板是 hidden 的，什么都看不到。
+			setStatus(els.generalStatus, error.message, 'bad')
 		}
 		return currentSettings
 	}
@@ -318,7 +323,7 @@
 			swatch.addEventListener('click', () => {
 				void (async () => {
 					if (!ready) {
-						notReady(els.backupStatus)
+						notReady(els.generalStatus)
 						return
 					}
 					await features.writeSettings({ accentColor: value })
@@ -335,7 +340,7 @@
 					// 允许不写 `#`
 					const value = /^[0-9a-fA-F]{6}$/.test(raw) ? `#${raw}` : raw
 					if (!/^#[0-9a-fA-F]{6}$/.test(value)) {
-						setStatus(els.backupStatus, '颜色要写成 #RRGGBB', 'bad')
+						setStatus(els.generalStatus, '颜色要写成 #RRGGBB', 'bad')
 						// 还原成当前值 —— 别让用户对着一个无效值继续编辑
 						await refreshSettings()
 						return
@@ -350,7 +355,7 @@
 		button.addEventListener('click', () => {
 			void (async () => {
 				if (!ready) {
-					notReady(els.backupStatus)
+					notReady(els.generalStatus)
 					return
 				}
 				await features.writeSettings({
@@ -374,7 +379,7 @@
 		button.addEventListener('click', () => {
 			void (async () => {
 				if (!ready) {
-					notReady(els.backupStatus)
+					notReady(els.generalStatus)
 					return
 				}
 				await features.writeSettings({
@@ -1232,10 +1237,32 @@
 	function close() {
 		if (!els.view) return
 		els.view.hidden = true
-		if (downloadTicker) {
-			clearInterval(downloadTicker)
-			downloadTicker = null
-		}
+		stopDownloadPolling()
+	}
+
+	/**
+	 * 停掉下载轮询。
+	 *
+	 * ⚠️ 原来清理**只**发生在 `close()` 里，而 `close()` 挂在
+	 * `#settings-close` 上 —— 那个 id 在整个应用里**不存在**（返回按钮是
+	 * `#settings-back`，它只回到分类列表，不关设置页）。
+	 * 于是那个 800ms 的定时器从首屏一直跑到进程结束：离开设置页也在刷 IPC。
+	 *
+	 * 现在改由**可见性**驱动（见下面的 observer）—— 那才是真正的不变量：
+	 * "设置页不可见 = 没必要轮询"。
+	 */
+	function stopDownloadPolling() {
+		if (!downloadTicker) return
+		clearInterval(downloadTicker)
+		downloadTicker = null
+	}
+
+	// 设置视图一被隐藏就停轮询（showMainPane 只改 `hidden`，不再需要
+	// 多一条"记得调用 close()"的约定）
+	if (els.view) {
+		new MutationObserver(() => {
+			if (els.view.hidden) stopDownloadPolling()
+		}).observe(els.view, { attributes: true, attributeFilter: ['hidden'] })
 	}
 
 	// 顶部齿轮已移除（「设置」是左栏的目的地，不再需要第二个入口）。
@@ -1265,7 +1292,18 @@
 		})
 	document
 		.getElementById('settings-general-open-folder')
-		?.addEventListener('click', () => void window.bbplayer.backupOpenFolder?.())
+		?.addEventListener('click', () => {
+			// ⚠️ 原来是 `window.bbplayer.backupOpenFolder?.()` —— 这个名字
+			// 在 preload 里**不存在**，带 `?.` 所以点了完全没反应（静默失败）。
+			// 现在走 preload 暴露出来的 `backup.openFolder()`。
+			void (async () => {
+				try {
+					unwrap(await window.bbplayer.backup.openFolder(), '打开数据目录')
+				} catch (error) {
+					setStatus(els.generalStatus, error.message, 'bad')
+				}
+			})()
+		})
 	/*
 	 * 关于页的「前往 GitHub」。
 	 *
@@ -1309,7 +1347,7 @@
 		})
 	// ⚠️ 设置不再是浮层，所以**没有"点遮罩关闭"**这回事 ——
 	// 它是一个页面，离开靠点左栏的别的目的地。
-	els.back2?.addEventListener('click', close)
+	// 轮询的清理改由 `els.view` 的 hidden 观察器负责（见 stopDownloadPolling）。
 
 	/**
 	 * 分类子页打开时轮询下载进度。

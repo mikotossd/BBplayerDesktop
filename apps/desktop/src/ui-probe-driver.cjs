@@ -1042,7 +1042,7 @@ async function run(window) {
 			`(() => {
 				const nodes = [
 					...document.querySelectorAll('.playbar__cover'),
-					...document.querySelectorAll('.track-table .list-row__art'),
+					...document.querySelectorAll('.track-grid .list-row__art'),
 					...document.querySelectorAll('[data-playlist-id] .list-row__art'),
 				]
 				const problems = []
@@ -1093,10 +1093,24 @@ async function run(window) {
 			`(() => {
 				const rows = [...document.querySelectorAll('[data-playlist-id]')]
 				const firstRow = rows[0]
-				const art = firstRow?.querySelector('.list-row__art')
-				const artStyle = art ? getComputedStyle(art) : null
-
-				return JSON.stringify({
+				/*
+				 * 首字方块只在**没有封面**时才出现，而演示歌单是带封面的 ——
+				 * 所以这里直接用组件造一行"没有封面"的，检查它的封面位。
+				 * （比"碰运气找一行无封面的真实数据"可靠：断言不该依赖数据运气。）
+				 */
+				const probeRow = window.bbComponents.listRow({
+					title: '首字测试',
+					sub: '1 首',
+					coverUrl: null,
+				})
+				// ⚠️ 必须真的挂进文档：**游离节点上 getComputedStyle 不解析
+				// CSS 变量**（backgroundImage 会读成 none，断言误判为"纯色"）。
+				probeRow.style.position = 'absolute'
+				probeRow.style.left = '-9999px'
+				document.body.appendChild(probeRow)
+				const art = probeRow.querySelector('.list-row__art')
+				const artStyle = getComputedStyle(art)
+				const result = {
 					// 列表行
 					rowCount: rows.length,
 					rowsAreListRow: rows.every((r) => r.classList.contains('list-row')),
@@ -1116,7 +1130,9 @@ async function run(window) {
 					).length,
 					// 组件工具是否可用
 					hasHelpers: typeof window.bbComponents?.listRow === 'function',
-				})
+				}
+				probeRow.remove()
+				return JSON.stringify(result)
 			})()`,
 		),
 	)
@@ -1292,13 +1308,18 @@ async function run(window) {
 				const card = document.querySelector('.media-card')
 				card?.click()
 				await new Promise((r) => setTimeout(r, 1500))
-				// 作者列：**数据库路径**的作者在 artists 表里（tracks 只存外键），
-				// 所以这条同时验证 join 真的做了 —— 用户抱怨过「作者列永远是 —」。
+				// 作者名：**数据库路径**的作者在 artists 表里（tracks 只存外键），
+				// 所以这条同时验证 join 真的做了 —— 用户抱怨过「作者永远是 —」。
+				// 曲目卡把它放在副标题里（「歌手 · 时长」）。
 				const artists = [
-					...document.querySelectorAll('.track-table tbody td.col-artist'),
-				].map((td) => td.textContent)
+					...document.querySelectorAll('.track-card .media-card__sub'),
+				]
+					.map((node) => node.textContent.split('·')[0].trim())
+					.filter(Boolean)
 				const inDetail = {
-					trackTable: Boolean(document.querySelector('[data-testid="track-table"]')),
+					trackGrid: Boolean(
+						document.querySelector('[data-testid="track-table"] .track-card'),
+					),
 					back: Boolean(document.querySelector('[data-testid="playlist-back"]')),
 					title: document.querySelector('.view-head h2')?.textContent ?? '',
 					authorRows: artists.length,
@@ -1313,8 +1334,8 @@ async function run(window) {
 		),
 	)
 	check(
-		'点歌单卡片进详情（曲目表 + 返回按钮都在）',
-		drill.inDetail.trackTable && drill.inDetail.back,
+		'点歌单卡片进详情（曲目卡网格 + 返回按钮都在）',
+		drill.inDetail.trackGrid && drill.inDetail.back,
 		`标题「${drill.inDetail.title}」 ${JSON.stringify(drill.inDetail)}`,
 	)
 	check(
@@ -1323,7 +1344,7 @@ async function run(window) {
 		String(drill.backToList),
 	)
 	check(
-		'歌单详情里「作者」列真的有作者（数据库路径必须 join artists）',
+		'歌单详情里每张曲目卡的副标题都有作者（数据库路径必须 join artists）',
 		drill.inDetail.authorRows > 0 &&
 			drill.inDetail.authorFilled === drill.inDetail.authorRows,
 		`${drill.inDetail.authorFilled}/${drill.inDetail.authorRows} 行有作者，例：${drill.inDetail.authorSample}`,
@@ -1452,159 +1473,66 @@ async function run(window) {
 	await sleep(1500)
 
 	// ---------------------------------------------------------------
-	// 2.6b 冻结表头（阶段 A）
+	// 2.6b 曲目卡网格（阶段 A → 用户复审：取消曲目表）
 	// ---------------------------------------------------------------
 	//
-	// 用户截图圈出来的三件事，逐条对应：
-	//   1. **"一条发白的横带"** —— 表头底色用的是页面底的令牌（`--bg`），
-	//      而它浮在卡片上（`--surface`）。两个令牌不同色，滚动时就看出来了。
-	//   2. **方角压住卡片圆角** —— `top` 是负值，表头故意钻出滚动视口 16px。
-	//   3. **表头与表体对不上** —— 序号/时长列只给 `td` 设了右对齐，
-	//      表头落到通用规则的左对齐，同一列两种对齐。
+	// 用户的原话：「两个按钮出来的是两个完全不同的播放列表页面，只保留
+	// 播放详情页里面的播放列表（圆角卡片样式的那个）」。
 	//
-	// 断言按"看得见的现象"写：颜色一致、不越界、**逐列对齐**、滚起来还粘着。
-	// （"类名在、样式生效了"是证明不了这三件事的。）
-	console.log('\n[ui] 2.6b) 冻结表头')
-	const stickyHead = JSON.parse(
+	// 也就是说歌单详情**不再有曲目表**，而是与歌单列表同一张圆角卡片。
+	// 断言按看得见的现象写：
+	//   1. 详情里没有任何 `<table class="track-table">`；
+	//   2. 曲目卡是 `<button>`（键盘可达：有 role 语义 + tabindex）；
+	//   3. 每张卡的封面是 1:1 的圆角正方形；
+	//   4. 卡片底色与页面底色可区分（是"卡片"而不是裸文字）。
+	console.log('\n[ui] 2.6b) 曲目卡网格')
+	const trackGrid = JSON.parse(
 		await evaluate(
 			window,
-			`(async () => {
-				const content = document.getElementById('content')
-				const table = document.querySelector('[data-testid="track-table"]')
-				if (!content || !table) return JSON.stringify({ missing: true })
-				const ths = [...table.querySelectorAll('thead th')]
-				const firstRow = table.querySelector('tbody tr')
-				const tds = firstRow ? [...firstRow.children] : []
-				const thStyle = getComputedStyle(ths[0])
-				const contentTop = content.getBoundingClientRect().top
-
-				// 逐列比较表头/表体的对齐方式与左右边缘
-				const alignMismatch = []
-				let maxEdgeDelta = 0
-				ths.forEach((th, i) => {
-					const td = tds[i]
-					if (!td) return
-					const a = getComputedStyle(th).textAlign
-					const b = getComputedStyle(td).textAlign
-					if (a !== b) alignMismatch.push((th.className || 'th') + ' ' + a + ' ≠ ' + b)
-					const ra = th.getBoundingClientRect()
-					const rb = td.getBoundingClientRect()
-					maxEdgeDelta = Math.max(
-						maxEdgeDelta,
-						Math.abs(ra.left - rb.left),
-						Math.abs(ra.right - rb.right),
-					)
-				})
-
-				const atRestTop = Math.round(ths[0].getBoundingClientRect().top - contentTop)
-				/*
-				 * 「粘住」的定义是：**内容继续往上走，表头停住**。
-				 *
-				 * ⚠️ 第一版断言写的是"滚动后表头与容器上沿重合（偏移 0）"，
-				 * 实测是 16px —— 因为滚动容器的粘性定位矩形是**内边距盒**，
-				 * 表头会停在容器的 padding-top 处。那个位置**正是我们想要的**
-				 * （它刚好不碰卡片的圆角），错的是断言而不是实现。
-				 * 所以改成量两次：内容动了、表头没动。
-				 */
-				const offsetOf = () =>
-					Math.round(ths[0].getBoundingClientRect().top - contentTop)
-				const rowOffsetOf = () =>
-					Math.round(firstRow.getBoundingClientRect().top - contentTop)
-				content.scrollTop = 400
-				await new Promise((r) =>
-					requestAnimationFrame(() => requestAnimationFrame(r)),
-				)
-				const at400 = offsetOf()
-				const rowAt400 = rowOffsetOf()
-				content.scrollTop = 800
-				await new Promise((r) =>
-					requestAnimationFrame(() => requestAnimationFrame(r)),
-				)
-				const at800 = offsetOf()
-				const rowAt800 = rowOffsetOf()
-				const afterScroll = {
-					scrollTop: content.scrollTop,					// ⚠️ 不要写成嵌套的模板字符串（美元加大括号那种插值）：
-					// 内层的反引号会当场结束外层这个 evaluate 模板。
-					// 规矩是"模板里要拼字符串就用 + "。
-					headOffset: at400 + ' → ' + at800,
-					rowOffset: rowAt400 + ' → ' + rowAt800,
-					// 内容还在动（行位置变了），但表头停住了；且停在容器内（不为负）
-					stuck: rowAt400 !== rowAt800 && at400 === at800 && at800 >= 0,
-				}
-				/*
-				 * 「冻结表头所在的这条带子里，最上面命中的元素必须是表头自己」。
-				 *
-				 * 这是**能机械化验证"有没有被行盖住"**的判据：颜色、位置、对齐
-				 * 全对，也仍然可能有行从表头那里画出来 —— 第一版就是这样：
-				 * 截图上一行"幽灵文字"压在表头上，而所有坐标断言都是绿的。
-				 */
-				const headRect = ths[0].getBoundingClientRect()
-				const hitAt = (x, y) => {
-					const hit = document.elementFromPoint(x, y)
-					return hit ? hit.tagName + (hit.className ? '.' + hit.className : '') : 'null'
-				}
-				const hits = [0.2, 0.6, 0.9].map((f) =>
-					hitAt(headRect.left + headRect.width * f, headRect.top + 3),
-				)
-				// 表头**上方**那条补边（容器内边距那一格）也该由表头自己占着
-				const aboveHit = hitAt(
-					headRect.left + headRect.width * 0.5,
-					headRect.top - 6,
-				)
-				const headOnTop = hits.every((h) => h.startsWith('TH'))
-				const gapCovered = aboveHit.startsWith('TH')
-
-				content.scrollTop = 0
+			`(() => {
+				const grid = document.querySelector('[data-testid="track-table"]')
+				const cards = [...document.querySelectorAll('.track-card')]
+				const first = cards[0]
+				const art = first?.querySelector('.list-row__art')
+				const artRect = art?.getBoundingClientRect()
+				const radius = art ? Number.parseFloat(getComputedStyle(art).borderRadius) : 0
 				return JSON.stringify({
-					bg: thStyle.backgroundColor,
-					containerBg: getComputedStyle(content).backgroundColor,
-					position: thStyle.position,
-					zIndex: thStyle.zIndex,
-					atRestTop,
-					alignMismatch,
-					maxEdgeDelta: Math.round(maxEdgeDelta),
-					afterScroll,
-					hits,
-					headOnTop,
-					aboveHit,
-					gapCovered,
+					isGrid: grid ? grid.tagName === 'DIV' && grid.classList.contains('media-grid') : false,
+					hasTable: Boolean(document.querySelector('table.track-table')),
+					count: cards.length,
+					tag: first?.tagName ?? null,
+					hasSub: Boolean(first?.querySelector('.media-card__sub')),
+					artSquare: artRect
+						? Math.abs(artRect.width - artRect.height) <= 2
+						: false,
+					artRadius: radius,
+					cardBg: first ? getComputedStyle(first).backgroundColor : null,
+					contentBg: getComputedStyle(document.getElementById('content')).backgroundColor,
 				})
 			})()`,
 		),
 	)
 	check(
-		'冻结表头底色与所在容器一致（不再是一条发白的横带）',
-		!stickyHead.missing && stickyHead.bg === stickyHead.containerBg,
-		`表头 ${stickyHead.bg} vs 容器 ${stickyHead.containerBg}`,
+		'歌单详情渲染的是曲目**卡网格**，页面上不再有曲目表',
+		trackGrid.isGrid && !trackGrid.hasTable && trackGrid.count > 1,
+		`grid=${trackGrid.isGrid} table=${trackGrid.hasTable} 卡片 ${trackGrid.count} 张`,
 	)
 	check(
-		'冻结表头贴住容器上沿、有 z-index（不会钻出去压住卡片圆角、也不会被行盖住）',
-		!stickyHead.missing &&
-			stickyHead.position === 'sticky' &&
-			stickyHead.atRestTop >= 0 &&
-			Number(stickyHead.zIndex) >= 1,
-		`静止时距容器顶 ${stickyHead.atRestTop}px，position=${stickyHead.position}，z-index=${stickyHead.zIndex}`,
+		'曲目卡是 <button>（键盘可达）且带歌手的副标题',
+		trackGrid.tag === 'BUTTON' && trackGrid.hasSub,
+		`<${trackGrid.tag}> sub=${trackGrid.hasSub}`,
 	)
 	check(
-		'表头与表体**逐列对齐**（对齐方式一致 + 左右边缘重合）',
-		!stickyHead.missing &&
-			stickyHead.alignMismatch.length === 0 &&
-			stickyHead.maxEdgeDelta <= 1,
-		stickyHead.alignMismatch.length > 0
-			? stickyHead.alignMismatch.join(' / ')
-			: `最大边缘偏差 ${stickyHead.maxEdgeDelta}px`,
+		'曲目卡封面是 1:1 的圆角正方形',
+		trackGrid.artSquare && trackGrid.artRadius >= 8,
+		`1:1=${trackGrid.artSquare} radius=${trackGrid.artRadius}`,
 	)
 	check(
-		'冻结表头所在的带子里，命中的是**表头自己**（没有行从它上面画出来）',
-		!stickyHead.missing && stickyHead.headOnTop && stickyHead.gapCovered,
-		`表头带内命中 ${JSON.stringify(stickyHead.hits)}；表头上方命中 ${stickyHead.aboveHit}`,
-	)
-	check(
-		'滚动之后表头确实粘住（内容在动、它不动，且停在容器内）',
-		!stickyHead.missing &&
-			stickyHead.afterScroll.scrollTop > 0 &&
-			stickyHead.afterScroll.stuck,
-		JSON.stringify(stickyHead.afterScroll),
+		'曲目卡底色与内容区底色可区分',
+		Boolean(trackGrid.cardBg) &&
+			trackGrid.cardBg !== 'rgba(0, 0, 0, 0)' &&
+			trackGrid.cardBg !== trackGrid.contentBg,
+		`卡片 ${trackGrid.cardBg} vs 内容区 ${trackGrid.contentBg}`,
 	)
 
 	// ---------------------------------------------------------------
@@ -1624,7 +1552,7 @@ async function run(window) {
 		await evaluate(
 			window,
 			`(() => JSON.stringify({
-				rows: document.querySelectorAll('.track-table tbody tr').length,
+				rows: document.querySelectorAll('.track-card').length,
 				barHidden: document.querySelector('[data-testid="selection-bar"]')?.hidden,
 				selectButton: Boolean(document.querySelector('[data-testid="btn-select-mode"]')),
 			}))()`,
@@ -1643,7 +1571,7 @@ async function run(window) {
 		await evaluate(
 			window,
 			`(async () => {
-				const rows = [...document.querySelectorAll('.track-table tbody tr')]
+				const rows = [...document.querySelectorAll('.track-card')]
 				const click = (row, init) =>
 					row.dispatchEvent(
 						new MouseEvent('click', { bubbles: true, cancelable: true, ...init }),
@@ -1652,17 +1580,14 @@ async function run(window) {
 				await new Promise((r) => setTimeout(r, 200))
 				const afterOne = {
 					barHidden: document.querySelector('[data-testid="selection-bar"]').hidden,
-					checked: document.querySelectorAll('tr.is-checked').length,
+					checked: document.querySelectorAll('.track-card.is-checked').length,
 					label: document.querySelector('[data-testid="selection-count"]').textContent,
-					checkBoxes: document.querySelectorAll('.track-table.is-select-mode .track-check')
-						.length,
-					// 复选框必须是**方的**（圆圈会被读成单选）
-					boxRadius: getComputedStyle(
-						document.querySelector('.track-check'),
-					).borderTopLeftRadius,
-					boxSize: (() => {
-						const box = document.querySelector('.track-check').getBoundingClientRect()
-						return [Math.round(box.width), Math.round(box.height)]
+					// 选中标记：曲目卡用主色勾选图标（表格那套方格复选框已随表格退场）
+					mark: (() => {
+						const card = document.querySelector('.track-card.is-checked')
+						if (!card) return null
+						const s = getComputedStyle(card, '::after')
+						return { content: s.content, color: s.color }
 					})(),
 					// 进多选后行拖拽必须关掉（拖动与点选互相打架）
 					draggable: rows[0].draggable,
@@ -1671,7 +1596,7 @@ async function run(window) {
 				click(rows[2], { shiftKey: true })
 				await new Promise((r) => setTimeout(r, 200))
 				const afterRange = {
-					checked: document.querySelectorAll('tr.is-checked').length,
+					checked: document.querySelectorAll('.track-card.is-checked').length,
 					label: document.querySelector('[data-testid="selection-count"]').textContent,
 				}
 				return JSON.stringify({ afterOne, afterRange })
@@ -1679,13 +1604,11 @@ async function run(window) {
 		),
 	)
 	check(
-		'Ctrl 点选进入多选：工具条出现、该行选中、复选框是方的',
+		'Ctrl 点选进入多选：工具条出现、该卡选中、有勾选标记',
 		multi.afterOne.barHidden === false &&
 			multi.afterOne.checked === 1 &&
 			/multi|已选择 1 首/.test(multi.afterOne.label) &&
-			multi.afterOne.checkBoxes > 0 &&
-			Number.parseFloat(multi.afterOne.boxRadius) <= 6 &&
-			Math.abs(multi.afterOne.boxSize[0] - multi.afterOne.boxSize[1]) <= 1,
+			multi.afterOne.mark?.content?.includes('check_circle'),
 		JSON.stringify(multi.afterOne),
 	)
 	check(
@@ -1704,16 +1627,16 @@ async function run(window) {
 		await evaluate(
 			window,
 			`(async () => {
-				const rows = document.querySelectorAll('.track-table tbody tr').length
+				const rows = document.querySelectorAll('.track-card').length
 				document.querySelector('[data-testid="selection-all"]').click()
 				await new Promise((r) => setTimeout(r, 200))
-				const all = document.querySelectorAll('tr.is-checked').length
+				const all = document.querySelectorAll('.track-card.is-checked').length
 				document.querySelector('[data-testid="selection-invert"]').click()
 				await new Promise((r) => setTimeout(r, 200))
-				const inverted = document.querySelectorAll('tr.is-checked').length
+				const inverted = document.querySelectorAll('.track-card.is-checked').length
 				document.querySelector('[data-testid="selection-all"]').click()
 				await new Promise((r) => setTimeout(r, 200))
-				const backToAll = document.querySelectorAll('tr.is-checked').length
+				const backToAll = document.querySelectorAll('.track-card.is-checked').length
 				return JSON.stringify({ rows, all, inverted, backToAll })
 			})()`,
 		),
@@ -1767,8 +1690,8 @@ async function run(window) {
 				return JSON.stringify({
 					inMode,
 					barHidden: document.querySelector('[data-testid="selection-bar"]').hidden,
-					checked: document.querySelectorAll('tr.is-checked').length,
-					rowsVisible: document.querySelectorAll('.track-table tbody tr').length,
+					checked: document.querySelectorAll('.track-card.is-checked').length,
+					rowsVisible: document.querySelectorAll('.track-card').length,
 				})
 			})()`,
 		),
@@ -3179,17 +3102,17 @@ async function run(window) {
 	// ---------------------------------------------------------------
 	// 8. 双击曲目播放
 	// ---------------------------------------------------------------
-	console.log('\n[ui] 8) 双击曲目行播放')
+	console.log('\n[ui] 8) 双击曲目卡播放')
 	const doubleClicked = await evaluate(
 		window,
 		`(() => {
-			const row = document.querySelector('.track-table tbody tr')
-			if (!row) return false
-			row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+			const card = document.querySelector('.track-card')
+			if (!card) return false
+			card.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
 			return true
 		})()`,
 	)
-	check('找到并双击首行', doubleClicked)
+	check('找到并双击首张曲目卡', doubleClicked)
 	if (doubleClicked) {
 		const played = await waitFor(
 			window,
@@ -3960,7 +3883,7 @@ async function run(window) {
 	const coverBackfilled = await waitFor(
 		window,
 		`(() => {
-			const imgs = [...document.querySelectorAll('[data-testid="track-table"] tbody tr .list-row__art img')]
+			const imgs = [...document.querySelectorAll('[data-testid="track-table"] .track-card .list-row__art img')]
 			return imgs.length === 2 ? { ok: true, src: imgs[0].getAttribute('src') } : false
 		})()`,
 		20_000,

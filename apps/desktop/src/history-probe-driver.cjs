@@ -182,8 +182,8 @@ async function run(window) {
 		await click(window, '[data-testid="btn-seed-demo"]')
 		const imported = await waitFor(
 			window,
-			`document.querySelectorAll('.track-table tbody tr').length > 0
-				? { ok: true, rows: document.querySelectorAll('.track-table tbody tr').length }
+			`document.querySelectorAll('.track-card').length > 0
+				? { ok: true, rows: document.querySelectorAll('.track-card').length }
 				: false`,
 			180_000,
 			'import',

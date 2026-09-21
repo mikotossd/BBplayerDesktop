@@ -33,6 +33,28 @@ require('./ports.cjs').configureElectronPaths()
 
 const { handleAudioRequest } = require('./audio-proxy.cjs')
 const mediaIntegration = require('./media-integration.cjs')
+const theme = require('./theme.cjs')
+
+/**
+ * 窗口底色：必须与**当前主题**一致，否则浅色主题的用户在启动时会先看到
+ * 一个深色矩形再变白（用户实测"启动先黑一下"）。
+ *
+ * ⚠️ 这里**只跟系统**（`nativeTheme.shouldUseDarkColors`），不读持久化偏好 ——
+ * 偏好要过 `createSettings()`（异步、依赖 app ready 之后才有的存储），
+ * 在 `new BrowserWindow` 这一刻拿不到。只有"用户在深色系统里显式选了浅色"
+ * 这一种组合会有一帧误差，之后 `setBackgroundColor` 会把窗口底色纠正过来
+ * （见 `ipc-handlers.cjs` 的 `broadcastTheme`），所以是可接受的折中。
+ */
+function windowBackgroundColor() {
+	try {
+		const dark = require('electron').nativeTheme.shouldUseDarkColors
+		const tokens = theme.loadTokens()
+		return tokens.colorSchemes[dark ? 'dark' : 'light'].background
+	} catch {
+		// 读不到就退回深色（与旧行为一致，不会更差）
+		return '#1C1B1F'
+	}
+}
 
 /** 自验证模式：跑完验证就退出，便于脚本化 */
 const PROBE_MODE = process.argv.includes('--probe')
@@ -315,10 +337,29 @@ function createWindow() {
 	 *     `paintWhenInitiallyHidden` 默认为 true，这里显式写出来表明依赖它。
 	 */
 	const silent = PROBE_ENABLED
+	/*
+	 * ⚠️ `minWidth` / `minHeight` 必须给。
+	 *
+	 * 三栏 shell 的左右两栏是**固定**宽度（左 240、右 320），中列是 `1fr`。
+	 * 没有下界时窗口可以被拖到 400px：中列算出来是 0px —— 搜索框、页面标题、
+	 * 内容卡全部消失，右栏右侧被裁且没有滚动条，而且**拖不回来**
+	 * （用户只能重启或手改配置文件）。
+	 *
+	 * 980 / 620 的取法：左栏 240 + 右栏 320 + 中列最小 ~400 + 边距。
+	 */
 	mainWindow = new BrowserWindow({
 		width: 1100,
 		height: 760,
-		backgroundColor: '#1C1B1F',
+		minWidth: 980,
+		minHeight: 620,
+		/*
+		 * ⚠️ 底色由**当前主题**决定，不能写死深色。
+		 *
+		 * 浅色主题的用户会在启动时先看到一个深色矩形再变白（用户实测
+		 * "启动先黑一下"）。`setBackgroundColor` 也没人调 —— 窗口底色
+		 * 永远不会跟着主题走。
+		 */
+		backgroundColor: windowBackgroundColor(),
 		show: !silent,
 		skipTaskbar: silent,
 		webPreferences: {

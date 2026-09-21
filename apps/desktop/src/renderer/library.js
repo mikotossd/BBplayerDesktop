@@ -409,13 +409,18 @@
 		ui.table.classList.toggle('is-select-mode', selectMode)
 		// 多选时关掉行拖拽：拖动与"点一下选中"会互相打架
 		// （安卓端在本地列表里也是把「⋮」换成拖拽把手，不会同时给两个手势）
-		for (const row of ui.table.querySelectorAll('tbody tr')) {
-			const key = row.dataset.trackKey
-			row.classList.toggle(
+		//
+		// ⚠️ 这里同时服务两种形态：曲目**表格**的行（`tbody tr`）与
+		// 曲目**卡片**网格的卡（`.track-card`）。两者都带 `data-track-key`，
+		// 所以按属性选，而不是按标签选 —— 按标签选会在换形态时静默失效
+		// （表现是"多选点了没反应"）。
+		for (const item of ui.table.querySelectorAll('[data-track-key]')) {
+			const key = item.dataset.trackKey
+			item.classList.toggle(
 				'is-checked',
 				selectMode && key != null && selectedKeys.has(key),
 			)
-			if (row.dataset.draggable === 'true') row.draggable = !selectMode
+			if (item.dataset.draggable === 'true') item.draggable = !selectMode
 		}
 		ui.bar.hidden = !selectMode
 		ui.actions.hidden = selectMode
@@ -461,7 +466,9 @@
 			const updated = result?.data?.updated ?? []
 			if (updated.length === 0) return
 			const byBvid = new Map(updated.map((item) => [item.bvid, item.cover]))
-			for (const row of table.querySelectorAll('tbody tr')) {
+			// 两种形态：曲目表的行（`tbody tr`）与曲目卡的网格（`.track-card`），
+			// 都带 `data-bvid`
+			for (const row of table.querySelectorAll('[data-bvid]')) {
 				const cover = window.bbComponents.coverSrc(byBvid.get(row.dataset.bvid))
 				if (!cover) continue
 				const art = row.querySelector('.list-row__art')
@@ -474,7 +481,10 @@
 				// 加载失败仍退回首字方块（而不是留一个破图图标）
 				img.addEventListener('error', () => {
 					const fallback = window.bbComponents.art({
-						title: row.querySelector('.col-title__text')?.textContent ?? '',
+						title:
+							row.querySelector('.col-title__text')?.textContent ??
+							row.querySelector('.media-card__title')?.textContent ??
+							'',
 					})
 					art.replaceChildren(...fallback.childNodes)
 				})
@@ -485,6 +495,400 @@
 		} finally {
 			coverBackfillRunning = false
 		}
+	}
+
+	/**
+	 * 曲目卡的拖拽重排。
+	 *
+	 * ⚠️ 与 `wireRowDrag`（表格行）**不能共用**：那边用 `clientY` 判断
+	 * "插到上/下半行"，而卡片网格是**横向流式**排列的 —— 用 Y 判断会出现
+	 * "把卡拖到右边，它却插到了下面一行"。
+	 */
+	function wireCardDrag(card, index, container, onDrop) {
+		card.draggable = true
+		card.dataset.draggable = 'true'
+		card.dataset.dragIndex = String(index)
+
+		card.addEventListener('dragstart', (event) => {
+			event.dataTransfer.effectAllowed = 'move'
+			event.dataTransfer.setData('text/plain', String(index))
+			card.classList.add('is-dragging')
+		})
+
+		card.addEventListener('dragend', () => {
+			card.classList.remove('is-dragging')
+			for (const other of container.querySelectorAll(
+				'.is-drop-before, .is-drop-after',
+			)) {
+				other.classList.remove('is-drop-before', 'is-drop-after')
+			}
+		})
+
+		card.addEventListener('dragover', (event) => {
+			event.preventDefault()
+			event.dataTransfer.dropEffect = 'move'
+			const rect = card.getBoundingClientRect()
+			const after = event.clientX > rect.left + rect.width / 2
+			card.classList.toggle('is-drop-before', !after)
+			card.classList.toggle('is-drop-after', after)
+		})
+
+		card.addEventListener('dragleave', () => {
+			card.classList.remove('is-drop-before', 'is-drop-after')
+		})
+
+		card.addEventListener('drop', (event) => {
+			event.preventDefault()
+			const from = Number(
+				event.dataTransfer.getData('text/plain') || card.dataset.dragIndex,
+			)
+			const rect = card.getBoundingClientRect()
+			const after = event.clientX > rect.left + rect.width / 2
+			let to = index + (after ? 1 : 0)
+			if (from < to) to -= 1
+			if (!Number.isInteger(from) || from < 0 || from === to) return
+			card.classList.remove('is-drop-before', 'is-drop-after')
+			onDrop(from, to)
+		})
+	}
+
+	/** 行内「⋯」菜单：与曲目表完全同一份构造逻辑 */
+	function buildTrackMenu(track, index, anchor, removal) {
+		const items = [
+			{
+				label: '下一首播放',
+				icon: 'queue_play_next',
+				testid: `menu-play-next-${index}`,
+				onSelect: () => {
+					const result = window.bbPlayer.playNextInsert(track)
+					setStatus(
+						result.ok ? `「${track.title}」将在下一首播放` : '没能加入队列',
+						result.ok ? 'ok' : 'bad',
+					)
+				},
+			},
+			{
+				label: '添加到歌单',
+				icon: 'playlist_add',
+				testid: `menu-add-to-playlist-${index}`,
+				onSelect: () => openAddToPlaylistDialog([track]),
+			},
+		]
+		if (removal.canRemove) {
+			items.push({
+				label: '从歌单移除',
+				icon: 'delete',
+				danger: true,
+				testid: `menu-remove-${index}`,
+				onSelect: () => void removeTrackFromPlaylist(track, anchor),
+			})
+		}
+		return items
+	}
+
+	/**
+	 * 整页曲目列表：**卡片网格**（音乐库 › 歌单详情 / 搜索结果 / 合集详情）。
+	 *
+	 * 与曲目表同源同语义，只是把"表格行"换成"曲目卡"：
+	 *   * 卡片本体是 `<button>` → 键盘可达、有 hover/active 反馈；
+	 *   * 双击播放、单击选中（多选态下点选）、拖拽重排、行内「⋯」全部保留；
+	 *   * testid 与曲目表**逐条对齐**（`track-table` / `track-row-N` /
+	 *     `track-check-N` / `track-more-N`），所以巡检与 ui 探针只需换选择器。
+	 */
+	function renderTrackCards(
+		tracks,
+		{ title, query, tableTestid = 'track-table' } = {},
+	) {
+		clear(els.content)
+		// 换了列表就把多选清掉 —— 否则在 A 歌单选中的曲子会"跟到" B 歌单
+		clearSelection()
+		selectionUi = null
+		window.bbUI?.showContent?.()
+
+		const removal = removalContext(tracks.length)
+
+		// ── 页头：与歌单卡片页同一套 `.view-head` ──────────────
+		const head = document.createElement('div')
+		head.className = 'view-head'
+		const lead = document.createElement('div')
+		lead.className = 'view-head__lead'
+
+		// 歌单详情是从「播放列表」卡片进来的，所以要有一条**明确的回路**。
+		// 安卓端这是路由自带的返回；桌面端没有导航栈，得自己给。
+		if (window.bbState.get().view === 'playlist') {
+			const back = document.createElement('button')
+			back.className = 'text-button view-head__back'
+			back.dataset.testid = 'playlist-back'
+			back.innerHTML = `${window.bbComponents.iconHtml('arrow_back', 'icon--sm')} 播放列表`
+			back.addEventListener('click', () => void showPlaylistsTab())
+			lead.appendChild(back)
+		}
+
+		const h2 = document.createElement('h2')
+		h2.textContent = title || '音乐库'
+		lead.appendChild(h2)
+		head.appendChild(lead)
+
+		const meta = document.createElement('span')
+		meta.className = 'muted'
+		meta.textContent = `${tracks.length} 首`
+		head.appendChild(meta)
+
+		if (window.bbState.get().view === 'playlist' && removal.playlistId) {
+			const playlistId = removal.playlistId
+			const more = document.createElement('button')
+			more.className = 'icon-only icon-button'
+			more.dataset.testid = 'playlist-more'
+			more.title = '更多'
+			more.setAttribute('aria-label', '更多操作')
+			more.innerHTML = window.bbComponents.iconHtml('more_vert', 'icon--md')
+			more.addEventListener('click', () => {
+				window.bbComponents.menu(more, [
+					{
+						label: '设置封面…',
+						icon: 'palette',
+						testid: 'playlist-set-cover',
+						onSelect: () => void pickPlaylistCover(playlistId),
+					},
+					{
+						label: '恢复默认封面',
+						icon: 'restart_alt',
+						testid: 'playlist-clear-cover',
+						onSelect: () => void clearPlaylistCover(playlistId),
+					},
+				])
+			})
+			head.appendChild(more)
+		}
+		els.content.appendChild(head)
+
+		if (removal.readOnly) {
+			const note = document.createElement('p')
+			note.className = 'muted share-hint'
+			note.dataset.testid = 'playlist-readonly-note'
+			note.textContent =
+				'这是订阅来的共享歌单（只读）：可以播放与同步，但不能增删曲目。'
+			els.content.appendChild(note)
+		}
+
+		if (tracks.length === 0) {
+			els.content.appendChild(
+				window.bbComponents.empty({
+					testid: 'content-empty',
+					iconName: query ? 'search_off' : 'library_music',
+					title: query ? `没有与「${query}」相关的结果` : '这里还没有内容',
+					hint: query
+						? '换个关键词，或者直接用 BV 号搜索。'
+						: '用上方搜索框找歌，或从左栏选一个歌单。',
+				}),
+			)
+			return
+		}
+
+		// ── 动作条（与曲目表同一套）────────────────────────────
+		const actions = document.createElement('div')
+		actions.className = 'row-actions'
+		const playAll = document.createElement('button')
+		playAll.dataset.testid = 'btn-play-all'
+		playAll.innerHTML = '<span class="icon icon--sm">play_arrow</span> 播放全部'
+		playAll.addEventListener('click', () => {
+			// ⚠️ 必须显式 playAt(0)：`setQueue` 只设置队列，不会载入曲目；
+			// 直接 play() 对空 src 的 <audio> 是静默 no-op（实测踩过）。
+			window.bbPlayer.setQueue(tracks, 0)
+			window.bbPlayer.playAt(0)
+			void window.bbPlayer.play()
+		})
+		actions.appendChild(playAll)
+
+		const queueAll = document.createElement('button')
+		queueAll.dataset.testid = 'btn-queue-all'
+		queueAll.textContent = '加入队列'
+		queueAll.addEventListener('click', () => {
+			const current = window.bbPlayer.getQueue()
+			const seen = new Set(current.map((track) => track.bvid))
+			const merged = current.concat(
+				tracks.filter((track) => !seen.has(track.bvid)),
+			)
+			window.bbPlayer.setQueue(merged, window.bbPlayer.getIndex())
+		})
+		actions.appendChild(queueAll)
+
+		const selectButton = document.createElement('button')
+		selectButton.dataset.testid = 'btn-select-mode'
+		selectButton.textContent = '多选'
+		selectButton.addEventListener('click', () => {
+			if (selectMode) exitSelectMode()
+			else enterSelectMode(null)
+		})
+		actions.appendChild(selectButton)
+		els.content.appendChild(actions)
+
+		// ── 多选工具条（结构与曲目表逐条一致）──────────────────
+		const bar = document.createElement('div')
+		bar.className = 'selection-bar'
+		bar.dataset.testid = 'selection-bar'
+		bar.hidden = true
+
+		const count = document.createElement('span')
+		count.className = 'selection-bar__count'
+		count.dataset.testid = 'selection-count'
+		count.textContent = '已选择 0 首'
+		bar.appendChild(count)
+
+		const batchButtons = []
+		const makeBatch = (testid, label, className, handler, options = {}) => {
+			const button = document.createElement('button')
+			button.dataset.testid = testid
+			if (className) button.className = className
+			button.textContent = label
+			button.disabled = options.needsSelection === true
+			button.addEventListener('click', () => handler(button))
+			bar.appendChild(button)
+			if (options.needsSelection) batchButtons.push(button)
+			return button
+		}
+
+		makeBatch('selection-all', '全选', null, () =>
+			enterSelectModeWith(new Set(tracks.map(trackKey).filter(Boolean))),
+		)
+		makeBatch('selection-invert', '反选', null, () => {
+			const inverted = new Set(
+				tracks.map(trackKey).filter((key) => key && !selectedKeys.has(key)),
+			)
+			enterSelectModeWith(inverted)
+		})
+		const addButton = makeBatch(
+			'selection-add',
+			'添加到歌单',
+			'btn--filled',
+			() => openAddToPlaylistDialog(selectedTracks()),
+			{ needsSelection: true },
+		)
+		const removeButton = makeBatch(
+			'selection-remove',
+			'从歌单移除',
+			'btn--tonal',
+			() => void removeSelectedTracks(removeButton),
+			{ needsSelection: true },
+		)
+		removeButton.hidden = !removal.canRemove
+
+		const spacer = document.createElement('span')
+		spacer.className = 'modal__actions-spacer'
+		bar.appendChild(spacer)
+		const clearButton = document.createElement('button')
+		clearButton.className = 'text-button'
+		clearButton.dataset.testid = 'selection-clear'
+		clearButton.textContent = '清除选择（Esc）'
+		clearButton.addEventListener('click', () => exitSelectMode())
+		bar.appendChild(clearButton)
+		els.content.appendChild(bar)
+
+		// ── 卡片网格 ──────────────────────────────────────────
+		const grid = document.createElement('div')
+		grid.className = 'media-grid track-grid'
+		grid.dataset.testid = tableTestid
+		els.content.appendChild(grid)
+
+		tracks.forEach((track, index) => {
+			const key = trackKey(track)
+			const moreButton = document.createElement('button')
+			moreButton.className = 'track-action'
+			moreButton.dataset.testid = `track-more-${index}`
+			moreButton.dataset.action = 'more'
+			moreButton.innerHTML = window.bbComponents.iconHtml(
+				'more_vert',
+				'icon--sm',
+			)
+			moreButton.title = '更多操作'
+			moreButton.setAttribute('aria-label', '更多操作')
+			moreButton.addEventListener('click', (event) => {
+				// 不要让单击冒泡到卡片的「选中」逻辑上
+				event.stopPropagation()
+				window.bbComponents.menu(
+					moreButton,
+					buildTrackMenu(track, index, moreButton, removal),
+				)
+			})
+
+			const card = window.bbComponents.trackCard({
+				title: track.title || '(无标题)',
+				/*
+				 * ⚠️ 字段名要**同时认两套**（与曲目表同源）：
+				 * 数据库来的曲目带 `artist` / `artist_name`，
+				 * B 站接口来的条目带 `upperName`。
+				 */
+				sub: [
+					track.artist ||
+						track.artist_name ||
+						track.upperName ||
+						track.author ||
+						'—',
+					window.bbPlayer.formatTime(track.duration),
+				].join(' · '),
+				index,
+				coverClass: 'media-card__art',
+				coverUrl: track.cover ?? track.coverUrl ?? track.cover_url ?? null,
+				testid: `track-row-${index}`,
+				playing: window.bbPlayer.getCurrent()?.bvid === track.bvid,
+				active: key != null && selectedKeys.has(key),
+				trailing: [moreButton],
+				onClick: (event) => {
+					if (event.target.closest?.('.track-action')) return
+					if (event.shiftKey && selectMode && lastClickedKey) {
+						selectRangeTo(key)
+						lastClickedKey = key
+						return
+					}
+					if (event.ctrlKey || event.metaKey) {
+						if (selectMode) toggleKey(key)
+						else enterSelectMode(key)
+						lastClickedKey = key
+						return
+					}
+					if (selectMode) {
+						toggleKey(key)
+						lastClickedKey = key
+						return
+					}
+					// 单击只选中（高亮），双击才播放 —— 桌面上避免误触
+					for (const other of grid.children) {
+						other.classList.remove('is-selected')
+					}
+					card.classList.add('is-selected')
+				},
+				onActivate: () => {
+					// 多选态下双击不播放（否则"点两下选中两首"会变成开始播放）
+					if (selectMode) return
+					window.bbPlayer.setQueue(tracks, index)
+					window.bbPlayer.playAt(index)
+					void window.bbPlayer.play()
+				},
+			})
+			if (key) card.dataset.trackKey = key
+			card.dataset.bvid = track.bvid
+			if (removal.canRemove) {
+				wireCardDrag(card, index, grid, (from, to) => {
+					const playlistId = window.bbState.get().selectedPlaylistId
+					if (!playlistId) return
+					void moveTrackInPlaylist(playlistId, from, to)
+				})
+			}
+			grid.appendChild(card)
+		})
+
+		selectionUi = {
+			table: grid,
+			bar,
+			actions,
+			count,
+			addButton,
+			batchButtons,
+			selectButton,
+		}
+		syncSelectionUi()
+
+		void backfillCovers(tracks, grid)
 	}
 
 	/**
@@ -516,6 +920,22 @@
 		tracks,
 		{ title, query, into = null, tableTestid = 'track-table' } = {},
 	) {
+		/*
+		 * ⚠️ **整页曲目列表 = 卡片网格**（用户明确要求）。
+		 *
+		 * 历史上这里有两种长相：音乐库 › 播放列表的页签是**歌单卡片网格**，
+		 * 点进去的"歌单详情"却是**曲目表** —— 用户看到的两个按钮通向
+		 * "两个完全不同的播放列表页面"。现在统一成同一张卡（`trackCard`），
+		 * 与正在播放里的歌曲列表、主页的近期歌单一套语言。
+		 *
+		 * 表格形态**保留给内嵌预览**（收藏夹展开那一块）：那里是卡片网格
+		 * 里的一个嵌层，宽度只有几百像素，卡片会退化成小方块。
+		 */
+		if (!into) {
+			renderTrackCards(tracks, { title, query, tableTestid })
+			return
+		}
+
 		const embedded = Boolean(into)
 		const container = into ?? els.content
 		if (!embedded) clear(els.content)
@@ -1182,7 +1602,13 @@
 				title.textContent = playlist.title ?? '(未命名)'
 				const sub = document.createElement('span')
 				sub.className = 'dialog-option__sub'
-				sub.textContent = `${playlist.itemCount ?? 0} 首`
+				/*
+				 * ⚠️ 字段名是 `item_count`（`db.listPlaylists` 直接 `SELECT p.*`，
+				 * 蛇形命名原样透出），不是 `itemCount` —— 原来写成驼峰，
+				 * 于是这个弹层里**每个歌单都显示「0 首」**（用户实测反馈）。
+				 * 同一个列表的其它三处（左栏行、卡片、主页）都用的是对的那个名字。
+				 */
+				sub.textContent = `${playlist.item_count ?? 0} 首`
 				main.append(title, sub)
 				button.append(mark, main)
 				button.addEventListener('click', () => {
@@ -1341,6 +1767,17 @@
 
 	let cachedPlaylists = []
 
+	/*
+	 * 渲染序号（竞态守卫）。
+	 *
+	 * ⚠️ 中栏是**一块共享画布**：任何一次异步加载（读歌单曲目、搜索、列歌单）
+	 * 回来的时机都不受控。没有守卫时用户能看到两类串页：
+	 *   1. 连搜三个词 → 结果被**旧**查询覆盖两次，最后停在最早那个词上；
+	 *   2. 快速双击「音乐库」→ 两次都先清空再追加，每张卡渲染两遍。
+	 * 每次"开始一次渲染"就自增，回来后比对；不一致就丢弃本次结果。
+	 */
+	let renderSeq = 0
+
 	async function refreshPlaylists() {
 		const data = unwrap(await window.bbplayer.listPlaylists(), '读取歌单')
 		cachedPlaylists = data
@@ -1350,12 +1787,15 @@
 	}
 
 	async function openPlaylist(playlistId) {
+		const seq = ++renderSeq
 		setStatus('读取歌单…', 'busy')
 		try {
 			const tracks = unwrap(
 				await window.bbplayer.getPlaylistTracks(playlistId),
 				'读取曲目',
 			)
+			// 期间用户又切走了 → 丢弃这次结果，别把旧列表画到新页面上
+			if (seq !== renderSeq) return
 			const playlist = cachedPlaylists.find((item) => item.id === playlistId)
 			window.bbState.set({
 				view: 'playlist',
@@ -1369,16 +1809,24 @@
 			})
 			setStatus(`已加载 ${tracks.length} 首`, 'ok')
 		} catch (error) {
+			if (seq !== renderSeq) return
 			setStatus(error.message, 'bad')
 		}
 	}
 
 	async function runSearch(query) {
 		const keyword = (query ?? '').trim()
-		if (!keyword) return
+		if (!keyword) {
+			// 别的页签空输入都有提示（导入 / 收藏夹 / 共享），搜索页不该静默
+			setStatus('请先输入关键词', 'idle')
+			return
+		}
+		const seq = ++renderSeq
 		setStatus(`搜索「${keyword}」…`, 'busy')
 		try {
 			const items = unwrap(await window.bbplayer.search(keyword), '搜索')
+			// 用户可能在等待期间又搜了别的词 —— 旧结果不能覆盖新结果
+			if (seq !== renderSeq) return
 			const tracks = items.map((item) => ({
 				bvid: item.bvid,
 				title: item.title,
@@ -1395,6 +1843,7 @@
 			renderTrackTable(tracks, { title: `搜索：${keyword}`, query: keyword })
 			setStatus(`找到 ${tracks.length} 个结果`, 'ok')
 		} catch (error) {
+			if (seq !== renderSeq) return
 			setStatus(error.message, 'bad')
 		}
 	}
@@ -1622,6 +2071,12 @@
 	 *     的实现，所以只放 3 项 —— 不做一个点了没用的菜单项。
 	 */
 	async function showPlaylistsTab() {
+		/*
+		 * ⚠️ 竞态守卫：`clear()` 之后要 `await` 一次 IPC，期间用户完全可能
+		 * 再点一次「音乐库」（或点别的页签）。两次调用都"先清空、再追加"，
+		 * 于是**每张卡渲染两遍**（实测：2 个歌单画出 4 张卡）。
+		 */
+		const seq = ++renderSeq
 		clear(els.content)
 		window.bbUI?.showContent?.()
 
@@ -1629,6 +2084,7 @@
 		try {
 			playlists = await refreshPlaylists()
 		} catch (error) {
+			if (seq !== renderSeq) return
 			setStatus(error.message, 'bad')
 			els.content.appendChild(
 				window.bbComponents.empty({
@@ -1639,6 +2095,7 @@
 			)
 			return
 		}
+		if (seq !== renderSeq) return
 
 		// 空库：欢迎视图（带「导入示例合集」）比一张空网格有用得多
 		if (playlists.length === 0) {

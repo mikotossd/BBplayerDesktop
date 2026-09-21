@@ -127,6 +127,7 @@
 							type="text"
 							placeholder="搜索视频 / 粘贴 BV 号或链接…"
 							spellcheck="false"
+							aria-label="搜索视频或粘贴 BV 号"
 						/>
 						<button id="search-button" data-testid="search-button">搜索</button>
 					</div>
@@ -957,6 +958,16 @@
 							打开所在文件夹
 						</button>
 					</div>
+					<!--
+						⚠️ 这一格必须有：通用页的所有动作（打开目录…）以前没有
+						自己的状态行，出错时只能往「备份」页的状态行里写 ——
+						用户在当前页面**什么都看不到**。
+					-->
+					<p
+						class="settings-status"
+						id="settings-general-status"
+						data-testid="settings-general-status"
+					></p>
 
 					<h3>快捷键</h3>
 					<div class="settings-row">
@@ -1326,6 +1337,7 @@
 						data-testid="btn-play"
 						class="playbar__play icon-only"
 						title="播放/暂停"
+						aria-label="播放/暂停"
 					>
 						<span class="icon icon--md">play_arrow</span>
 					</button>
@@ -1358,6 +1370,7 @@
 						min="0"
 						max="1000"
 						value="0"
+						aria-label="播放进度"
 					/>
 					<span class="mono" id="time-total" data-testid="time-total">0:00</span>
 				</div>
@@ -1377,6 +1390,7 @@
 						max="100"
 						value="100"
 						title="音量"
+						aria-label="音量"
 					/>
 				</div>
 			</footer>
@@ -1393,8 +1407,20 @@
 			也是探针读进度/结果的地方。只是外观与生命周期换了。
 			文本在淡出后**仍然留在 DOM 里**，所以探针不会被"已经消失"骗到。
 		-->
+		<!--
+			⚠️ 这个胶囊是全应用**唯一**的操作反馈出口，而它原来没有任何
+			`aria-live` —— 所有"导入完成 / 播放失败 / 搜索到 N 条"对读屏软件
+			都是**静默**的。`role="status"` + `aria-live="polite"` 让它在内容
+			变化时被念出来（错误用 assertive 会打断用户，故仍用 polite）。
+		-->
 		<div class="status-host" data-testid="status-host">
-			<span id="status" data-testid="status" class="status status--idle"></span>
+			<span
+				id="status"
+				data-testid="status"
+				class="status status--idle"
+				role="status"
+				aria-live="polite"
+			></span>
 		</div>
 		<!-- 构建号挪到设置 › 关于 里（诊断信息的去处），不再占界面 -->
 		<span class="visually-hidden" id="build-info" data-testid="build-info"></span>
@@ -1417,6 +1443,7 @@
 						id="login-close"
 						data-testid="login-close"
 						title="关闭"
+						aria-label="关闭登录面板"
 					>
 						<span class="icon icon--sm">close</span>
 					</button>

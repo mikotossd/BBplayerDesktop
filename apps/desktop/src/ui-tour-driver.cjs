@@ -634,7 +634,7 @@ async function run(window) {
 			// 进多选并选中前 3 首（与用户在界面上 Ctrl 点选的效果一致 ——
 			// 用真实事件而不是直接改类名，否则截图里的状态可能是"画出来的"）
 			document.querySelector('[data-testid="btn-select-mode"]')?.click()
-			const rows = [...document.querySelectorAll('.track-table tbody tr')].slice(0, 3)
+			const rows = [...document.querySelectorAll('.track-card')].slice(0, 3)
 			for (const row of rows) {
 				row.dispatchEvent(
 					new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }),
@@ -644,7 +644,7 @@ async function run(window) {
 		})()`,
 	)
 	await sleep(800)
-	await shot(window, '30-multi-select', '多选（工具条 + 行首复选框）')
+	await shot(window, '30-multi-select', '多选（工具条 + 卡片勾选标记）')
 	await click(window, '[data-testid="selection-clear"]')
 	await sleep(500)
 

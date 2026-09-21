@@ -541,6 +541,30 @@
 			return { summary, rows }
 		} catch (error) {
 			if (stale()) return null
+			/*
+			 * ⚠️ 失败时**必须画出错误态**。
+			 *
+			 * `refresh()` 开头就 `content.textContent = ''`，而这里原来只写一行
+			 * 状态胶囊 —— 胶囊 9 秒后淡出，主页就剩一张**空白卡片**，
+			 * 用户既看不到原因也没有重试入口。
+			 */
+			content.appendChild(
+				window.bbComponents.empty({
+					testid: 'home-error',
+					iconName: 'error',
+					title: '读取播放历史失败',
+					hint: error.message,
+					actions: [
+						(() => {
+							const retry = document.createElement('button')
+							retry.textContent = '重试'
+							retry.dataset.testid = 'home-retry'
+							retry.addEventListener('click', () => void refresh())
+							return retry
+						})(),
+					],
+				}),
+			)
 			setStatus(error.message, 'bad')
 			return null
 		}

@@ -15,13 +15,43 @@
  * ⚠️ 不要在这里加新的语义色。加令牌 → 改 `packages/design-tokens`。
  */
 :root {
-	color-scheme: dark;
+	/*
+	 * ⚠️ 这里**不能**钉死 `color-scheme: dark`。
+	 *
+	 * 它决定原生控件/滚动条/表单的默认配色：钉成 dark 之后，浅色主题的用户
+	 * 在 `theme.js` 落到之前的那一帧会看到深色的滚动条与输入框
+	 * （而且首帧的语义色也被下面这套暗色兜底值染成暗色）。用 `light dark`
+	 * 让浏览器跟随系统，主进程的变量一到再由 `theme.js` 精确覆盖。
+	 */
+	color-scheme: light dark;
 
-	/* 兜底：暗色 MD3 基线（与 colorSchemes.dark 一致） */
+	/*
+	 * 兜底：暗色 MD3 基线。
+	 *
+	 * ⚠️ 别名要与 `theme.cjs` 的映射**逐条对齐**，否则首帧会比真值更暗：
+	 * `--surface` → surfaceContainer(#211F26)、`--surface-2` →
+	 * surfaceContainerHigh(#2B2930)、`--surface-3` → surfaceContainerHighest(#36343B)。
+	 * 原来这三个写成了 #1c1b1f / #211f26 / #2b2930，整体错了一档。
+	 */
 	--bg: #1c1b1f;
-	--surface: #1c1b1f;
-	--surface-2: #211f26;
-	--surface-3: #2b2930;
+	--surface: #211f26;
+	--surface-2: #2b2930;
+	--surface-3: #36343b;
+	--surface-container: #211f26;
+	--surface-container-high: #2b2930;
+	--surface-container-highest: #36343b;
+	--secondary-container: #4a4458;
+	--on-secondary-container: #e8def8;
+	--error: #f2b8b5;
+	--inverse-surface: #e6e1e5;
+	--inverse-on-surface: #313033;
+	--scrim: #000000;
+	/*
+	 * 材质模糊：`[data-material]` 是 `theme.js` 写的，首帧还没到 ——
+	 * 少了它 `backdrop-filter: var(--material-blur)` 整条失效，
+	 * 顶栏/播放条的毛玻璃会"先没有、再突然出现"。
+	 */
+	--material-blur: blur(18px);
 	--primary: #d0bcff;
 	--on-primary: #381e72;
 	--on-surface: #e6e1e5;
@@ -1650,18 +1680,31 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
 	box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
+/*
+ * ⚠️ 焦点环**不能一删了事**。
+ *
+ * 原来这里是 `outline: none`，而唯一的焦点提示是与 `:hover` **完全相同**的
+ * 那圈光晕 —— 键盘用户看到的效果与"鼠标刚好停在这"一模一样，分不清
+ * "我 Tab 到哪了"。改成给滑块本身一圈更实的描边。
+ */
 input[type='range']:focus-visible {
-	outline: none;
+	outline: 2px solid var(--primary);
+	outline-offset: 4px;
+	border-radius: var(--r-full);
 }
 
 /* ── 滚动条 ────────────────────────────────────────────── */
 /*
  * 又一个「默认 HTML」痕迹：Chromium 的浅灰滚动条在深色面板上非常跳。
  * 做成"平时几乎看不见、悬停才显形"的细滚动条。
+ *
+ * ⚠️ 滑块颜色用 `--outline`（不是 `--surface-3`）：后者与面板底色只差
+ * 1.1–1.3:1，实测**浅色主题下等于没有滚动条**（用户看不到还有内容可滚）。
+ * 描边色在浅/深两套里都明显高于底色。
  */
 * {
 	scrollbar-width: thin;
-	scrollbar-color: var(--surface-3) transparent;
+	scrollbar-color: var(--outline) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -1674,14 +1717,14 @@ input[type='range']:focus-visible {
 }
 
 ::-webkit-scrollbar-thumb {
-	background: var(--surface-3);
+	background: var(--outline);
 	border: 3px solid transparent;
 	background-clip: content-box;
 	border-radius: var(--r-full);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: var(--outline-variant);
+	background: var(--on-surface-variant);
 	background-clip: content-box;
 }
 
@@ -1976,8 +2019,13 @@ input[type='range']:focus-visible {
 }
 
 /* ── 登录卡片 ─────────────────────────────────────────── */
+/*
+ * ⚠️ 写死 460px 在窄窗口下会被裁掉两侧：✕ 与「扫码登录」直接跑到屏幕外，
+ * 用户既关不掉也切不了页签（只能靠 Esc，而 Esc 那时还没接）。这里给它
+ * 一个下界：窗口再窄也留出 16px 边距。
+ */
 .login-card {
-	width: 460px;
+	width: min(460px, calc(100vw - 32px));
 }
 
 /*
@@ -2150,6 +2198,16 @@ input[type='range']:focus-visible {
 	line-height: 1;
 	padding: 3px 5px;
 	border-radius: var(--r-sm);
+}
+
+/*
+ * ⚠️ `.icon-button` 一直没有 `:focus-visible` ——
+ * 顶栏与页头那一排图标按钮（账号 / 队列开关 / 快捷键 / 返回 / 共享 / 刷新）
+ * Tab 过去**完全没有可见焦点**，键盘用户不知道回车会按到哪一个。
+ */
+.icon-button:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
 }
 
 .icon-button:hover {
@@ -2506,6 +2564,23 @@ input[type='range']:focus-visible {
 
 .share-status--bad {
 	color: var(--bad);
+}
+
+/*
+ * ⚠️ 危险动作（取消共享 / 退出共享 / 退出登录…）必须**看起来**危险。
+ *
+ * `share.js` 一直在给这些按钮加 `.is-danger`，但整个工程**没有这条规则** ——
+ * 于是「取消共享」和旁边的「同步 / 分享链接」像素级一样，手一滑就把云端的
+ * 歌单删了（用户实测反馈里点名过"危险操作与高频操作长得一样")。
+ */
+.is-danger {
+	color: var(--error, var(--bad));
+	border-color: color-mix(in srgb, var(--error, var(--bad)) 45%, transparent);
+}
+
+.is-danger:hover {
+	background: color-mix(in srgb, var(--error, var(--bad)) 12%, transparent);
+	border-color: color-mix(in srgb, var(--error, var(--bad)) 70%, transparent);
 }
 
 .share-section {

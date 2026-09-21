@@ -391,13 +391,29 @@
 		if (tab === 'qr') void startQr()
 	}
 
+	/*
+	 * ⚠️ 弹窗必须**管焦点**。
+	 *
+	 * 它声明了 `aria-modal="true"`（见 index.html），但原来打开时只是
+	 * 去掉 `hidden` —— 焦点仍停在背后被遮住的页面上，Tab 会一路走到
+	 * 看不见的控件；关闭后焦点也不会回到触发它的那个按钮（掉到 `<body>`）。
+	 * 读屏/键盘用户于是"打开登录后不知道自己在哪"。
+	 */
+	let focusBeforeOpen = null
+
 	function open(tab = 'qr') {
 		if (!els.modal) return
+		focusBeforeOpen =
+			document.activeElement instanceof HTMLElement
+				? document.activeElement
+				: null
 		els.modal.hidden = false
 		els.modal.classList.add('is-open')
 		// 每次打开都重新拉一次登录态：用户可能在别处改了
 		void refresh()
 		switchTab(tab)
+		// 焦点进弹窗：优先落在关闭按钮上（用户随时能退出）
+		;(els.close ?? els.modal).focus?.()
 	}
 
 	function close() {
@@ -408,6 +424,9 @@
 		stopQrPolling()
 		qrGeneration += 1
 		qrKey = null
+		// 焦点还给打开它的那个按钮（否则键盘用户"丢失位置"）
+		if (focusBeforeOpen?.isConnected) focusBeforeOpen.focus()
+		focusBeforeOpen = null
 	}
 
 	// ---------------------------------------------------------------

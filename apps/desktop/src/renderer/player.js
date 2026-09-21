@@ -262,13 +262,41 @@
 	// ---------------------------------------------------------------
 
 	async function play() {
+		/*
+		 * ⚠️ 队列为空时必须**直接拒绝**，不要让 `<audio>` 去 play() 一个空 src。
+		 *
+		 * 空库时点两次播放条上的 ▶：第一次是静默 no-op（但 `audio.paused`
+		 * 已经翻成 false），第二次 Chromium 抛
+		 * `The play() request was interrupted by a call to pause()` —— 那条
+		 * **英文原文 + goo.gl 短链**会被原样打进红色胶囊给用户看（用户实测截图）。
+		 */
+		if (state.queue.length === 0) {
+			setStatus('先从音乐库选一首歌吧', 'idle')
+			return false
+		}
 		try {
 			await els.audio.play()
 			return true
 		} catch (error) {
-			setStatus(`播放失败：${error.message}`, 'bad')
+			setStatus(`播放失败：${describeError() ?? error.message}`, 'bad')
+			// 播放失败时按钮必须回到「播放」，否则图标停在暂停上，
+			// 用户以为正在放（点一下反而是"暂停"）
+			syncPlayButtons()
 			return false
 		}
+	}
+
+	/**
+	 * 把播放/暂停图标同步到**实际**的 `audio.paused`。
+	 *
+	 * 之前图标只在 `playing` / `pause` 两个事件里更新：`error` 分支与
+	 * `play()` 的拒绝路径都不动它 —— 于是加载失败的曲目会让按钮**永久停在
+	 * 暂停图标**上。
+	 */
+	function syncPlayButtons() {
+		const name = els.audio.paused ? 'play_arrow' : 'pause'
+		if (els.play) els.play.innerHTML = icon(name)
+		if (els.npPlay) els.npPlay.innerHTML = icon(name)
 	}
 
 	function pause() {
@@ -1027,7 +1055,11 @@
 				// （不是失败，是挂住，更难查）。
 				// `data-playlist-id` 是行本身带的数据，与外观无关，改样式不会碰它。
 				playlistItems: document.querySelectorAll('[data-playlist-id]').length,
-				trackRows: document.querySelectorAll('.track-table tbody tr').length,
+				// ⚠️ 曲目列表的两种形态：整页卡片（`.track-card`）与内嵌表行。
+				// 只认表格会让探针在"卡片刻"永远读到 0，表现为**整套挂到超时**。
+				trackRows: document.querySelectorAll(
+					'[data-testid^="track-row-"], .track-table tbody tr',
+				).length,
 				queueItems: document.querySelectorAll('[data-queue-index]').length,
 				activePanel: document.querySelector('.panel.is-active')?.dataset.panel,
 				activeView: document

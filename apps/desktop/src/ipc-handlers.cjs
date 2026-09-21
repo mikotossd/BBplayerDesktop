@@ -1368,9 +1368,18 @@ function broadcastTheme() {
 	void describeCurrentTheme()
 		.then((theme) => {
 			for (const window of BrowserWindow.getAllWindows()) {
-				if (!window.isDestroyed()) {
-					window.webContents.send('theme:changed', theme)
+				if (window.isDestroyed()) continue
+				/*
+				 * ⚠️ 窗口**自身的底色**也要跟着改。
+				 *
+				 * 它决定的是"页面还没画出第一帧时那片颜色"：写死深色的话，
+				 * 浅色主题的用户在启动、以及每次窗口从后台恢复时都会看到
+				 * 一下深色底（用户实测"启动先黑一下"）。
+				 */
+				if (typeof window.setBackgroundColor === 'function') {
+					window.setBackgroundColor(theme.colors.background)
 				}
+				window.webContents.send('theme:changed', theme)
 			}
 		})
 		.catch((error) => logger.warn(`[theme] 推送失败: ${error.message}`))

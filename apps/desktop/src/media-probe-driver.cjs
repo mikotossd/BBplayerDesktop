@@ -181,7 +181,7 @@ async function run(window) {
 		await click(window, '[data-testid="btn-seed-demo"]')
 		await waitFor(
 			window,
-			`document.querySelectorAll('.track-table tbody tr').length > 0`,
+			`document.querySelectorAll('.track-card').length > 0`,
 			120_000,
 			'tracks',
 		)

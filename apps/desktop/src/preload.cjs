@@ -127,6 +127,15 @@ contextBridge.exposeInMainWorld('bbplayer', {
 			ipcRenderer.invoke('backup:restoreLocal', filePath),
 		listRemote: () => ipcRenderer.invoke('backup:listRemote'),
 		upload: () => ipcRenderer.invoke('backup:upload'),
+		/*
+		 * ⚠️ 主进程早就注册了 `backup:openFolder`（见 ipc-handlers.cjs），
+		 * 但这里一直**没有暴露** —— 于是「打开所在文件夹」两个按钮：
+		 *   1. 备份页那个调 `bbplayer.backup.openFolder()` → 必然抛"不是函数"；
+		 *   2. 通用页那个调 `bbplayer.backupOpenFolder()` → 那个名字根本不存在，
+		 *      带 `?.` 所以**静默无效**（点了完全没反应）。
+		 * 用户实测反馈的就是这两个按钮。
+		 */
+		openFolder: () => ipcRenderer.invoke('backup:openFolder'),
 		downloadRemote: (remotePath) =>
 			ipcRenderer.invoke('backup:downloadRemote', remotePath),
 	},

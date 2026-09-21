@@ -67,6 +67,13 @@
 	const state = {
 		/** `share.status()` 的返回；未读取时为 null */
 		account: null,
+		/**
+		 * 读取失败的原因。
+		 *
+		 * ⚠️ 必须有这个字段：只靠 `account === null` 分不清"还没读到"和
+		 * "读失败了"，界面会永久停在「正在读取本地共享状态…」。
+		 */
+		accountError: null,
 		/** 订阅区的输入 */
 		url: '',
 		inviteCode: '',
@@ -389,7 +396,18 @@
 	/** 账号摘要（`share-account-status`）：探针与用户都靠它一眼看登录态 */
 	function describeAccountSummary() {
 		const account = state.account
-		if (!account) return '正在读取本地共享状态…'
+		/*
+		 * ⚠️ "读失败"与"还没读到"必须分开。
+		 *
+		 * `state.account === null` 既表示"还没读完"，也表示"读失败了" ——
+		 * 于是失败之后界面**永久停在「正在读取本地共享状态…」**上，
+		 * 用户以为它还在转（用户实测反馈）。失败时给一句真话。
+		 */
+		if (!account) {
+			return state.accountError
+				? `读取本地共享状态失败：${String(state.accountError)}`
+				: '正在读取本地共享状态…'
+		}
 		if (!account.loggedIn)
 			return '未登录（可以预览与订阅，登录后才能分享自己的歌单）'
 		// 昵称与用户名都给出来：探针按用户名等待登录态，而用户更认得昵称
@@ -1371,6 +1389,8 @@
 			const data = unwrap(await window.bbplayer.share.status(), '读取共享状态')
 			if (seq !== refreshSeq) return null
 			state.account = data
+			// 读成功就清掉上一次的失败原因（否则摘要会一直挂着旧错误）
+			state.accountError = null
 			render()
 			/*
 			 * ⚠️ 未登录时**不写状态行**。
@@ -1391,6 +1411,7 @@
 		} catch (error) {
 			if (seq !== refreshSeq) return null
 			state.account = null
+			state.accountError = error.message
 			render()
 			report(error.message, 'bad')
 			return null
