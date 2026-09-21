@@ -125,6 +125,20 @@ function ensureDatabase() {
 	return result
 }
 
+/**
+ * 从"搜索框里粘进来的东西"里认出一个 BV 号。
+ *
+ * ⚠️ 占位文案承诺了「粘贴 BV 号或链接」，但 `bili:search` 原来只当关键词
+ * 透传 —— 粘 BV 号会得到一屏模糊匹配的无关结果。裸 BV 号与 URL 都认
+ * （BV 号固定 12 位：`BV` + 10 位）。
+ */
+function extractBvid(input) {
+	const text = String(input ?? '').trim()
+	if (!text) return null
+	const match = text.match(/BV[0-9A-Za-z]{10}/)
+	return match ? match[0] : null
+}
+
 function registerIpcHandlers() {
 	// ---------- 音频 ----------
 	ipcMain.handle('audio:resolve', async (_event, bvid) => {
@@ -213,6 +227,23 @@ function registerIpcHandlers() {
 	// ---------- B 站 ----------
 	ipcMain.handle('bili:search', async (_event, keyword) => {
 		try {
+			// 能认出 BV 号就**直接按那个视频**返回一条结果（见 extractBvid）
+			const bvid = extractBvid(keyword)
+			if (bvid) {
+				const info = await bilibiliApi.getVideoInfo(bvid)
+				return {
+					ok: true,
+					data: [
+						{
+							bvid: info.bvid,
+							title: info.title,
+							author: info.owner ?? null,
+							duration: info.duration,
+							cover: info.cover,
+						},
+					],
+				}
+			}
 			const items = await bilibiliApi.searchVideos(keyword)
 			return { ok: true, data: items }
 		} catch (error) {

@@ -149,7 +149,7 @@
 					testid: 'favorites-empty',
 					iconName: 'star',
 					title: '没有读到收藏夹',
-					hint: '确认这个用户有收藏夹的话，可能是**私密收藏夹** —— 需要先登录 B 站账号。',
+					hint: '确认这个用户有收藏夹的话，可能是私密收藏夹 —— 需要先登录 B 站账号。',
 				}),
 			)
 			return

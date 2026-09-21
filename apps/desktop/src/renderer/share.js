@@ -198,6 +198,14 @@
 		const button = el('button', danger ? 'is-danger' : null, testid)
 		button.id = testid
 		button.textContent = text
+		/*
+		 * ⚠️ 危险动作在**悬停时**也要保持红色。
+		 *
+		 * `.is-danger` 只设了 `color`，而通用按钮的 `button:hover` 会改
+		 * 背景与文字色 —— 通用规则的选择器特异性不低于 `.is-danger`，
+		 * 悬停那一刻红字就被吃掉，"取消共享"又变得和普通按钮一样。
+		 */
+		if (danger) button.dataset.danger = 'true'
 		// 行内动作另外用 `data-action` 标记：探针（和未来的快捷键）靠它定位，
 		// 比 testid 更稳定（testid 里带歌单 id，值每次都可能不同）
 		if (action) button.dataset.action = action

@@ -383,10 +383,20 @@
 
 	function switchTab(tab) {
 		for (const button of els.tabs) {
-			button.classList.toggle('is-active', button.dataset.loginTab === tab)
+			const active = button.dataset.loginTab === tab
+			button.classList.toggle('is-active', active)
+			/*
+			 * ⚠️ 页签也要有**语义**：只有 `is-active` 类的话，读屏软件
+			 * 念不出"当前选中哪一个"（用户只能看到视觉高亮）。
+			 */
+			button.setAttribute('aria-selected', String(active))
+			button.setAttribute('role', 'tab')
 		}
+		const tablist = document.querySelector('[data-testid="login-tabs"]')
+		tablist?.setAttribute('role', 'tablist')
 		for (const panel of els.panels) {
 			panel.classList.toggle('is-active', panel.dataset.loginPanel === tab)
+			panel.setAttribute('role', 'tabpanel')
 		}
 		if (tab === 'qr') void startQr()
 	}
@@ -409,6 +419,15 @@
 				: null
 		els.modal.hidden = false
 		els.modal.classList.add('is-open')
+		/*
+		 * ⚠️ 弹窗打开时把**背后的外壳**设为不可交互。
+		 *
+		 * 它声明了 `aria-modal="true"`，但 Tab 仍然会走进被遮住的页面
+		 * （键盘用户能操作看不见的按钮）。`inert` 是浏览器原生的做法，
+		 * 比手写焦点陷阱可靠；`.modal` 与 `.app` 是兄弟节点，所以是安全的。
+		 */
+		const shell = document.querySelector('.app')
+		if (shell && typeof shell.inert === 'boolean') shell.inert = true
 		// 每次打开都重新拉一次登录态：用户可能在别处改了
 		void refresh()
 		switchTab(tab)
@@ -420,6 +439,8 @@
 		if (!els.modal) return
 		els.modal.hidden = true
 		els.modal.classList.remove('is-open')
+		const shell = document.querySelector('.app')
+		if (shell && typeof shell.inert === 'boolean') shell.inert = false
 		// 关掉就停止轮询，避免后台一直请求
 		stopQrPolling()
 		qrGeneration += 1

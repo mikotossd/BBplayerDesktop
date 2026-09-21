@@ -859,6 +859,25 @@
 	font-weight: 600;
 }
 
+/*
+ * ⚠️ 账号名的容器必须有 `min-width: 0` + 截断。
+ *
+ * `index.html` 里这个 div 是 `.account-summary`（flex 行）的子项，但**没有任何
+ * CSS 定义** —— flex 项的默认 `min-width: auto` 会拒绝收缩，于是一个长昵称
+ * 会把头像和右边的「登录 / 退出」按钮一路挤出面板（B 站昵称可以很长）。
+ */
+.account-summary__main {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.account-summary__main .account-summary__name,
+.account-summary__main .account-summary__sub {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .account-summary__sub {
 	font-size: var(--fs-body-medium);
 	margin-top: 2px;
@@ -1679,7 +1698,7 @@
 
 .empty__hint {
 	font-size: var(--fs-body-medium);
-	line-height: 1.6;
+	line-height: var(--lh-body-large);
 	max-width: 44ch;
 }
 

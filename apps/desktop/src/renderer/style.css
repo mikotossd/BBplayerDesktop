@@ -681,7 +681,7 @@ body {
 	background: var(--surface-container-high);
 	color: var(--on-surface);
 	font-size: var(--fs-body-small);
-	line-height: 1.6;
+	line-height: var(--lh-body-medium);
 	box-shadow: 0 6px 20px rgb(0 0 0 / 22%);
 }
 
@@ -1118,6 +1118,12 @@ body {
 .track-table .col-title__text {
 	flex: 1;
 	min-width: 0;
+	/*
+	 * ⚠️ `display: block` 是必须的：历史表把标题直接套在 `td` 里（没有
+	 * `.col-title__wrap` 那层 flex），内联元素上的 `text-overflow` 不生效 ——
+	 * 长标题会**换行成 2–3 行**，行高与音乐库那张表对不上。
+	 */
+	display: block;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1519,7 +1525,7 @@ select {
 textarea {
 	min-height: 72px;
 	resize: vertical;
-	line-height: 1.5;
+	line-height: var(--lh-body-large);
 }
 
 input::placeholder,
@@ -2103,7 +2109,7 @@ input[type='range']:focus-visible {
 
 .login-hint {
 	font-size: var(--fs-body-small);
-	line-height: 1.6;
+	line-height: var(--lh-body-medium);
 	margin: 0;
 }
 
@@ -2240,7 +2246,7 @@ input[type='range']:focus-visible {
 
 .settings-hint {
 	font-size: var(--fs-body-small);
-	line-height: 1.6;
+	line-height: var(--lh-body-medium);
 	margin: 0;
 }
 
@@ -2381,7 +2387,7 @@ input[type='range']:focus-visible {
 .settings-status {
 	margin: 0;
 	font-size: var(--fs-body-small);
-	line-height: 1.5;
+	line-height: var(--lh-body-large);
 	color: var(--on-surface-variant);
 	overflow-wrap: anywhere;
 }
@@ -2571,15 +2577,27 @@ input[type='range']:focus-visible {
  *
  * `share.js` 一直在给这些按钮加 `.is-danger`，但整个工程**没有这条规则** ——
  * 于是「取消共享」和旁边的「同步 / 分享链接」像素级一样，手一滑就把云端的
- * 歌单删了（用户实测反馈里点名过"危险操作与高频操作长得一样")。
+ * 歌单删了（用户实测反馈里点名过"危险操作与高频操作长得一样"）。
+ *
+ * 选择器写全三档（裸类 / `.row-actions` / `.share-view`）是必须的：行内动作
+ * 的悬停底色来自 `.row-actions button:hover`，那条的选择器比特异性更高 ——
+ * 只写 `.is-danger` 的话鼠标一碰上去红色就没了。
  */
-.is-danger {
+.is-danger,
+.row-actions button.is-danger,
+.share-view button.is-danger {
 	color: var(--error, var(--bad));
 	border-color: color-mix(in srgb, var(--error, var(--bad)) 45%, transparent);
 }
 
-.is-danger:hover {
-	background: color-mix(in srgb, var(--error, var(--bad)) 12%, transparent);
+.is-danger:hover,
+.is-danger:focus-visible,
+.row-actions button.is-danger:hover,
+.row-actions button.is-danger:focus-visible,
+.share-view button.is-danger:hover,
+.share-view button.is-danger:focus-visible {
+	background: color-mix(in srgb, var(--error, var(--bad)) 14%, transparent);
+	color: var(--error, var(--bad));
 	border-color: color-mix(in srgb, var(--error, var(--bad)) 70%, transparent);
 }
 

@@ -933,6 +933,12 @@
 
 				const restore = document.createElement('button')
 				restore.dataset.testid = `restore-${item.name}`
+				/*
+				 * ⚠️ 恢复是**破坏性**动作（当前数据会被整体替换）。
+				 * 不给危险样式的话，它和旁边的「下载」长得一样 —— 一次误点
+				 * 就要用 `.before-restore` 去救。
+				 */
+				restore.className = 'is-danger'
 				restore.textContent = '恢复'
 				restore.addEventListener('click', () => void restoreRemote(item))
 				row.appendChild(restore)

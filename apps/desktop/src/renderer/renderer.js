@@ -149,8 +149,12 @@
 		if (!LIBRARY_TABS[tab]) return
 		currentLibraryTab = tab
 		for (const button of document.querySelectorAll('[data-lib-tab]')) {
-			button.classList.toggle('is-active', button.dataset.libTab === tab)
+			const active = button.dataset.libTab === tab
+			button.classList.toggle('is-active', active)
+			// 只有视觉类名的话，读屏软件念不出"当前是哪个页签"
+			button.setAttribute('aria-selected', String(active))
 		}
+		document.getElementById('library-tabs')?.setAttribute('role', 'tablist')
 		window.bbState.set({ libraryTab: tab })
 		if (focusNav) {
 			setActiveNav('library')

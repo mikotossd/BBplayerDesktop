@@ -277,8 +277,18 @@
 			// 远端曲目
 			const titleCell = document.createElement('td')
 			titleCell.className = 'col-title'
-			titleCell.textContent = `${row.title}${row.artist ? ` — ${row.artist}` : ''}`
-			titleCell.title = titleCell.textContent
+			/*
+			 * ⚠️ 标题要套 `.col-title__text`。
+			 *
+			 * `td.col-title` 是 `max-width: 0`（表格里做省略号的常规写法），
+			 * 省略号规则挂在**内层 span** 上。直接写进 `td` 的话，窄窗口下这一列
+			 * 会被压成一个字一行（实测：默认窗口下"远端曲目"列变成竖排单字）。
+			 */
+			const titleText = document.createElement('span')
+			titleText.className = 'col-title__text'
+			titleText.textContent = `${row.title}${row.artist ? ` — ${row.artist}` : ''}`
+			titleCell.title = titleText.textContent
+			titleCell.appendChild(titleText)
 			tr.appendChild(titleCell)
 
 			// 匹配结果

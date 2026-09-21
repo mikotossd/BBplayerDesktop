@@ -223,8 +223,23 @@
 			for (const [text, cls] of cells) {
 				const td = document.createElement('td')
 				td.className = cls
-				td.textContent = text
 				td.title = text
+				/*
+				 * ⚠️ 标题列要套一层 `.col-title__text`。
+				 *
+				 * 省略号规则（`white-space: nowrap` + `text-overflow: ellipsis`）
+				 * 挂在内层 span 上，而 `td.col-title` 自己是 `max-width: 0` ——
+				 * 直接把长标题写进 `td` 会让它**换行成 2–3 行**，行高与音乐库
+				 * 那张表对不上（同一个 `.track-table` 类，两种长相）。
+				 */
+				if (cls === 'col-title') {
+					const span = document.createElement('span')
+					span.className = 'col-title__text'
+					span.textContent = text
+					td.appendChild(span)
+				} else {
+					td.textContent = text
+				}
 				tr.appendChild(td)
 			}
 

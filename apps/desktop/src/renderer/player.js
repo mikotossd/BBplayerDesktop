@@ -134,9 +134,23 @@
 			3: 'MEDIA_ERR_DECODE',
 			4: 'MEDIA_ERR_SRC_NOT_SUPPORTED',
 		}
+		/*
+		 * ⚠️ 给用户看的是一句**中文**，不是 `MEDIA_ERR_SRC_NOT_SUPPORTED`。
+		 *
+		 * 原来直接把枚举名拼进状态胶囊，用户看到的是"播放失败：
+		 * MEDIA_ERR_SRC_NOT_SUPPORTED"。技术细节留给 title/诊断，
+		 * 界面上只留人能读的那半句。
+		 */
+		const human = {
+			1: '播放被中断',
+			2: '网络错误，拉流失败',
+			3: '音频解码失败',
+			4: '这个音源无法播放（可能已下架或需要登录）',
+		}
 		return {
 			code: error.code,
 			name: names[error.code] || `UNKNOWN(${error.code})`,
+			human: human[error.code] || '未知的播放错误',
 			message: error.message || null,
 		}
 	}
@@ -277,8 +291,10 @@
 		try {
 			await els.audio.play()
 			return true
-		} catch (error) {
-			setStatus(`播放失败：${describeError() ?? error.message}`, 'bad')
+		} catch {
+			// 失败原因统一走 describeError()（`<audio>.error` 里有 code），
+			// **不**直接展示 Chromium 的英文原文（用户实测看到过 goo.gl 短链）
+			setStatus(`播放失败：${describeError()?.human ?? '音源无法播放'}`, 'bad')
 			// 播放失败时按钮必须回到「播放」，否则图标停在暂停上，
 			// 用户以为正在放（点一下反而是"暂停"）
 			syncPlayButtons()
@@ -758,7 +774,7 @@
 			counters[name] += 1
 			if (name === 'error') {
 				const error = describeError()
-				setStatus(`播放失败：${error ? error.name : '未知'}`, 'bad')
+				setStatus(`播放失败：${error ? error.human : '未知'}`, 'bad')
 			} else if (name === 'playing') {
 				setStatus('正在播放', 'ok')
 				if (els.play) els.play.innerHTML = icon('pause')
