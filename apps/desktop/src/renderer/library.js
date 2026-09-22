@@ -1072,7 +1072,9 @@
 		// "曲目列表在不在"，不该因为长相变了就找不到。
 		const list = document.createElement('div')
 		if (layout === 'cards') {
-			list.className = 'media-grid track-grid'
+			// ⚠️ 只用 `.media-grid`：`.track-grid` 是历史遗留类名，
+			// 样式表里从来没有对应的规则（卡片化阶段 8 清掉）。
+			list.className = 'media-grid'
 		} else {
 			list.className = 'song-list'
 		}

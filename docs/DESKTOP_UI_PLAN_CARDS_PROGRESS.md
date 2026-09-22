@@ -608,31 +608,73 @@ audio.dispatchEvent(new Event('timeupdate'))
 
 ---
 
-### 下一件：阶段 8 · 清理与收尾
+### P13 · 阶段 8：清理与收尾（已完成）
 
-**基线**：`verify:desktop:ui` = **217 项全通过**。
+**做了什么**
 
-**具体改动**
+| 文件                            | 改动                                                                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `style.css`                     | 删掉整段 `.favorite-list*`（11 条规则：收藏夹已经是卡片）；补 `--icon-xl` 令牌                                            |
+| `library.js`                    | 去掉历史遗留类名 `.track-grid`（样式表里从来没有它的规则）                                                                |
+| `favorites.js`                  | `getFolders()` 的选择器从 `.favorite-list__item` 改成 `[data-media-id]`（**它当时恒返回空数组**，而调用方看起来一切正常） |
+| `build-icon-font.mjs`           | 尺寸档位改成读令牌（`var(--icon-*, 兜底)`）—— 图标尺寸**只有一处真相**                                                    |
+| `components.css`                | 补一条**全局** `prefers-reduced-motion` 兜底                                                                              |
+| `ui-probe-driver.cjs`           | 新增一条断言钉住"档位类的 font-size 必须等于同名令牌"                                                                     |
+| `docs/DESKTOP_UI_PLAN_CARDS.md` | 新增 §9 实施记录（与草图的偏差 / 三个看不见的坑 / 布局结论 / 本轮没做的）                                                 |
 
-1. **删死 CSS**：
-   - `.track-grid`（整页曲目列表已经是行，不再是卡片网格）；
-   - `.favorite-list*` 那一套（收藏夹改成卡片了）；
-   - `.track-table` 那套仍要**保留**（内嵌预览 + 历史表还在用）
-     —— 只清真正没人引用的选择器。做法：对每个候选选择器在
-     `renderer/` 与 `probe-driver` 里搜一遍再用。
-2. **图标尺寸的两套真相收敛**：`.icon--sm/--md/--xl` 与
-   `.icon-only` 里的写死尺寸目前并存；统一到令牌上。
-3. `prefers-reduced-motion` 补齐：这一轮加过的动画（marquee、
-   `.queue-popover`、`#view-nowplaying`）都有分支了，
-   再扫一遍剩下的一处。
-4. **文档**：更新 `docs/DESKTOP_UI_PLAN_CARDS.md` 的"实施记录"一节，
-   把 P0–P12 的结论与仍存在的取舍写进去（这是给下一个窗口的交接件）。
+#### 图标尺寸的两套真相
+
+原来 `material-symbols.css`（生成物）写死 `16/20/24/40`，而 `style.css`
+的令牌是 `14/16/20` —— 同一个 `icon--md` 与 `--icon-md` **差 4px**，
+改令牌时图标纹丝不动。现在字体那一层读令牌，并有一条断言钉住。
+
+顺带发现 `.icon--xl` 在令牌里**根本不存在**（只有字体那层写死的 40px），
+补了 `--icon-xl`。
+
+#### `prefers-reduced-motion` 的全局兜底
+
+每一处动画各自写了分支，但那是"靠人记得"—— 这个仓库已经出现过三次新加
+动画忘了写。补一条全局兜底：动画与过渡时长压到 `1ms`（**不是 0**：
+`0s` 在 Chromium 上不派发 `transitionend`，靠它收尾的地方会卡住），
+并把 `scroll-behavior` 关掉。
+
+#### 一个"静默失效"的私有 API
+
+`bbFavorites.getFolders()` 还在查 `.favorite-list__item` —— 卡片化之后那个
+类名不存在了，它**恒返回空数组**，而调用方看不出区别（"没有收藏夹"与
+"选择器过时"长得一样）。已改成 `[data-media-id]`。
+
+#### 图标字体重新生成
+
+`icon--*` 的改动在生成物里，所以必须重新跑构建。这次又碰上一次
+`fetch failed`（沙箱里 node 的 fetch 连不上 `fonts.gstatic.com`），
+用 `BB_ICON_FONT_HTTP_DIR` + `cache-http-response.mjs` 预置缓存后构建成功。
+顺手记一个坑：`--dry-run` 的 URL 是按**整份 CSS 模板**算哈希的，
+所以"剥掉注释再 dry-run"会拿到**另一个** URL（缓存喂不上）。
+
+**验证**（全套）
+
+| 套件                             | 结果                  |
+| -------------------------------- | --------------------- |
+| `verify:desktop:ui`              | **218 / 0**           |
+| `verify:desktop`                 | 18 / 0                |
+| `verify:desktop:settings`        | 88 / 0                |
+| `verify:desktop:history`         | 31 / 0                |
+| `verify:desktop:import`          | 25 / 0                |
+| `verify:desktop:login`           | 42 / 0                |
+| `verify:desktop:media`           | 27 / 0                |
+| `verify:desktop:icons`           | 25 / 0                |
+| `verify:desktop:lyrics-win`      | 38 / 0                |
+| `verify:desktop:tour`（浅 + 深） | 各 37 张截图 / 0 问题 |
+
+⚠️ `verify:desktop:shared` 需要**本机后端**（`127.0.0.1:8787`），本环境不可达 ——
+它刻意不回退到上游生产后端，所以这一条**没法在这里验**（不是回归）。
 
 ### 之后
 
-无（阶段 8 是最后一件）。
+无（阶段 8 是最后一件）。整个卡片化改造到此完成。
 
-### 已完成（本文件 P0–P12）
+### 已完成（本文件 P0–P13）
 
 原型（`prototype/`）· 播放模式四档 · 图标构建脚本两个 bug ·
 阶段 0（播放条进中栏）· 阶段 1（左栏两张卡）· 自绘标题栏 + 默认中性浅色 ·
@@ -640,7 +682,12 @@ audio.dispatchEvent(new Event('timeupdate'))
 阶段 4（播放详情两栏 + 封面主色背景 + **修掉歌词的两个既有 bug**）·
 阶段 5（**搜索框进内容卡** + 播放列表浮层）·
 阶段 6（**歌单详情页头 + 紧凑歌曲行**）·
-阶段 7（**收藏夹卡片化** + 中栏从网格改成 flex）。
+阶段 7（**收藏夹卡片化** + 中栏从网格改成 flex）·
+阶段 8（死 CSS / 图标尺寸收敛 / reduced-motion 兜底 / 文档）。
+
+**整个改造到此完成**。下一步要接手的，先读
+`docs/DESKTOP_UI_PLAN_CARDS.md` §9（实施记录：与草图的偏差、三个看不见的
+坑、以及本轮**没做**的候选）。
 
 ### 每一步都要守的纪律
 

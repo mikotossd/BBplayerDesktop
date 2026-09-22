@@ -2174,3 +2174,26 @@ input[type='checkbox'].switch:disabled {
 		animation: none;
 	}
 }
+
+/*
+ * ⚠️ 全局兜底（卡片化阶段 8）。
+ *
+ * 上面每一处动画都各自写了 `prefers-reduced-motion` 分支，但那是**靠人记得**
+ * —— 这个仓库里已经出现过三次"新加动画忘了写分支"。这里补一条全局兜底：
+ * 关掉所有动画与过渡，并压到 1ms（而不是 0：有些地方靠 `transitionend`
+ * 收尾，时长为 0 时那个事件在部分浏览器里不触发）。
+ *
+ * 为什么不是把时长设成 0：`0s` 在 Chromium 上**不会**派发 `transitionend`，
+ * 于是"等过渡结束再切状态"的地方会卡住。1ms 既看不见，又保证事件照常发。
+ */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 1ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 1ms !important;
+		/* 平滑滚动也算"动效" */
+		scroll-behavior: auto !important;
+	}
+}

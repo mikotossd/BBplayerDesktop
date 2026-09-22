@@ -89,6 +89,12 @@
 	--icon-sm: 14px;
 	--icon-md: 16px;
 	--icon-lg: 20px;
+	/*
+	 * ⚠️ 补上这一档（卡片化阶段 8）：`.icon--xl` 本来只有字体那一层写死的
+	 * 40px，而"图标多大"这件事现在只认令牌 —— 没有令牌就等于没有真相。
+	 * 目前只有原型与独立歌词窗口用得到它。
+	 */
+	--icon-xl: 40px;
 
 	/*
 	 * 字阶兜底（与 design-tokens.typography 逐条一致）。
@@ -2559,78 +2565,19 @@ input[type='range']:focus-visible {
 	cursor: default;
 }
 
-/* ── 收藏夹列表 ───────────────────────────────────────── */
-.favorite-list {
-	list-style: none;
-	margin: 0;
-	padding: 0;
-	display: flex;
-	flex-direction: column;
-	gap: var(--sp-xs);
-}
-
-.favorite-list__item {
-	background: var(--surface);
-	border: 1px solid var(--outline-variant);
-	border-radius: var(--r-md);
-	padding: var(--sp-sm);
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto;
-	gap: var(--sp-xs) var(--sp-sm);
-	align-items: center;
-}
-
-.favorite-list__main {
-	min-width: 0;
-}
-
-.favorite-list__title {
-	font-weight: 600;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.favorite-list__sub {
-	font-size: var(--fs-body-medium);
-}
-
-.favorite-list__actions {
-	display: flex;
-	gap: var(--sp-xs);
-}
-
-.favorite-list__actions button {
-	background: var(--surface-2);
-	color: var(--on-surface);
-	border: 1px solid var(--outline-variant);
-	border-radius: var(--r-sm);
-	padding: 4px var(--sp-sm);
-	cursor: pointer;
-	font: inherit;
-	white-space: nowrap;
-}
-
-.favorite-list__actions button:hover {
-	background: var(--surface-3);
-}
-
-.favorite-list__actions button:disabled {
-	opacity: 0.5;
-	cursor: default;
-}
-
-/* 预览块横跨两列 */
-.favorite-list__preview {
-	grid-column: 1 / -1;
-	max-height: 260px;
-	overflow-y: auto;
-	border-top: 1px solid var(--outline-variant);
-	padding-top: var(--sp-xs);
-	/* 它自己是滚动容器，上内边距是 `--sp-xs` —— 冻结表头补边要按这个高度
-	   （写死 --sp-md 会多盖 12px，把上面的内容切掉一条） */
-	--sticky-head-gap: var(--sp-xs);
-}
+/*
+ * ── 收藏夹列表 ─────────────────────────────────────────
+ *
+ * ⚠️ 卡片化阶段 8：这一整套（`.favorite-list` / `__item` / `__main` /
+ * `__title` / `__sub` / `__actions` / `__preview`）**删掉了**。
+ *
+ * 收藏夹现在是**卡片网格**（`favorites.js` 用组件层的 `.media-card`，
+ * 与「音乐库 › 播放列表」同一张），预览也不再内嵌进卡里。
+ * 留着这些规则会让人以为收藏夹还是"一行一个 + 卡内展开"。
+ *
+ * ⚠️ `data-testid="favorite-list"` **保留**（探针按它找收藏夹容器），
+ * 只是元素上的类名换成了 `.media-grid`。
+ */
 
 /* ── 侧栏徽标可点 ─────────────────────────────────────── */
 .sidebar__badge {

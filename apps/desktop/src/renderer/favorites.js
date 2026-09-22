@@ -506,11 +506,12 @@
 		isBarWanted: () => barWanted,
 		/** 供自动化断言 */
 		getFolders: () =>
-			Array.from(document.querySelectorAll('.favorite-list__item')).map(
-				(item) => ({
-					mediaId: Number(item.dataset.mediaId),
-					title: item.querySelector('.favorite-list__title')?.textContent,
-				}),
-			),
+			// ⚠️ 卡片化阶段 7：收藏夹已经是**卡片**（`[data-media-id]`），
+			// 不再是 `.favorite-list__item` —— 这里不改的话它恒返回空数组，
+			// 而调用方看起来一切正常（"没有收藏夹"与"选择器过时"长得一样）。
+			Array.from(document.querySelectorAll('[data-media-id]')).map((item) => ({
+				mediaId: Number(item.dataset.mediaId),
+				title: item.querySelector('.media-card__title')?.textContent,
+			})),
 	}
 })()

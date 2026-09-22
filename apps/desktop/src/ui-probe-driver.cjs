@@ -923,6 +923,57 @@ async function run(window) {
 			? `漏标：${centered.missingClass.join('、')}`
 			: '无遗漏',
 	)
+
+	/*
+	 * ── 图标尺寸只有一处真相（卡片化阶段 8 收敛）──────────────
+	 *
+	 * 原来有两套"图标多大"：`material-symbols.css`（生成物）里写死的
+	 * `icon--sm/md/lg = 16/20/24`，与 `style.css` 的令牌
+	 * `--icon-sm/md/lg = 14/16/20`。同一个 `icon--md` 与 `--icon-md`
+	 * 差 4px，改令牌时图标纹丝不动。
+	 *
+	 * 现在字体那一层读令牌（`var(--icon-*, 兜底)`），所以判据是：
+	 * **带档位类的图标，它的 `font-size` 必须正好等于对应令牌的值**。
+	 * 谁再把数字写死回去，这条就会红。
+	 */
+	const iconScale = JSON.parse(
+		await evaluate(
+			window,
+			`(() => {
+				const root = getComputedStyle(document.documentElement)
+				// 临时造三个图标，量完即摘 —— 不为断言改界面
+				const box = document.createElement('div')
+				box.style.cssText = 'position:absolute;visibility:hidden'
+				document.body.appendChild(box)
+				const rows = ['md', 'sm', 'lg'].map((size) => {
+					const icon = document.createElement('span')
+					icon.className = 'icon icon--' + size
+					icon.textContent = 'home'
+					box.appendChild(icon)
+					const token = Number.parseFloat(
+						root.getPropertyValue('--icon-' + size),
+					)
+					return {
+						size,
+						token,
+						actual: Number.parseFloat(getComputedStyle(icon).fontSize),
+					}
+				})
+				box.remove()
+				return JSON.stringify({ rows })
+			})()`,
+		),
+	)
+	const iconMismatch = (iconScale.rows ?? []).filter(
+		(r) => !Number.isFinite(r.token) || r.token !== r.actual,
+	)
+	check(
+		'图标尺寸只有一处真相：档位类的 font-size 等于同名令牌',
+		iconMismatch.length === 0,
+		iconMismatch.length === 0
+			? (iconScale.rows ?? []).map((r) => `${r.size}=${r.actual}px`).join(' / ')
+			: `对不上：${JSON.stringify(iconMismatch)}`,
+	)
 	// 反向：卡片里的入口是「图标 + 文字」，**不能**被当成图标按钮压缩
 	// （卡片化阶段 1：判据从 `.nav__item` 换成 `.sidebar__entry` ——
 	//  那个"文字被压成竖排"的缺陷与具体是哪种入口无关）

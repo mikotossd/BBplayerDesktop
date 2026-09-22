@@ -39,18 +39,36 @@
 	user-select: none;
 }
 
-/* 尺寸档位 */
+/*
+ * 尺寸档位（卡片化阶段 8 收敛）。
+ *
+ * ⚠️ 这里**不再写死像素**，而是读渲染层的令牌，并带上同样的兜底值。
+ *
+ * 原来有两套"图标多大"的真相，名字一样、数字不一样：
+ *   * 本文件（生成物）：sm/md/lg/xl = 16 / 20 / 24 / 40
+ *   * style.css 的令牌：--icon-sm/md/lg = 14 / 16 / 20
+ * 于是同一个 icon--md 与 --icon-md 差 4px，谁也不知道该信哪个；
+ * 改主题令牌时图标纹丝不动。
+ *
+ * 现在字体这一层读令牌（var(--icon-*, 兜底)），令牌是唯一真相；
+ * 令牌没定义时（比如把这份 CSS 单独拿去用）仍能正常显示。
+ */
 .icon--sm {
-	font-size: 16px;
+	font-size: var(--icon-sm, 14px);
 }
 .icon--md {
-	font-size: 20px;
+	font-size: var(--icon-md, 16px);
 }
 .icon--lg {
-	font-size: 24px;
+	font-size: var(--icon-lg, 20px);
 }
+/*
+ * ⚠️ xl 在渲染层**没有对应令牌**，用它之前先想清楚：这个尺寸目前只出现在
+ * 原型与独立歌词窗口里。要长期用就补一个令牌，不要在这里写死数字
+ * （那正是这一节要收敛掉的东西）。
+ */
 .icon--xl {
-	font-size: 40px;
+	font-size: var(--icon-xl, 40px);
 }
 
 /* 填充版（选中态、当前曲目） */
