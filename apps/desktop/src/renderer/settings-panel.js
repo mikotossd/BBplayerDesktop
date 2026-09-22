@@ -1280,6 +1280,22 @@
 	function open(category) {
 		if (!els.view) return
 		els.view.hidden = false
+		/*
+		 * ⚠️ 打开设置页要**通知外壳**（但**不能**调 `setActiveNav`）。
+		 *
+		 * `open()` 是设置页真正的入口（`#sidebar-settings`、`Ctrl+,`、
+		 * `bbSettings.open()` 都走它），但它只切了自己的 `hidden` ——
+		 * 外壳那边不知道"内容卡顶上该不该有搜索框"。
+		 *
+		 * 后果（卡片化阶段 5 实测）：设置页里搜索框**还露着**，
+		 * 因为那条规则挂在 `setActiveNav` 里，而它没被调到。
+		 *
+		 * 为什么不直接调 `setActiveNav('settings')`：那会走到
+		 * `showMainPane()`，而它又调回 `bbSettings.open()` ——
+		 * `open()` 里的 `showCategories()` 会把用户刚点开的子页
+		 * 打回分类列表。所以只同步"外壳外观"，不动导航状态。
+		 */
+		window.bbUI?.syncShellForView?.('settings')
 		if (category) switchCategory(category)
 		else showCategories()
 	}

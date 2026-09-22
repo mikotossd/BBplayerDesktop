@@ -234,10 +234,12 @@
 			>
 				<header class="topbar material">
 					<!--
-						⚠️ 卡片化阶段 1 之后左栏没有导航项了，"搜索"这个目的地
-						需要一个显式入口（阶段 2 会把搜索框整个搬进内容卡顶部）。
-						这个按钮保留了原来的 testid `nav-search`：
-						它是"去搜索"的语义，与左栏那四个入口同级。
+						⚠️ 「搜索」入口（卡片化阶段 5）。
+						左栏没有导航项之后，"去搜索这一页"需要一个显式入口；
+						它**不再**是搜索框的宿主 —— 搜索框已经搬进内容卡顶部
+						（用户确认的方案 A），这里只负责跳到那一页。
+						testid 保留 `nav-search`：它是"去搜索"的语义，
+						巡检脚本按它点，语义没变。
 					-->
 					<button
 						class="icon-button icon-only"
@@ -249,32 +251,16 @@
 					>
 						<span class="icon icon--md">search</span>
 					</button>
-					<div class="search-box">
-						<input
-							id="search-input"
-							data-testid="search-input"
-							type="text"
-							placeholder="搜索视频 / 粘贴 BV 号或链接…"
-							spellcheck="false"
-							aria-label="搜索视频或粘贴 BV 号"
-						/>
-						<button
-							id="search-button"
-							data-testid="search-button"
-						>
-							搜索
-						</button>
-					</div>
 					<!--
-						右栏（播放队列 / 歌词）的开关。右栏**默认收起** ——
+						右栏（播放队列）的开关。右栏**默认收起** ——
 						它原来常驻 320px，不管有没有内容都占着，观感偏"IDE 面板"。
 					-->
 					<button
 						class="icon-button icon-only"
 						id="rightbar-toggle"
 						data-testid="rightbar-toggle"
-						title="播放队列 / 歌词"
-						aria-label="播放队列 / 歌词"
+						title="播放队列"
+						aria-label="播放队列"
 						aria-expanded="false"
 					>
 						<span class="icon icon--md">queue_music</span>
@@ -303,9 +289,45 @@
 						hidden
 					>
 						快捷键：Space 播放/暂停 · ←/→ 快退/快进 · Ctrl+F 搜索 · Ctrl+Q
-						切换队列/歌词 · Ctrl+Alt+L 独立歌词窗口
+						播放列表 · Ctrl+Alt+L 独立歌词窗口
 					</div>
+					<!-- 顶栏右侧留白：把上面几个控件都顶到左边 -->
+					<div class="topbar__spacer"></div>
 				</header>
+
+				<!--
+					── 内容卡顶部的搜索框（卡片化阶段 5，用户确认的**方案 A**）──
+					⚠️ 它必须**常驻在内容卡顶部**：不管当前是哪一页，搜索入口都在
+					同一个位置，用户不用先想"我在哪一页、搜索在哪"。
+
+					⚠️ 但它**不能放进 `#content`** —— 那里面会被各视图
+					`textContent = ''` 整块清掉。所以它是 `#content` 的**兄弟**，
+					在网格里占一整行；`#search-row` 的 `hidden` 由
+					`renderer.js` 的 `setActiveNav` 按当前目的地切。
+				-->
+				<div
+					class="search-row"
+					id="search-row"
+					data-testid="search-row"
+					hidden
+				>
+					<div class="search-box">
+						<input
+							id="search-input"
+							data-testid="search-input"
+							type="text"
+							placeholder="搜索视频 / 粘贴 BV 号或链接…"
+							spellcheck="false"
+							aria-label="搜索视频或粘贴 BV 号"
+						/>
+						<button
+							id="search-button"
+							data-testid="search-button"
+						>
+							搜索
+						</button>
+					</div>
+				</div>
 
 				<!--
 					页面大标题区（阶段 2b）。
@@ -467,6 +489,50 @@
 				>
 					<!-- 由 renderer.js 按视图渲染 -->
 				</section>
+
+				<!--
+					── 播放列表浮层（卡片化阶段 5）────────────────────
+					⚠️ 队列 DOM **只有一份**（`#queue-list`）。它在三个槽位之间搬家：
+					      `#queue-slot`（右栏，主家）、`#queue-popover-slot`（这里）。
+					搬家由 `renderer.js` 的 `placeQueue(slotId)` 统一负责 ——
+					复制一份会让 `data-queue-index` 翻倍，探针计数与拖拽都会错。
+
+					⚠️ 它是 `.main` 网格里的一行，靠**网格行高 1fr → 0fr** 展开/收起
+					（见 style.css 的 `.queue-popover`），所以不需要 `position: fixed`
+					也不会盖住下方的播放卡。
+				-->
+				<div
+					class="queue-popover"
+					id="queue-popover"
+					data-testid="queue-popover"
+					hidden
+				>
+					<div class="queue-popover__inner">
+						<header class="queue-popover__head">
+							<h2 class="queue-popover__title">播放列表</h2>
+							<span
+								class="muted mono"
+								id="queue-popover-count"
+								data-testid="queue-popover-count"
+								>0</span
+							>
+							<button
+								class="icon-button icon-only"
+								id="queue-popover-close"
+								data-testid="queue-popover-close"
+								title="收起播放列表"
+								aria-label="收起播放列表"
+							>
+								<span class="icon icon--md">expand_more</span>
+							</button>
+						</header>
+						<div
+							class="queue-popover__body"
+							id="queue-popover-slot"
+							data-testid="queue-popover-slot"
+						></div>
+					</div>
+				</div>
 
 				<!--
 					── 主页下沿的两块（卡片化阶段 2）──────────────────────

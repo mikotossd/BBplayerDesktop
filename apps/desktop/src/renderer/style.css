@@ -1055,6 +1055,99 @@ body {
 	min-width: 0;
 }
 
+/*
+ * 内容卡顶部的搜索框（卡片化阶段 5，用户确认的**方案 A**）。
+ *
+ * ⚠️ 它是 `.main` 网格里的一行，而不是塞进 `#content` ——
+ * 后者会被各视图 `textContent = ''` 整块清掉。
+ *
+ * ⚠️ 左右 margin 与 `#content` / `.home-strip` / 播放卡取**同一个**
+ * `--sp-md`，否则一屏里并排的元素左边缘会差几像素（这个仓库量过好几次）。
+ */
+.search-row {
+	padding: var(--sp-sm) var(--sp-md) 0;
+	margin: 0;
+}
+.search-row[hidden] {
+	display: none;
+}
+
+/* 顶栏右侧留白：把控件都顶到左边 */
+.topbar__spacer {
+	flex: 1 1 auto;
+}
+
+/*
+ * 播放列表浮层（卡片化阶段 5）。
+ *
+ * ⚠️ 它是**浮层**，不占 `.main` 网格的行。
+ *
+ * 试过"占一行 + `grid-template-rows: 0fr → 1fr`"的展开方式：浮层一展开
+ * 就把播放详情页挤扁（大封面被裁、歌词卡只剩一条），而且窗口不高时
+ * 整个播放卡被挤出视口。浮层本来就该**浮在内容之上**，
+ * 所以这里用绝对定位，锚在 `.main` 的底部（紧贴播放卡上方）。
+ *
+ * ⚠️ `.main` 自己是 `position: relative`，所以这里的 `inset` 是相对它算的
+ * （`bottom` 要给播放卡让位 —— 播放卡高约 88px）。
+ */
+.queue-popover {
+	position: absolute;
+	right: var(--sp-md);
+	bottom: calc(var(--playbar-h, 88px) + var(--sp-sm));
+	width: min(420px, calc(100% - 2 * var(--sp-md)));
+	z-index: 30;
+	opacity: 0;
+	transform: translateY(8px);
+	pointer-events: none;
+	transition:
+		opacity var(--motion-duration-fast, 120ms) ease,
+		transform var(--motion-duration-fast, 120ms) ease;
+}
+.queue-popover[hidden] {
+	display: none;
+}
+.queue-popover.is-open {
+	opacity: 1;
+	transform: translateY(0);
+	pointer-events: auto;
+}
+.queue-popover__inner {
+	max-height: 46vh;
+	overflow: hidden;
+	background: var(--surface-container-high);
+	border: 1px solid var(--outline-variant);
+	border-radius: var(--r-lg);
+	box-shadow: 0 8px 28px rgb(0 0 0 / 22%);
+	display: flex;
+	flex-direction: column;
+}
+.queue-popover__head {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	padding: var(--sp-xs) var(--sp-sm) var(--sp-xs) var(--sp-md);
+	border-bottom: 1px solid var(--outline-variant);
+}
+.queue-popover__title {
+	margin: 0;
+	font-size: var(--fs-title-small);
+	font-weight: 600;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.queue-popover__body {
+	/* 队列自己会滚（内层已经有 max-height，这里只负责滚动） */
+	min-height: 0;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+}
+@media (prefers-reduced-motion: reduce) {
+	.queue-popover {
+		transition: none;
+	}
+}
+
 .topbar > .icon-button {
 	flex: none;
 }

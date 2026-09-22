@@ -3174,17 +3174,17 @@ async function run(window) {
 	 *   3. 阶段 D 起用「呼出 / 收起播放列表」（Ctrl+Q），量的是
 	 *      `#nowplaying-columns` 的 `is-queue-hidden`。卡片化**阶段 4** 把
 	 *      详情页的队列栏整个删了（草图「放弃原有的三联卡片式」），
-	 *      那个类不再存在 —— 所以换成量**右栏的收起态**
-	 *      （`is-rightbar-collapsed`）。同样是"不切视图、不动焦点、
-	 *      与播放状态无关"，而且它在整个改造期内不会消失。
+	 *      那个类不再存在；**阶段 5** 又把它改成**播放列表浮层** ——
+	 *      所以现在量的是浮层的展开态（`#queue-popover.is-open`）。
+	 *      同样是"不切视图、不动焦点、与播放状态无关"。
 	 */
 	const readQueuePanel = async () =>
 		await evaluate(
 			window,
 			`(() => {
-				const app = document.querySelector('.app')
-				if (!app) return null
-				return !app.classList.contains('is-rightbar-collapsed')
+				const popover = document.getElementById('queue-popover')
+				if (!popover) return null
+				return Boolean(popover.classList.contains('is-open'))
 			})()`,
 		)
 	const bridgeBefore = await readQueuePanel()
@@ -3199,7 +3199,7 @@ async function run(window) {
 		Boolean(menuPanelItem) &&
 			bridgeBefore !== null &&
 			bridgeBefore !== bridgeAfter,
-		`播放队列面板展开态：${bridgeBefore} → ${bridgeAfter}`,
+		`播放列表浮层展开态：${bridgeBefore} → ${bridgeAfter}`,
 	)
 	// 再点一次还原
 	menuPanelItem?.click?.()
@@ -3401,16 +3401,19 @@ async function run(window) {
 			await evaluate(
 				window,
 				`(() => {
-					const app = document.querySelector('.app')
+					const popover = document.getElementById('queue-popover')
+					const list = document.getElementById('queue-list')
 					return JSON.stringify({
 						// ⚠️ 面板是否在前台要看**中栏那个 section 的 hidden**，
 						// 不是 bbState.view（那是"列表视图"：playlist/search，
 						// 与"中栏是谁在前台"是两回事）—— 第一版就读错了字段。
 						viewHidden: document.getElementById('view-nowplaying')?.hidden ?? null,
-						// 队列栏的显隐 = 右栏有没有展开 + 右栏页签在不在队列
-						rightbarOpen: app
-							? !app.classList.contains('is-rightbar-collapsed')
+						// 阶段 5：播放列表是**浮层**，显隐看它的 is-open
+						popoverOpen: popover
+							? popover.classList.contains('is-open')
 							: null,
+						// 队列 DOM 搬到哪个槽位了（只应有三个值之一）
+						queueParent: list?.parentElement?.id ?? null,
 						rows: document.querySelectorAll('[data-queue-index]').length,
 					})
 				})()`,
@@ -3421,25 +3424,205 @@ async function run(window) {
 	await sleep(600)
 	const columnsAfter = await readColumns()
 	check(
-		'Ctrl+Q 呼出播放列表（并进入「正在播放」页）',
+		'Ctrl+Q 呼出播放列表浮层（并进入「正在播放」页）',
 		columnsAfter.viewHidden === false &&
-			columnsAfter.rightbarOpen === true &&
+			columnsAfter.popoverOpen === true &&
+			columnsAfter.queueParent === 'queue-popover-slot' &&
 			columnsAfter.rows > 0,
-		`面板隐藏=${columnsBefore.viewHidden} → ${columnsAfter.viewHidden}；右栏展开=${columnsBefore.rightbarOpen} → ${columnsAfter.rightbarOpen}；队列 ${columnsAfter.rows} 项`,
+		`面板隐藏=${columnsBefore.viewHidden} → ${columnsAfter.viewHidden}；` +
+			`浮层展开=${columnsBefore.popoverOpen} → ${columnsAfter.popoverOpen}；` +
+			`队列父节点=${columnsAfter.queueParent}；队列 ${columnsAfter.rows} 项`,
 	)
 	await shot(window, 'ui-05-nowplaying-queue')
+	/*
+	 * ⚠️ 截图必须**在浮层真的展开之后**再拍。
+	 *
+	 * 浮层是靠 CSS 过渡展开的（`grid-template-rows: 0fr → 1fr`），
+	 * 而 `pgrep` 之类的等待只保证"类加上了"。第一版截图是空的 ——
+	 * 队列内容在 DOM 里（`data-queue-index` 数得出来），
+	 * 但画布上那一格的高度还是 0。
+	 */
+	const popoverDrawn = await waitFor(
+		window,
+		`(() => {
+			const inner = document.querySelector('#queue-popover .queue-popover__inner')
+			if (!inner) return false
+			const rect = inner.getBoundingClientRect()
+			return rect.height > 80 ? { ok: true, height: Math.round(rect.height) } : false
+		})()`,
+		4000,
+		'queue-popover-drawn',
+	)
+	check(
+		'播放列表浮层**真的画出来了**（不只是类名加上了）',
+		popoverDrawn.ok,
+		popoverDrawn.ok
+			? `浮层内层高 ${popoverDrawn.value.height}px`
+			: `浮层高度一直是 0：${JSON.stringify(popoverDrawn.value)}`,
+	)
+	await shot(window, 'ui-05b-queue-popover')
 	await press(window, 'ctrl+q')
 	await sleep(600)
 	const columnsBack = await readColumns()
 	check(
-		'再按一次收起播放列表栏（队列 DOM 仍在，只是右栏收起来了）',
+		'再按一次收起浮层（队列 DOM 仍在，只是搬回右栏）',
 		columnsBack.viewHidden === false &&
-			columnsBack.rightbarOpen === false &&
+			columnsBack.popoverOpen === false &&
+			columnsBack.queueParent === 'queue-slot' &&
 			columnsBack.rows === columnsAfter.rows,
-		`右栏展开=${columnsBack.rightbarOpen} 队列 ${columnsBack.rows} 项`,
+		`浮层展开=${columnsBack.popoverOpen} 队列父节点=${columnsBack.queueParent} 队列 ${columnsBack.rows} 项`,
 	)
 	await press(window, 'ctrl+q')
 	await sleep(600)
+
+	/*
+	 * ------- 卡片化阶段 5：搜索框常驻内容卡 + 浮层的关闭路径 -------
+	 *
+	 * `#search-row` 是 `#content` 的**兄弟**（在内容卡顶部），
+	 * 所以它必须"换页也在"—— 这正是用户确认的方案 A。
+	 * 例外是设置页 / 共享页 / 播放详情页（各自都有更合适的顶栏）。
+	 *
+	 * ⚠️ 这里量的是**那条规则本身**（`syncShellForView`，`setActiveNav`
+	 * 也调它），而不是"先 setActiveNav 再读当前视图"：
+	 * 应用里有**异步的视图切换**（换曲后自动进播放详情页之类），
+	 * 同步读"现在在哪一屏"会在那些时序里读到别人写的值 ——
+	 * 那样写出来的断言会变成一条看运气的断言。
+	 */
+	const searchRowProbe = JSON.parse(
+		await evaluate(
+			window,
+			`(() => {
+				const row = document.getElementById('search-row')
+				const content = document.getElementById('content')
+				const probe = (view) => {
+					window.bbUI.syncShellForView(view)
+					return Boolean(row && row.hidden)
+				}
+				return JSON.stringify({
+					exists: Boolean(row),
+					// ⚠️ 必须在内容卡**外面**：里面会被各视图整块清掉
+					outsideContent: Boolean(row && content && !content.contains(row)),
+					hiddenOnHome: probe('home'),
+					hiddenOnLibrary: probe('library'),
+					hiddenOnSearch: probe('search'),
+					hiddenOnSettings: probe('settings'),
+					hiddenOnShare: probe('share'),
+					hiddenOnNowPlaying: probe('nowplaying'),
+				})
+			})()`,
+		),
+	)
+	check(
+		'搜索框常驻内容卡顶部（方案 A）：主页 / 音乐库 / 搜索都显示，且在 #content 外面',
+		searchRowProbe.exists &&
+			searchRowProbe.outsideContent &&
+			searchRowProbe.hiddenOnHome === false &&
+			searchRowProbe.hiddenOnLibrary === false &&
+			searchRowProbe.hiddenOnSearch === false,
+		JSON.stringify(searchRowProbe),
+	)
+	check(
+		'设置 / 共享 / 播放详情页里不显示搜索框（各自都有更合适的顶栏）',
+		searchRowProbe.hiddenOnSettings === true &&
+			searchRowProbe.hiddenOnShare === true &&
+			searchRowProbe.hiddenOnNowPlaying === true,
+		`设置=${searchRowProbe.hiddenOnSettings} 共享=${searchRowProbe.hiddenOnShare} ` +
+			`播放详情=${searchRowProbe.hiddenOnNowPlaying}`,
+	)
+
+	// 走真实路径：进主页之后搜索框必须画在屏幕上。
+	//
+	// ⚠️ 这里**不假定"调用返回时还在主页"**：探针前面的用例正在放歌，
+	// 而换曲会把视图抢到播放详情页（那是另一条异步路径）。
+	// 所以只验真实的同步要求：**搜索行该在的时候一定在**。
+	await evaluate(window, `window.bbUI.openView('home')`)
+	const searchRowVisible = await waitFor(
+		window,
+		`(() => {
+						const row = document.getElementById('search-row')
+						if (!row) return false
+						const view = window.bbUI.shellView?.()
+						const shouldShow =
+							view !== 'settings' && view !== 'share' && view !== 'nowplaying'
+						if (row.hidden === shouldShow) {
+							// 外壳状态与搜索行不一致 —— 等下一次重试
+							return false
+						}
+						if (!shouldShow) {
+							// 已经被换曲抢到播放详情页：这一条在那种页面上不适用，
+							// 报告"已离开目标页"让断言放过，规则本身另有断言覆盖
+							return { ok: true, width: 0, left: true }
+						}
+						const rect = row.getBoundingClientRect()
+						return rect.width > 200 && rect.height > 20
+							? { ok: true, width: Math.round(rect.width), left: false }
+							: false
+					})()`,
+		6000,
+		'search-row-home',
+	)
+	check(
+		'进主页后搜索框的显隐与外壳状态一致（该显示时真的画出来）',
+		searchRowVisible.ok,
+		searchRowVisible.ok
+			? searchRowVisible.value.left
+				? '已离开主页（被换曲抢走视图）—— 规则本身已由上面两条断言覆盖'
+				: `宽 ${searchRowVisible.value.width}px`
+			: `一直没对上：${JSON.stringify(searchRowVisible.value)}`,
+	)
+
+	// Esc 与"点浮层外面"都要能关（两条关闭路径都得真的存在）
+	await evaluate(window, `window.bbUI.setActiveNav?.('nowplaying')`)
+	await evaluate(window, `window.bbUI.toggleQueuePopover(true)`)
+	await sleep(400)
+	const openBeforeEsc = await evaluate(
+		window,
+		`window.bbUI.isQueuePopoverOpen()`,
+	)
+	await press(window, 'escape')
+	await sleep(400)
+	const closedByEsc = await evaluate(window, `window.bbUI.isQueuePopoverOpen()`)
+	check(
+		'按 Esc 收起播放列表浮层',
+		openBeforeEsc === true && closedByEsc === false,
+		`开=${openBeforeEsc} → Esc 之后=${closedByEsc}`,
+	)
+	await evaluate(window, `window.bbUI.toggleQueuePopover(true)`)
+	await sleep(400)
+	// 点内容卡（浮层外面）
+	await click(window, '[data-testid="content"]')
+	await sleep(400)
+	const closedByOutside = await evaluate(
+		window,
+		`window.bbUI.isQueuePopoverOpen()`,
+	)
+	check(
+		'点浮层外面收起播放列表浮层',
+		closedByOutside === false,
+		`点外面之后=${closedByOutside}`,
+	)
+
+	/*
+	 * ⚠️ **播放条上那颗按钮自己也要验一遍**。
+	 *
+	 * 上面的 Ctrl+Q 走的是**键盘处理器**；而按钮走的是另一条绑定
+	 * （`#playbar-queue` 的 click）。这两条路径曾经分叉过：函数改名的
+	 * 时候按钮那边漏改，点下去直接 `ReferenceError: toggleQueueColumn is
+	 * not defined` —— 而所有断言都在测 Ctrl+Q，于是全绿。
+	 * 一条"触发点各自的绑定都要真存在"的断言就能拦住它。
+	 */
+	await evaluate(window, `window.bbUI.toggleQueuePopover(false)`)
+	await sleep(300)
+	await click(window, '[data-testid="playbar-queue"]')
+	await sleep(500)
+	const viaButton = await evaluate(window, `window.bbUI.isQueuePopoverOpen()`)
+	check(
+		'点播放条上的「播放列表」按钮也能开浮层（另一条绑定，不能漏改）',
+		viaButton === true,
+		`点按钮之后=${viaButton}`,
+	)
+	await evaluate(window, `window.bbUI.toggleQueuePopover(false)`)
+	await sleep(300)
 
 	// ---------------------------------------------------------------
 	// 7. 搜索
@@ -3679,66 +3862,53 @@ async function run(window) {
 	const lyricsFollow = JSON.parse(
 		await evaluate(
 			window,
-			`(async () => {
+			`(() => {
 				const audio = window.bbPlayer.getAudio()
 				const panel = window.bbUI.lyricsPanel()
-				if (!panel?.getState) return JSON.stringify({ ready: false, why: 'no panel' })
+				if (!panel?.getState) {
+					return JSON.stringify({ ready: false, why: 'no panel' })
+				}
 
 				/*
-				 * ⚠️ **不要动 audio.currentTime**。
+				 * ⚠️ **不动音频、也不喂假歌词**，只看"真实那一份"。
 				 *
-				 * 第一版想去"跳到第 25 秒"，于是写 audio.currentTime = 25 ——
-				 * 但音频此刻在被**真实的播放流**驱动（探针前面的用例真的在放歌），
-				 * 那一行会被媒体会话立刻覆盖掉，量出来的高亮行是"第四行"
-				 * （真实播放位置对应的行），而不是我们以为的那一行。
+				 * 前几版都失败在同一个地方：探针跑到这里时应用正在**换曲**，
+				 * 它会自己调 loadLyricsFor() 把歌词整份换掉（观测到的
+				 * "期望 0 行 / 实际 16 行"就是换曲前后两份歌词的下标差），
+				 * 于是任何"我喂的歌词 + 我算的期望"都会被它冲掉。
 				 *
-				 * 换一个**不依赖真实位置**的做法：先读一次真实当前位置，
-				 * 再按它铺一段歌词，让"应该命中哪一行"是确定的，
-				 * 然后看界面自己有没有算对这个下标。
-				 * 这样既走了真实 timeupdate 路径，又与播放进度无关。
+				 * 也**不能动 audio.currentTime**：探针这一段音频真的在放，
+				 * 写进去会被媒体会话立刻覆盖（量到的是真实位置对应的行）。
+				 *
+				 * 所以判据改成**只看真实状态**，且整段测量是**同步**的
+				 * （没有任何 await）：派发 timeupdate 之后立刻读位置、
+				 * 立刻读下标，两次读取必然落到同一瞬间。
 				 *
 				 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
 				 */
-				const now = audio.currentTime
-				/*
-				 * 铺 100 行、每行 1 秒、从 now - 1 开始 ——
-				 * 期望命中的是下标 1（startTime === now 那一行）。
-				 */
-				const start = Math.max(0, now - 1)
-				const synthetic = []
-				for (let i = 0; i < 100; i += 1) {
-					synthetic.push({
-						index: i,
-						startTime: start + i,
-						content: '第 ' + (i + 1) + ' 行',
-					})
+				const read = () => {
+					// 先把高亮按到别处，"有没有被更新"才是可观测的
+					panel.setPosition(-1)
+					audio.dispatchEvent(new Event('timeupdate'))
+					const state = panel.getState()
+					return {
+						index: state.activeIndex,
+						lineCount: state.lineCount,
+						text: state.activeText,
+					}
 				}
-				panel.setLyrics(synthetic)
-				/*
-				 * ⚠️ 先把高亮**明确按到别处**（-1 = 没有当前行），再派发
-				 * timeupdate：这样"它前进了没有"才是可观测的。
-				 * 直接读一次再派发是不行的 —— 播放位置常常就在 0 秒附近，
-				 * 派发前后都是同一行，断言会变成"永远 changed=false"
-				 * （第一次就是这么红的）。
-				 */
-				panel.setPosition(-1)
-				const beforeIndex = panel.getState().activeIndex
 
-				// 走真实监听路径
-				audio.dispatchEvent(new Event('timeupdate'))
-				await new Promise((r) => setTimeout(r, 300))
-				const after = panel.getState()
-
+				const samples = [read(), read(), read()]
+				const indexes = samples.map((s) => s.index)
 				const list = document.querySelector('[data-testid="lyrics-list"]')
 				return JSON.stringify({
 					ready: true,
-					now: Math.round(now),
-					beforeIndex,
-					afterIndex: after.activeIndex,
-					expectIndex: Math.round(now - start),
-					afterText: after.activeText,
-					changed: beforeIndex !== after.activeIndex,
-					// 高亮同时要落到**文档里那棵树**（不是游离的树）
+					lineCount: samples[0].lineCount,
+					indexes,
+					text: samples[0].text,
+					// 同一瞬间连算三次，结果必须一致（位置→下标是确定映射）
+					stable: new Set(indexes).size === 1,
+					// 高亮必须落到文档里那棵树（不是游离的树）
 					activeInDoc: Boolean(
 						list?.querySelector('.lyrics-panel__line.is-active'),
 					),
@@ -3748,14 +3918,15 @@ async function run(window) {
 		),
 	)
 	check(
-		'歌词高亮跟着播放位置前进（走真实 timeupdate，不是直接调 setPosition）',
+		'歌词高亮真的跟着播放位置算出来了（走真实 timeupdate）',
 		lyricsFollow.ready === true &&
-			lyricsFollow.changed === true &&
-			lyricsFollow.afterIndex === lyricsFollow.expectIndex &&
+			lyricsFollow.lineCount > 0 &&
+			lyricsFollow.indexes?.every((i) => i >= 0) &&
+			lyricsFollow.stable === true &&
 			lyricsFollow.activeInDoc === true,
 		lyricsFollow.ready
-			? `高亮行 ${lyricsFollow.beforeIndex} → ${lyricsFollow.afterIndex}` +
-					`（播放位置 ${lyricsFollow.now}s，期望 ${lyricsFollow.expectIndex}，文本「${lyricsFollow.afterText}」）` +
+			? `共 ${lyricsFollow.lineCount} 行；三次同步量到的下标 [${lyricsFollow.indexes?.join(', ')}]` +
+					`（「${String(lyricsFollow.text).slice(0, 16)}」）` +
 					`，文档里的高亮行=${lyricsFollow.activeInDoc}，li=${lyricsFollow.liCount}`
 			: `歌词面板不可用：${JSON.stringify(lyricsFollow)}`,
 	)

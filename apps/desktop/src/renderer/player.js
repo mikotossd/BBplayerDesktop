@@ -692,8 +692,19 @@
 		els.queueList.textContent = ''
 		if (els.queueEmpty) els.queueEmpty.hidden = state.queue.length > 0
 		// 面板上的计数也跟着走（队列只有一份数据，两个地方显示）
-		const count = document.getElementById('nowplaying-count')
-		if (count) count.textContent = String(state.queue.length)
+		/*
+		 * 队列条数。
+		 *
+		 * ⚠️ 卡片化阶段 4 删掉了「正在播放」页的第三栏（`#nowplaying-count`
+		 * 跟着没了）；阶段 5 起这个数字显示在**播放列表浮层**的标题右边。
+		 * 两个 id 都查一次，是为了让"队列容器搬到哪儿"与"数字在哪儿"
+		 * 互不绑定 —— 少一个不影响渲染。
+		 */
+		const countText = String(state.queue.length)
+		for (const id of ['nowplaying-count', 'queue-popover-count']) {
+			const node = document.getElementById(id)
+			if (node) node.textContent = countText
+		}
 
 		state.queue.forEach((track, index) => {
 			const li = document.createElement('li')

@@ -218,6 +218,22 @@
 		}
 	}
 
+	/**
+	 * 只同步"外壳外观"（搜索行 / 下沿两块 / 页签条），**不动导航状态**。
+	 *
+	 * ⚠️ 给 `settings-panel.js` 的 `open()` 用：它需要让外壳知道
+	 * "现在是设置页"（搜索框该收起来），但**不能**走 `setActiveNav` ——
+	 * 那会进 `showMainPane()`，而后者又调回 `bbSettings.open()`，
+	 * 把用户刚点开的设置子页打回分类列表。
+	 */
+	function syncShellForView(view) {
+		const searchRow = document.getElementById('search-row')
+		if (searchRow) {
+			searchRow.hidden =
+				view === 'settings' || view === 'share' || view === 'nowplaying'
+		}
+	}
+
 	function setActiveNav(view) {
 		currentView = view
 		/*
@@ -274,9 +290,24 @@
 		// 正在播放面板里就出现了**两个返回按钮**（外壳的 + 面板自己的）。
 		const settingsBack = document.getElementById('settings-back')
 		if (settingsBack && view !== 'settings') settingsBack.hidden = true
+		/*
+		 * 内容卡顶部的搜索框（卡片化阶段 5，方案 A）。
+		 *
+		 * ⚠️ 它**不跟着 `#content` 走**（后者会被各视图整块重建），
+		 * 所以显隐由这里统一决定：
+		 *   * 设置页里不显示（那是另一套导航，搜索框在那儿只是噪音）；
+		 *   * 共享歌单页也不显示（它自带搜索/输入）；
+		 *   * **播放详情页也不显示** —— 那一页自带顶栏，搜索框压在它上面
+		 *     会把"正在播放"那几个字挤到下一行（截图里一眼可见）；
+		 *   * 其余页面（搜索 / 音乐库 / 主页）都在 —— 这正是"常驻"的含义。
+		 */
+		const searchRow = document.getElementById('search-row')
+		if (searchRow) {
+			searchRow.hidden =
+				view === 'settings' || view === 'share' || view === 'nowplaying'
+		}
 		showMainPane(view)
 	}
-
 	/**
 	 * 中栏是**三个互斥的页面**：常规内容、共享面板、设置。
 	 *
@@ -297,6 +328,14 @@
 		if (settingsRoot) settingsRoot.hidden = !showSettings
 		if (nowRoot) nowRoot.hidden = !showNow
 		if (content) content.hidden = showShare || showSettings || showNow
+		/*
+		 * ⚠️ 换了目的地就收起播放列表浮层。
+		 *
+		 * 浮层挂在内容卡下方，切到别的页面之后它还开着就是"浮层跟着串页"
+		 * ——用户会看到播放列表出现在音乐库里。队列 DOM 会被 `placeQueue`
+		 * 搬回右栏，所以这里只需要关掉浮层本身。
+		 */
+		if (!showNow) closeQueuePopover()
 		// ⚠️ 正在播放面板**自带标题**（大封面 + 曲名），外壳的页面标题区
 		// 在它上面就是重复的一行 —— 而且会把封面往下挤。
 		const pageHead = document.querySelector('.page-head')
@@ -585,12 +624,12 @@
 	// 播放条上的「呼出 / 收起播放列表」（位置见 index.html 的注释：参考图里圈的那个）
 	document
 		.getElementById('playbar-queue')
-		?.addEventListener('click', () => toggleQueueColumn())
+		?.addEventListener('click', () => toggleQueuePopover())
 
 	// 正在播放卡片顶部条上的同一动作（同一组状态，两个触发点）
 	document
 		.getElementById('nowplaying-toggle-queue')
-		?.addEventListener('click', () => toggleQueueColumn())
+		?.addEventListener('click', () => toggleQueuePopover())
 
 	// 页内动作：共享歌单面板
 	document.getElementById('library-share')?.addEventListener('click', () => {
@@ -720,33 +759,103 @@
 	 *   * 不在「正在播放」页 → 先进那一页，并把播放列表**显示出来**；
 	 *   * 已经在那一页 → 切换播放列表的显隐。
 	 *
-	 * ⚠️ 实现变过两次，记下来避免再绕回去：
+	 * ⚠️ 实现变过三次，记下来避免再绕回去：
 	 *   1. 最初切的是**右栏的队列/歌词两个页签**——歌词页签去掉后语义消失；
 	 *   2. 阶段 D 改成切「正在播放」页第三栏的显隐（`is-queue-hidden`）——
 	 *      卡片化**阶段 4** 把那第三栏整个删了（草图「放弃原有的三联卡片式」），
 	 *      于是这个函数变成了对着一个不存在的类名做 `classList` 操作：
 	 *      按钮点了**毫无反应**，而所有既有断言都读那个类，于是全都"通过"
-	 *      （一条假绿，靠的是探针直接读 classList，而不是看界面上有没有东西出现）。
-	 *   3. 现在切的是**右栏（播放队列真正的家）**的展开/收起。
-	 *      阶段 5 会把它换成队列浮层 —— 那时仍然只有这一个函数是入口。
+	 *      （一条假绿：探针读的是 classList，不是"界面上有没有东西出现"）；
+	 *   3. **阶段 5** 起它弹的是内容卡下方的**播放列表浮层**。
+	 *      队列 DOM 仍然只有一份 —— 在右栏与浮层之间搬家（见 placeQueue）。
 	 */
-	function toggleQueueColumn() {
-		if (currentView !== 'nowplaying') {
-			setNowPlaying(true)
-			setRightbar(true)
-		} else {
-			setRightbar(!isRightbarOpen())
-		}
-		const open = isRightbarOpen()
-		// 两个触发点同步（播放条按钮 + 正在播放卡片顶栏按钮）
-		const playbarButton = document.getElementById('playbar-queue')
-		if (playbarButton) playbarButton.setAttribute('aria-pressed', String(open))
-		const topbarButton = document.getElementById('nowplaying-toggle-queue')
-		if (topbarButton) topbarButton.setAttribute('aria-expanded', String(open))
+	function toggleQueuePopover(force) {
+		const popover = document.getElementById('queue-popover')
+		if (!popover) return
+		/*
+		 * ⚠️ **顺序很重要**：`setNowPlaying(true)` 会走 `showMainPane()`，
+		 * 而那里有一句"换目的地就收起浮层"（`closeQueuePopover()`）。
+		 * 如果先算 open 再切页，切页那一步会把刚打开的状态又关掉 ——
+		 * 症状是"Ctrl+Q 之后队列 DOM 已经搬到浮层里了，但浮层没展开"
+		 * （探针第一版就是这么红的）。
+		 * 所以：先切页（可能会顺带关一次），**再**重新算一次 open。
+		 */
+		if (currentView !== 'nowplaying') setNowPlaying(true)
+		const open =
+			typeof force === 'boolean'
+				? force
+				: !popover.classList.contains('is-open')
+		popover.hidden = false
+		/*
+		 * ⚠️ 用 `setTimeout(0)` 而**不是** `requestAnimationFrame`。
+		 *
+		 * 目的只是"让元素先参与一次布局，再改类"，这样过渡才有起始值可插值。
+		 * 但探针窗口是 `show: false` 创建的（无头），而**隐藏窗口里
+		 * `requestAnimationFrame` 根本不会被调度** —— 于是那个回调永远不跑，
+		 * `is-open` 永远加不上：界面表现为"点了没反应"，而队列 DOM
+		 * 已经搬进浮层了（一半生效，最难查的那种）。
+		 *
+		 * `setTimeout(0)` 不依赖合成器，隐藏窗口里照样跑，
+		 * 而过渡动画仍然由 CSS 负责（图层可见时自然会动）。
+		 */
+		setTimeout(() => popover.classList.toggle('is-open', open), 0)
+		// 队列 DOM 搬进/搬出浮层，**始终只有一份**
+		placeQueue(open ? 'queue-popover-slot' : 'queue-slot')
+		// 浮层只属于播放详情页：那一页不显示搜索框
+		syncShellForView('nowplaying')
+		syncQueueTriggers(open)
 	}
 
+	/** 三个触发点的 aria 状态要一致（否则读屏软件与视觉说的不是一回事） */
+	function syncQueueTriggers(open) {
+		const label = open ? '收起播放列表' : '呼出播放列表'
+		for (const id of ['playbar-queue', 'nowplaying-toggle-queue']) {
+			const button = document.getElementById(id)
+			if (!button) continue
+			button.setAttribute('aria-expanded', String(open))
+			button.title = label
+		}
+	}
+
+	/** 浮层现在开着吗（给快捷键与探针读） */
+	function isQueuePopoverOpen() {
+		return Boolean(
+			document.getElementById('queue-popover')?.classList.contains('is-open'),
+		)
+	}
+
+	/** 点浮层里的关闭按钮 / 按 Esc / 点浮层外面都收起 */
+	function closeQueuePopover() {
+		if (isQueuePopoverOpen()) toggleQueuePopover(false)
+	}
+
+	document
+		.getElementById('queue-popover-close')
+		?.addEventListener('click', closeQueuePopover)
+
+	/*
+	 * 点浮层**外面**收起。
+	 *
+	 * ⚠️ 用**捕获**阶段：队列行自己的点击会在冒泡阶段到达 document，
+	 * 那时浮层已经关了 —— 用户的感觉是"点一下队列就没了"。
+	 * 捕获阶段先判断"点在不在浮层/触发按钮里"，两处都放过。
+	 */
+	document.addEventListener(
+		'click',
+		(event) => {
+			if (!isQueuePopoverOpen()) return
+			const popover = document.getElementById('queue-popover')
+			const trigger = event.target?.closest?.(
+				'#playbar-queue, #nowplaying-toggle-queue',
+			)
+			if (trigger || popover?.contains(event.target)) return
+			closeQueuePopover()
+		},
+		true,
+	)
+
 	keys.register('ctrl+q', { description: '呼出/收起播放列表' }, () => {
-		toggleQueueColumn()
+		toggleQueuePopover()
 	})
 
 	// —— 功能 ——
@@ -784,7 +893,13 @@
 				return
 			}
 		}
-		// 2) 快捷键提示
+		// 2) 播放列表浮层 → 收起（阶段 5：它比"回到上一页"更浅一层）
+		if (isQueuePopoverOpen()) {
+			closeQueuePopover()
+			event.preventDefault?.()
+			return
+		}
+		// 3) 快捷键提示
 		const hint = document.getElementById('hint')
 		if (hint && !hint.hidden) {
 			hint.hidden = true
@@ -1334,6 +1449,8 @@
 	window.bbUI = {
 		switchPanel,
 		setActiveNav,
+		/** 外壳自己记的"现在在哪一屏"（探针用；`bbState.view` 是另一回事） */
+		shellView: () => currentView,
 		/** 音乐库的页签切换（供 library.js 复用，不要自己点 DOM 按钮） */
 		setLibraryTab,
 		/** 打开一个目的地（同上） */
@@ -1341,6 +1458,12 @@
 		/** 右栏开关（阶段 2：默认收起，按需展开） */
 		setRightbar,
 		isRightbarOpen,
+		/** 只同步外壳外观（搜索行等），不动导航状态 —— 给设置页的 open() 用 */
+		syncShellForView,
+		/** 播放列表浮层开着吗（阶段 5；供快捷键与探针读） */
+		isQueuePopoverOpen,
+		/** 手动开/关播放列表浮层（供探针，避免只能靠合成按键） */
+		toggleQueuePopover,
 		/** 从共享视图切回 #content 里的其它视图（library.js 直接渲染时要用） */
 		showContent: () => toggleShareView(false),
 		keys: () => keys.list(),
