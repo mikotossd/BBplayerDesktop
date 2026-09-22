@@ -251,6 +251,19 @@ contextBridge.exposeInMainWorld('bbplayer', {
 	/** 重启应用（恢复备份后需要） */
 	relaunch: () => ipcRenderer.invoke('app:relaunch'),
 	/**
+	 * **自绘标题栏的窗口控制**（卡片化改造）。
+	 *
+	 * 窗口已经没有原生 frame（`main.cjs` 的 `titleBarStyle: 'hidden'`），
+	 * 所以这三个动作必须由渲染层发起。`isMaximized()` 用于首屏把
+	 * 最大化/还原的图标画对。
+	 */
+	window: {
+		minimize: () => ipcRenderer.invoke('window:minimize'),
+		toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
+		close: () => ipcRenderer.invoke('window:close'),
+		isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+	},
+	/**
 	 * 用系统浏览器打开链接（关于页的「前往 GitHub」）。
 	 *
 	 * ⚠️ 主进程侧有**白名单**校验 —— 不是任意 URL 都能开，

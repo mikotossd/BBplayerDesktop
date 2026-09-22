@@ -128,6 +128,62 @@
 	function setPageTitle(view) {
 		const el = document.getElementById('page-title')
 		if (el) el.textContent = VIEW_TITLES[view] ?? ''
+		/*
+		 * ⚠️ 自绘标题栏中间那截文字也要跟着走（卡片化改造）。
+		 * 原生标题栏去掉之后，"我在哪一屏"只剩页面标题区一处提示 ——
+		 * 而播放详情页会把 `.page-head` 隐藏掉，那时标题栏是唯一的线索。
+		 */
+		const where = document.getElementById('titlebar-where')
+		if (where) where.textContent = VIEW_TITLES[view] ?? ''
+	}
+
+	// ---------------------------------------------------------------
+	// 自绘标题栏：窗口控制（卡片化改造）
+	// ---------------------------------------------------------------
+	//
+	// ⚠️ 窗口已经没有原生 frame（`main.cjs` 的 `titleBarStyle: 'hidden'`），
+	// 所以最小化 / 最大化 / 关闭都必须由这里发起。
+	//
+	// ⚠️ 双击标题栏最大化/还原是**原生 frame 自带**的行为，自绘之后就没有了 ——
+	// 但**不要在这里补**：`.titlebar` 上有 `-webkit-app-region: drag`，
+	// Chromium 会把双击当成系统的拖拽手势处理并在 Windows 上自动最大化/还原。
+	// 自己再监听 dblclick 会变成"切两次"，反而把窗口切回原状。
+	function initTitlebar() {
+		const api = window.bbplayer?.window
+		const minButton = document.getElementById('titlebar-min')
+		const maxButton = document.getElementById('titlebar-max')
+		const closeButton = document.getElementById('titlebar-close')
+
+		minButton?.addEventListener('click', () => void api?.minimize?.())
+		closeButton?.addEventListener('click', () => void api?.close?.())
+
+		/** 最大化/还原时把图标与提示一起换掉（否则按钮说的是反的） */
+		function syncMaximizeIcon(maximized) {
+			if (!maxButton) return
+			const label = maximized ? '还原' : '最大化'
+			maxButton.title = label
+			maxButton.setAttribute('aria-label', label)
+			/*
+			 * ⚠️ 两态用**同一个** `crop_square` 图标，只换 title/aria-label。
+			 * 想用不同的图标就得往字体子集里加一个（如 `filter_none`）——
+			 * 而 Google Fonts 对**不认识的名字**是整批返回 400（不是只丢那一个），
+			 * 加错一个名字会让整个图标构建失败。不值得为一个"还原"图标冒这个险。
+			 */
+			const icon = maxButton.querySelector('.icon')
+			if (icon) icon.textContent = 'crop_square'
+			maxButton.setAttribute('aria-pressed', String(maximized))
+		}
+
+		maxButton?.addEventListener('click', () => {
+			void api?.toggleMaximize?.().then((result) => {
+				syncMaximizeIcon(Boolean(result?.data?.maximized))
+			})
+		})
+
+		// 首屏问一次状态：直接以最大化启动时（Windows 会记住窗口大小）图标要对
+		void api?.isMaximized?.().then((result) => {
+			syncMaximizeIcon(Boolean(result?.data?.maximized))
+		})
 	}
 
 	/** 音乐库的页签 → 渲染函数 */
@@ -164,8 +220,27 @@
 
 	function setActiveNav(view) {
 		currentView = view
-		for (const item of document.querySelectorAll('.nav__item')) {
-			item.classList.toggle('is-active', item.dataset.view === view)
+		/*
+		 * ⚠️ 选中态绑在 `[data-nav]` 上，不再写死 `.nav__item`（卡片化阶段 1）。
+		 *
+		 * 左栏现在只有两张卡片，入口分散在用户卡 / 歌单卡 / 内容卡里 ——
+		 * 但"当前在哪个目的地"这件事仍然要有**一处**真相。所以仍然按
+		 * `data-nav` 统一高亮；同一个目的地有多个入口时（比如音乐库既是
+		 * 歌单卡的本体、又是收藏夹入口的父级）它们会**一起**高亮，
+		 * 这是想要的行为：它们指向同一个地方。
+		 */
+		for (const item of document.querySelectorAll('[data-nav]')) {
+			let active = item.dataset.nav === view
+			/*
+			 * ⚠️ 「收藏夹」是**音乐库里的一个页签**，不是独立目的地，
+			 * 所以 `data-nav="favorites"` 自己没有对应的 `view`。
+			 * 这里把它显式算出来，否则用户在收藏夹页签时左栏完全没有
+			 * 选中态（表现是"左栏看不出我在哪"）。
+			 */
+			if (item.dataset.nav === 'favorites') {
+				active = view === 'library' && currentLibraryTab === 'favorites'
+			}
+			item.classList.toggle('is-active', active)
 		}
 		setPageTitle(view)
 		// 收藏夹的 UID 工具条**按需出现**（登录后自动读自己的、它就收起来；
@@ -323,12 +398,59 @@
 		}
 	}
 
-	for (const item of document.querySelectorAll('.nav__item')) {
-		item.addEventListener('click', () => openView(item.dataset.view))
-	}
-
 	for (const button of document.querySelectorAll('[data-lib-tab]')) {
 		button.addEventListener('click', () => setLibraryTab(button.dataset.libTab))
+	}
+
+	/**
+	 * 左栏 / 内容卡里的**目的地入口**（卡片化阶段 1）。
+	 *
+	 * ⚠️ 入口按 `data-nav` 声明，而不是写死 `.nav__item`：
+	 * 卡片化之后"主页"是用户卡的本体、"设置"是歌单卡的页脚、
+	 * "收藏夹"是歌单卡的页头按钮 —— 它们**长得完全不一样**，
+	 * 但跳转语义是同一个。用属性声明之后，入口再搬家只改 HTML。
+	 *
+	 * `favorites` 不是目的地而是**音乐库里的一个页签**，所以它走
+	 * `setLibraryTab` 而不是 `openView` —— 否则会落回上次的页签
+	 * （用户点「收藏夹」却看到「播放列表」）。
+	 */
+	function activateNav(name, event) {
+		if (!name) return
+		/*
+		 * ⚠️ 只让**最内层**的入口生效。
+		 *
+		 * 歌单卡本体是 `data-nav="library"`，而它的页头「收藏夹」是
+		 * `data-nav="favorites"`、页脚「设置」是 `data-nav="settings"` ——
+		 * 三者是**嵌套**的。点击会冒泡，于是"点收藏夹"会先切到收藏夹、
+		 * 紧接着又被卡片的 handler 切回音乐库（表现是"点了没反应"）。
+		 * 判据：事件目标就是当前 handler 的元素时才是真正被点的那个。
+		 */
+		if (event && event.target !== event.currentTarget) return
+		if (name === 'favorites') {
+			window.bbUI?.setLibraryTab?.('favorites')
+			return
+		}
+		openView(name)
+	}
+
+	for (const item of document.querySelectorAll('[data-nav]')) {
+		item.addEventListener('click', (event) =>
+			activateNav(item.dataset.nav, event),
+		)
+		/*
+		 * ⚠️ 卡片本体是 `<div>`（用户卡）或 `<section>`（歌单卡），不是 `<button>`，
+		 * 所以键盘用户进不来。补上按钮语义与 Enter/Space 激活 ——
+		 * 不改外观，只让它能被 Tab 到、能被按下去。同一个坑在播放条的
+		 * 封面/标题进入点上踩过一次（见下面 nowPlayingEntryPoints 的注释）。
+		 */
+		if (item.tagName === 'BUTTON') continue
+		if (!item.hasAttribute('tabindex')) item.tabIndex = 0
+		if (!item.hasAttribute('role')) item.setAttribute('role', 'button')
+		item.addEventListener('keydown', (event) => {
+			if (event.key !== 'Enter' && event.key !== ' ') return
+			event.preventDefault()
+			activateNav(item.dataset.nav, event)
+		})
 	}
 
 	/**
@@ -482,15 +604,20 @@
 	/*
 	 * `Ctrl+1/2` 切到音乐库 / 搜索；`Ctrl+3/4` 切到音乐库里的**收藏夹 / 合集**。
 	 *
-	 * ⚠️ 原来 `Ctrl+3/4` 点的是 `[data-view="favorites"]` / `[data-view="collection"]`
+	 * ⚠️ `Ctrl+3/4` 原来是点 `[data-view="favorites"]` / `[data-view="collection"]`
 	 * —— 这两个元素**从来不存在**（左栏只有 home/library/search/settings），
 	 * 于是它们是完全无声的死键，而快捷键帮助面板还在宣传它们。
+	 *
+	 * ⚠️ `Ctrl+1/2` 原来是点左栏的 `[data-view="library"|"search"]` 导航项。
+	 * 卡片化之后左栏没有导航项了（入口分散在用户卡、歌单卡与内容卡里），
+	 * 所以改成直接调 `openView()` —— 与点击走**同一条路径**，
+	 * 不再依赖"某个元素恰好存在"。
 	 */
 	keys.register('ctrl+1', { description: '切到音乐库' }, () => {
-		document.querySelector('[data-view="library"]')?.click()
+		openView('library')
 	})
 	keys.register('ctrl+2', { description: '切到搜索' }, () => {
-		document.querySelector('[data-view="search"]')?.click()
+		openView('search')
 	})
 	keys.register('ctrl+3', { description: '切到收藏夹' }, () => {
 		window.bbUI?.setLibraryTab?.('favorites')
@@ -1154,6 +1281,10 @@
 
 	async function boot() {
 		log('渲染进程就绪')
+
+		// 自绘标题栏的三个窗口按钮（卡片化改造）：**最早**绑定，
+		// 因为它是"窗口还能不能关掉"的退路 —— 绑晚了用户会以为卡死。
+		initTitlebar()
 
 		initLyricsPanel()
 		initMediaSession()

@@ -7,17 +7,84 @@
 			content="default-src 'self'; media-src bbplayer-audio: https:; connect-src bbplayer-audio: https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'"
 		/>
 		<title>BBPlayer Desktop</title>
-		<link rel="stylesheet" href="assets/material-symbols.css" />
-		<link rel="stylesheet" href="style.css" />
-		<link rel="stylesheet" href="lyrics-panel.css" />
+		<link
+			rel="stylesheet"
+			href="assets/material-symbols.css"
+		/>
+		<link
+			rel="stylesheet"
+			href="style.css"
+		/>
+		<link
+			rel="stylesheet"
+			href="lyrics-panel.css"
+		/>
 		<!--
 			components.css 排在最后：它是**设计系统层**（列表行 / 空状态 /
 			开关 / 骨架屏 / toast），需要在需要时覆盖 style.css 里那些
 			历史遗留的同类样式（比如 .empty）。
 		-->
-		<link rel="stylesheet" href="components.css" />
+		<link
+			rel="stylesheet"
+			href="components.css"
+		/>
 	</head>
 	<body>
+		<!--
+			── 自绘标题栏（卡片化改造）──────────────────────────
+			⚠️ 窗口已经没有原生 frame（`main.cjs` 的 `titleBarStyle: 'hidden'`），
+			所以这三颗按钮必须自己画、自己发意图（`window:*` IPC）。
+
+			⚠️ 拖拽区靠 CSS 的 `-webkit-app-region: drag`（见 style.css 的
+			`.titlebar`），按钮上必须写 `no-drag`，否则点不动。
+			双击标题栏最大化/还原由 renderer.js 实现 —— 原生 frame 自带这个行为，
+			自绘之后就没有了。
+		-->
+		<div
+			class="titlebar"
+			id="titlebar"
+			data-testid="titlebar"
+		>
+			<div class="titlebar__brand">
+				<span class="titlebar__mark icon">music_note</span>
+				<span class="titlebar__name">BBPlayer</span>
+				<span
+					class="titlebar__where"
+					id="titlebar-where"
+					data-testid="titlebar-where"
+				></span>
+			</div>
+			<div class="titlebar__spacer"></div>
+			<div class="titlebar__controls">
+				<button
+					class="titlebar__btn icon-only"
+					id="titlebar-min"
+					data-testid="titlebar-min"
+					title="最小化"
+					aria-label="最小化"
+				>
+					<span class="icon icon--sm">remove</span>
+				</button>
+				<button
+					class="titlebar__btn icon-only"
+					id="titlebar-max"
+					data-testid="titlebar-max"
+					title="最大化"
+					aria-label="最大化"
+				>
+					<span class="icon icon--sm">crop_square</span>
+				</button>
+				<button
+					class="titlebar__btn titlebar__btn--close icon-only"
+					id="titlebar-close"
+					data-testid="titlebar-close"
+					title="关闭"
+					aria-label="关闭"
+				>
+					<span class="icon icon--sm">close</span>
+				</button>
+			</div>
+		</div>
 		<div class="app">
 			<!--
 				「左栏 ↔ 中栏」的拖拽分隔条（阶段 6，用户要求"各功能区能左右拉动改大小"）。
@@ -33,18 +100,34 @@
 				aria-label="拖动调整左栏宽度（双击还原）"
 				title="拖动调整宽度 · 双击还原"
 			></div>
-			<!-- ── 左栏：导航 + 歌单 ───────────────────────────── -->
-			<aside class="sidebar" data-testid="sidebar">
-				<!--
-					⚠️ 这里原来还有一个**文字徽标**显示「未登录 / 用户名」。
-					它是状态噪音：登录状态属于"账号"，属于设置，不属于每一屏的标题栏。
-					另外它还会挤掉品牌名（历史上出现过左栏按钮换行）。
+			<!-- ── 左栏：① 用户卡 + ② 歌单卡 ───────────────────── -->
+			<!--
+				⚠️ 卡片化阶段 1：左栏从「导航 + 歌单」改成**两张卡片**
+				（草图上的 card ① 与 card ②）。
 
-					现在换成**头像按钮**：未登录显示 person 图标，已登录显示头像/首字。
-					点它打开账号弹窗 —— 这是移动端「设置 › 账号」的桌面等价入口，
-					但把入口放在需要它的地方（顶部），而不是藏进设置。
-				-->
-				<div class="sidebar__brand">
+				为什么要拆：原来左栏是 4 个平级的**目的地**导航项
+				（主页 / 音乐库 / 搜索 / 设置），而"我现在是谁 / 我有哪些歌单"
+				这件事反而被挤在导航下面。草图上左栏是"我"：
+				上面一张卡是用户，下面一张卡是歌单，目的地入口分散到
+				用户卡（主页 / 账号）、歌单卡（音乐库 / 收藏夹 / 设置）
+				与内容卡顶部（搜索）。
+
+				⚠️ 所有可点的入口都带 `data-nav="<view>"`：
+				`renderer.js` 按这一个属性绑定跳转 + 选中态，
+				不再写死 `.nav__item` —— 入口搬家时只改 HTML。
+			-->
+			<aside
+				class="sidebar"
+				data-testid="sidebar"
+			>
+				<!-- ① 用户卡：点卡片本体进主页；头像按钮进账号 -->
+				<div
+					class="sidebar__brand"
+					id="sidebar-brand"
+					data-nav="home"
+					data-testid="sidebar-brand"
+					title="主页"
+				>
 					<span class="sidebar__title">BBPlayer</span>
 					<!--
 						用户名放在品牌名**右边**（用户复审时明确要求的）：
@@ -67,59 +150,105 @@
 							data-testid="account-open"
 							title="账号"
 							aria-label="账号"
-						><span class="icon icon--md">person</span></button>
-						<!--
-							⚠️ 这里**故意没有**设置齿轮。
-							阶段 2b 之后「设置」是左栏的一个**目的地**，
-							顶部再放一个齿轮就是同一个入口出现两次（截图审查发现的）。
-							顶栏只留「账号」这种**没有独立页面归属**的入口。
-						-->
+						>
+							<span class="icon icon--md">person</span>
+						</button>
 					</div>
 				</div>
 
 				<!--
-					左栏按**目的地**分组（阶段 2b）。
-					⚠️ 原来是 7 个平铺入口：音乐库 / 搜索 / 导入歌单 / 最近播放 /
-					收藏夹 / 合集 / 共享 —— 把"目的地"和"某个页面里的动作"混在一起，
-					用户得先猜"导入歌单"和"合集"有什么区别。
-
-					现在只留 4 个真正的目的地；「导入」「共享」降级为音乐库页内的动作。
-					* 主页   ← 原「最近播放」（含 最近 / 最常 / 继续收听 三个子页签）
-					* 音乐库 ← 播放列表 / 收藏夹 / 合集 / 导入 四个页签
-					* 搜索
-					* 设置
+					② 歌单卡：三段式（页头 / 中段滚动 / 页脚）。
+					⚠️ 中段必须 `min-width/min-height: 0` + `overflow-y: auto`：
+					歌单可能几百个，而**页头与页脚要固定**（草图上
+					「收藏夹」在最上、「设置」在最下，中间那段才是滚动的）。
 				-->
-				<nav class="nav" data-testid="nav">
-					<button class="nav__item" data-view="home" data-testid="nav-home">
-						<span class="nav__icon icon">home</span> 主页
-					</button>
-					<button
-						class="nav__item is-active"
-						data-view="library"
-						data-testid="nav-library"
-					>
-						<span class="nav__icon icon">library_music</span> 音乐库
-					</button>
-					<button class="nav__item" data-view="search" data-testid="nav-search">
-						<span class="nav__icon icon">search</span> 搜索
-					</button>
-					<button class="nav__item" data-view="settings" data-testid="nav-settings">
-						<span class="nav__icon icon">settings</span> 设置
-					</button>
-				</nav>
-
-				<div class="sidebar__section">
-					<div class="sidebar__section-head">
-						<span>我的歌单</span>
-						<span class="muted" id="playlist-count" data-testid="playlist-count">0</span>
+				<section
+					class="sidebar__card is-active"
+					id="sidebar-library"
+					data-nav="library"
+					data-testid="sidebar-card"
+					aria-label="我的歌单"
+					title="音乐库"
+				>
+					<!-- 页头：收藏夹 -->
+					<div class="sidebar__card-head">
+						<button
+							class="sidebar__entry"
+							id="sidebar-favorites"
+							data-nav="favorites"
+							data-testid="sidebar-favorites"
+							title="收藏夹"
+						>
+							<span class="icon icon--sm">star</span>
+							收藏夹
+						</button>
+						<span
+							class="sidebar__count muted"
+							id="playlist-count"
+							data-testid="playlist-count"
+							>0</span
+						>
 					</div>
-					<ul class="playlist-list" id="playlist-list" data-testid="playlist-list"></ul>
-				</div>
+
+					<!-- 中段：本地歌单（可滚动） -->
+					<div class="sidebar__card-body">
+						<div class="sidebar__card-title">
+							<span>本地歌单</span>
+							<button
+								class="icon-button icon-only"
+								id="sidebar-new-playlist"
+								data-testid="playlist-new"
+								title="新建歌单"
+								aria-label="新建歌单"
+							>
+								<span class="icon icon--sm">add</span>
+							</button>
+						</div>
+						<ul
+							class="playlist-list"
+							id="playlist-list"
+							data-testid="playlist-list"
+						></ul>
+					</div>
+
+					<!-- 页脚：设置 -->
+					<div class="sidebar__card-foot">
+						<button
+							class="sidebar__entry"
+							id="sidebar-settings"
+							data-nav="settings"
+							data-testid="sidebar-settings"
+							title="设置"
+						>
+							<span class="icon icon--sm">settings</span>
+							设置
+						</button>
+					</div>
+				</section>
 			</aside>
 
 			<!-- ── 中栏：主内容 ─────────────────────────────────── -->
-			<main class="main" data-testid="main">
+			<main
+				class="main"
+				data-testid="main"
+			>
 				<header class="topbar material">
+					<!--
+						⚠️ 卡片化阶段 1 之后左栏没有导航项了，"搜索"这个目的地
+						需要一个显式入口（阶段 2 会把搜索框整个搬进内容卡顶部）。
+						这个按钮保留了原来的 testid `nav-search`：
+						它是"去搜索"的语义，与左栏那四个入口同级。
+					-->
+					<button
+						class="icon-button icon-only"
+						id="nav-search"
+						data-nav="search"
+						data-testid="nav-search"
+						title="搜索"
+						aria-label="搜索"
+					>
+						<span class="icon icon--md">search</span>
+					</button>
 					<div class="search-box">
 						<input
 							id="search-input"
@@ -128,7 +257,13 @@
 							placeholder="搜索视频 / 粘贴 BV 号或链接…"
 							spellcheck="false"
 							aria-label="搜索视频或粘贴 BV 号"
-						/>						<button id="search-button" data-testid="search-button">搜索</button>
+						/>
+						<button
+							id="search-button"
+							data-testid="search-button"
+						>
+							搜索
+						</button>
 					</div>
 					<!--
 						右栏（播放队列 / 歌词）的开关。右栏**默认收起** ——
@@ -161,9 +296,14 @@
 					>
 						<span class="icon icon--md">keyboard</span>
 					</button>
-					<div class="topbar__hint muted" id="hint" data-testid="hint" hidden>
-						快捷键：Space 播放/暂停 · ←/→ 快退/快进 · Ctrl+F 搜索 ·
-						Ctrl+Q 切换队列/歌词 · Ctrl+Alt+L 独立歌词窗口
+					<div
+						class="topbar__hint muted"
+						id="hint"
+						data-testid="hint"
+						hidden
+					>
+						快捷键：Space 播放/暂停 · ←/→ 快退/快进 · Ctrl+F 搜索 · Ctrl+Q
+						切换队列/歌词 · Ctrl+Alt+L 独立歌词窗口
 					</div>
 				</header>
 
@@ -193,10 +333,18 @@
 					>
 						<span class="icon icon--md">arrow_back</span>
 					</button>
-					<h1 class="page-head__title" id="page-title" data-testid="page-title">
+					<h1
+						class="page-head__title"
+						id="page-title"
+						data-testid="page-title"
+					>
 						音乐库
 					</h1>
-					<div class="page-head__meta" id="page-meta" data-testid="page-meta"></div>
+					<div
+						class="page-head__meta"
+						id="page-meta"
+						data-testid="page-meta"
+					></div>
 				</div>
 
 				<!--
@@ -210,7 +358,12 @@
 					没有列出各分p的接口）。这里换成桌面端真实存在的「导入」
 					（网易云歌单 → 匹配 B 站视频）。详见 docs/DESKTOP_UI_PLAN.md。
 				-->
-				<div class="view-tabs" id="library-tabs" data-testid="library-tabs" hidden>
+				<div
+					class="view-tabs"
+					id="library-tabs"
+					data-testid="library-tabs"
+					hidden
+				>
 					<button
 						class="tab is-active"
 						data-lib-tab="playlists"
@@ -218,13 +371,25 @@
 					>
 						播放列表
 					</button>
-					<button class="tab" data-lib-tab="favorites" data-testid="lib-tab-favorites">
+					<button
+						class="tab"
+						data-lib-tab="favorites"
+						data-testid="lib-tab-favorites"
+					>
 						收藏夹
 					</button>
-					<button class="tab" data-lib-tab="collection" data-testid="lib-tab-collection">
+					<button
+						class="tab"
+						data-lib-tab="collection"
+						data-testid="lib-tab-collection"
+					>
 						合集
 					</button>
-					<button class="tab" data-lib-tab="import" data-testid="lib-tab-import">
+					<button
+						class="tab"
+						data-lib-tab="import"
+						data-testid="lib-tab-import"
+					>
 						导入
 					</button>
 					<!--
@@ -276,17 +441,32 @@
 						placeholder="B 站用户 UID"
 						spellcheck="false"
 					/>
-					<button id="favorite-use-mine" data-testid="favorite-use-mine">
+					<button
+						id="favorite-use-mine"
+						data-testid="favorite-use-mine"
+					>
 						用我的 UID
 					</button>
-					<button id="favorite-load" data-testid="favorite-load">读取收藏夹</button>
-					<span class="muted" id="favorite-status" data-testid="favorite-status"></span>
+					<button
+						id="favorite-load"
+						data-testid="favorite-load"
+					>
+						读取收藏夹
+					</button>
+					<span
+						class="muted"
+						id="favorite-status"
+						data-testid="favorite-status"
+					></span>
 				</div>
 
-				<section class="content" id="content" data-testid="content">
+				<section
+					class="content"
+					id="content"
+					data-testid="content"
+				>
 					<!-- 由 renderer.js 按视图渲染 -->
 				</section>
-
 
 				<!--
 					共享歌单视图（Phase 3.4）。
@@ -301,7 +481,7 @@
 					hidden
 					aria-label="共享歌单"
 				></section>
-			<!--
+				<!--
 				── 设置（一级页面，阶段 3）──────────────────────────────
 				⚠️ 原来是右侧的一个**抽屉**，顶部四个页签（外观 / 播放 / 下载 / 备份）。
 				两个问题：
@@ -314,218 +494,278 @@
 
 				`#view-settings` 与 `#content` / `#view-share` 互斥（同一个 flex 容器）。
 			-->
-			<section class="settings-view" id="view-settings" data-testid="view-settings" hidden>
-
-				<!--
+				<section
+					class="settings-view"
+					id="view-settings"
+					data-testid="view-settings"
+					hidden
+				>
+					<!--
 					分类列表（移动端的设置首页）。
 					用组件层的 .list-row：图标方块 + 名称 + 一句说明 + 右箭头，
 					与音乐库的歌单行是同一套视觉语言。
 				-->
-				<div
-					class="settings-categories"
-					id="settings-categories"
-					data-testid="settings-categories"
-				>
-					<button
-						class="list-row"
-						data-settings-category="theme"
-						data-testid="settings-cat-theme"
+					<div
+						class="settings-categories"
+						id="settings-categories"
+						data-testid="settings-categories"
 					>
-						<span class="list-row__art list-row__art--plain"
-							><span class="icon icon--md">contrast</span></span
+						<button
+							class="list-row"
+							data-settings-category="theme"
+							data-testid="settings-cat-theme"
 						>
-						<span class="list-row__main">
-							<span class="list-row__title">主题</span>
-							<span class="list-row__sub">跟随系统 / 浅色 / 深色</span>
-						</span>
-						<span class="icon icon--md settings-categories__chevron">chevron_right</span>
-					</button>
-
-					<button
-						class="list-row"
-						data-settings-category="appearance"
-						data-testid="settings-cat-appearance"
-					>
-						<span class="list-row__art list-row__art--plain"
-							><span class="icon icon--md">blur_on</span></span
-						>
-						<span class="list-row__main">
-							<span class="list-row__title">外观</span>
-							<span class="list-row__sub">材质与模糊强度</span>
-						</span>
-						<span class="icon icon--md settings-categories__chevron">chevron_right</span>
-					</button>
-
-					<button
-						class="list-row"
-						data-settings-category="playback"
-						data-testid="settings-cat-playback"
-					>
-						<span class="list-row__art list-row__art--plain"
-							><span class="icon icon--md">graphic_eq</span></span
-						>
-						<span class="list-row__main">
-							<span class="list-row__title">播放</span>
-							<span class="list-row__sub">定时关闭与响度均衡</span>
-						</span>
-						<span class="icon icon--md settings-categories__chevron">chevron_right</span>
-					</button>
-
-					<button
-						class="list-row"
-						data-settings-category="lyrics"
-						data-testid="settings-cat-lyrics"
-					>
-						<span class="list-row__art list-row__art--plain"
-							><span class="icon icon--md">lyrics</span></span
-						>
-						<span class="list-row__main">
-							<span class="list-row__title">歌词</span>
-							<span class="list-row__sub">自动匹配</span>
-						</span>
-						<span class="icon icon--md settings-categories__chevron">chevron_right</span>
-					</button>
-
-					<button
-						class="list-row"
-						data-settings-category="download"
-						data-testid="settings-cat-download"
-					>
-						<span class="list-row__art list-row__art--plain"
-							><span class="icon icon--md">download</span></span
-						>
-						<span class="list-row__main">
-							<span class="list-row__title">下载</span>
-							<span class="list-row__sub">目录、并发与已下载</span>
-						</span>
-						<span class="icon icon--md settings-categories__chevron">chevron_right</span>
-					</button>
-
-					<button
-						class="list-row"
-						data-settings-category="account-bili"
-						data-testid="settings-cat-account-bili"
-					>
-						<span class="list-row__art list-row__art--plain"
-							><span class="icon icon--md">person</span></span
-						>
-						<span class="list-row__main">
-							<span class="list-row__title">Bilibili 账号</span>
-							<span class="list-row__sub" id="settings-cat-bili-sub"
-								>未登录</span
+							<span class="list-row__art list-row__art--plain"
+								><span class="icon icon--md">contrast</span></span
 							>
-						</span>
-						<span class="icon icon--md settings-categories__chevron">chevron_right</span>
-					</button>
-
-					<button
-						class="list-row"
-						data-settings-category="account-bbplayer"
-						data-testid="settings-cat-account-bbplayer"
-					>
-						<span class="list-row__art list-row__art--plain"
-							><span class="icon icon--md">group</span></span
-						>
-						<span class="list-row__main">
-							<span class="list-row__title">BBPlayer 账号</span>
-							<span class="list-row__sub" id="settings-cat-bbplayer-sub"
-								>共享歌单用的账号</span
+							<span class="list-row__main">
+								<span class="list-row__title">主题</span>
+								<span class="list-row__sub">跟随系统 / 浅色 / 深色</span>
+							</span>
+							<span class="icon icon--md settings-categories__chevron"
+								>chevron_right</span
 							>
-						</span>
-						<span class="icon icon--md settings-categories__chevron">chevron_right</span>
-					</button>
-
-					<button
-						class="list-row"
-						data-settings-category="backup"
-						data-testid="settings-cat-backup"
-					>
-						<span class="list-row__art list-row__art--plain"
-							><span class="icon icon--md">upload</span></span
-						>
-						<span class="list-row__main">
-							<span class="list-row__title">备份与恢复</span>
-							<span class="list-row__sub">WebDAV 与本地导出</span>
-						</span>
-						<span class="icon icon--md settings-categories__chevron">chevron_right</span>
-					</button>
-
-					<button
-						class="list-row"
-						data-settings-category="general"
-						data-testid="settings-cat-general"
-					>
-						<span class="list-row__art list-row__art--plain"
-							><span class="icon icon--md">folder_open</span></span
-						>
-						<span class="list-row__main">
-							<span class="list-row__title">通用</span>
-							<span class="list-row__sub">存储位置与快捷键</span>
-						</span>
-						<span class="icon icon--md settings-categories__chevron">chevron_right</span>
-					</button>
-
-					<button
-						class="list-row"
-						data-settings-category="about"
-						data-testid="settings-cat-about"
-					>
-						<span class="list-row__art list-row__art--plain"
-							><span class="icon icon--md">info</span></span
-						>
-						<span class="list-row__main">
-							<span class="list-row__title">关于</span>
-							<span class="list-row__sub" id="settings-cat-about-sub"
-								>版本与诊断信息</span
-							>
-						</span>
-						<span class="icon icon--md settings-categories__chevron">chevron_right</span>
-					</button>
-				</div>
-
-				<!-- 分类内容：一次只显示一个 -->
-				<div class="settings-panels" id="settings-panels" data-testid="settings-panels" hidden>
-					<!-- 主题 -->
-					<section
-						class="settings-panel"
-						data-settings-panel="theme"
-						data-testid="settings-panel-theme"
-					>
-						<h3>显示模式</h3>
-						<p class="muted settings-hint">默认跟随系统的深浅色设置。</p>
-						<div class="segmented" data-testid="settings-theme">
-							<button data-theme-choice="system" data-testid="theme-system">
-								跟随系统
-							</button>
-							<button data-theme-choice="light" data-testid="theme-light">
-								浅色
-							</button>
-							<button data-theme-choice="dark" data-testid="theme-dark">
-								深色
-							</button>
-						</div>
-					</section>
-				<!-- 外观 -->
-				<section
-					class="settings-panel"
-					data-settings-panel="appearance"
-					data-testid="settings-panel-appearance"
-				>
-					<h3>配色</h3>
-					<p class="muted settings-hint">
-						默认用你系统的强调色生成整套配色；也可以自己挑一个种子色。
-					</p>
-					<div class="segmented" data-testid="settings-accent">
-						<button data-accent-choice="system" data-testid="accent-system">
-							系统主题色
 						</button>
-						<button data-accent-choice="custom" data-testid="accent-custom">
-							自定义
+
+						<button
+							class="list-row"
+							data-settings-category="appearance"
+							data-testid="settings-cat-appearance"
+						>
+							<span class="list-row__art list-row__art--plain"
+								><span class="icon icon--md">blur_on</span></span
+							>
+							<span class="list-row__main">
+								<span class="list-row__title">外观</span>
+								<span class="list-row__sub">材质与模糊强度</span>
+							</span>
+							<span class="icon icon--md settings-categories__chevron"
+								>chevron_right</span
+							>
+						</button>
+
+						<button
+							class="list-row"
+							data-settings-category="playback"
+							data-testid="settings-cat-playback"
+						>
+							<span class="list-row__art list-row__art--plain"
+								><span class="icon icon--md">graphic_eq</span></span
+							>
+							<span class="list-row__main">
+								<span class="list-row__title">播放</span>
+								<span class="list-row__sub">定时关闭与响度均衡</span>
+							</span>
+							<span class="icon icon--md settings-categories__chevron"
+								>chevron_right</span
+							>
+						</button>
+
+						<button
+							class="list-row"
+							data-settings-category="lyrics"
+							data-testid="settings-cat-lyrics"
+						>
+							<span class="list-row__art list-row__art--plain"
+								><span class="icon icon--md">lyrics</span></span
+							>
+							<span class="list-row__main">
+								<span class="list-row__title">歌词</span>
+								<span class="list-row__sub">自动匹配</span>
+							</span>
+							<span class="icon icon--md settings-categories__chevron"
+								>chevron_right</span
+							>
+						</button>
+
+						<button
+							class="list-row"
+							data-settings-category="download"
+							data-testid="settings-cat-download"
+						>
+							<span class="list-row__art list-row__art--plain"
+								><span class="icon icon--md">download</span></span
+							>
+							<span class="list-row__main">
+								<span class="list-row__title">下载</span>
+								<span class="list-row__sub">目录、并发与已下载</span>
+							</span>
+							<span class="icon icon--md settings-categories__chevron"
+								>chevron_right</span
+							>
+						</button>
+
+						<button
+							class="list-row"
+							data-settings-category="account-bili"
+							data-testid="settings-cat-account-bili"
+						>
+							<span class="list-row__art list-row__art--plain"
+								><span class="icon icon--md">person</span></span
+							>
+							<span class="list-row__main">
+								<span class="list-row__title">Bilibili 账号</span>
+								<span
+									class="list-row__sub"
+									id="settings-cat-bili-sub"
+									>未登录</span
+								>
+							</span>
+							<span class="icon icon--md settings-categories__chevron"
+								>chevron_right</span
+							>
+						</button>
+
+						<button
+							class="list-row"
+							data-settings-category="account-bbplayer"
+							data-testid="settings-cat-account-bbplayer"
+						>
+							<span class="list-row__art list-row__art--plain"
+								><span class="icon icon--md">group</span></span
+							>
+							<span class="list-row__main">
+								<span class="list-row__title">BBPlayer 账号</span>
+								<span
+									class="list-row__sub"
+									id="settings-cat-bbplayer-sub"
+									>共享歌单用的账号</span
+								>
+							</span>
+							<span class="icon icon--md settings-categories__chevron"
+								>chevron_right</span
+							>
+						</button>
+
+						<button
+							class="list-row"
+							data-settings-category="backup"
+							data-testid="settings-cat-backup"
+						>
+							<span class="list-row__art list-row__art--plain"
+								><span class="icon icon--md">upload</span></span
+							>
+							<span class="list-row__main">
+								<span class="list-row__title">备份与恢复</span>
+								<span class="list-row__sub">WebDAV 与本地导出</span>
+							</span>
+							<span class="icon icon--md settings-categories__chevron"
+								>chevron_right</span
+							>
+						</button>
+
+						<button
+							class="list-row"
+							data-settings-category="general"
+							data-testid="settings-cat-general"
+						>
+							<span class="list-row__art list-row__art--plain"
+								><span class="icon icon--md">folder_open</span></span
+							>
+							<span class="list-row__main">
+								<span class="list-row__title">通用</span>
+								<span class="list-row__sub">存储位置与快捷键</span>
+							</span>
+							<span class="icon icon--md settings-categories__chevron"
+								>chevron_right</span
+							>
+						</button>
+
+						<button
+							class="list-row"
+							data-settings-category="about"
+							data-testid="settings-cat-about"
+						>
+							<span class="list-row__art list-row__art--plain"
+								><span class="icon icon--md">info</span></span
+							>
+							<span class="list-row__main">
+								<span class="list-row__title">关于</span>
+								<span
+									class="list-row__sub"
+									id="settings-cat-about-sub"
+									>版本与诊断信息</span
+								>
+							</span>
+							<span class="icon icon--md settings-categories__chevron"
+								>chevron_right</span
+							>
 						</button>
 					</div>
-					<div class="settings-row" id="settings-accent-row" hidden>
-						<label>种子色</label>
-						<!--
+
+					<!-- 分类内容：一次只显示一个 -->
+					<div
+						class="settings-panels"
+						id="settings-panels"
+						data-testid="settings-panels"
+						hidden
+					>
+						<!-- 主题 -->
+						<section
+							class="settings-panel"
+							data-settings-panel="theme"
+							data-testid="settings-panel-theme"
+						>
+							<h3>显示模式</h3>
+							<p class="muted settings-hint">默认跟随系统的深浅色设置。</p>
+							<div
+								class="segmented"
+								data-testid="settings-theme"
+							>
+								<button
+									data-theme-choice="system"
+									data-testid="theme-system"
+								>
+									跟随系统
+								</button>
+								<button
+									data-theme-choice="light"
+									data-testid="theme-light"
+								>
+									浅色
+								</button>
+								<button
+									data-theme-choice="dark"
+									data-testid="theme-dark"
+								>
+									深色
+								</button>
+							</div>
+						</section>
+						<!-- 外观 -->
+						<section
+							class="settings-panel"
+							data-settings-panel="appearance"
+							data-testid="settings-panel-appearance"
+						>
+							<h3>配色</h3>
+							<p class="muted settings-hint">
+								默认用你系统的强调色生成整套配色；也可以自己挑一个种子色。
+							</p>
+							<div
+								class="segmented"
+								data-testid="settings-accent"
+							>
+								<button
+									data-accent-choice="system"
+									data-testid="accent-system"
+								>
+									系统主题色
+								</button>
+								<button
+									data-accent-choice="custom"
+									data-testid="accent-custom"
+								>
+									自定义
+								</button>
+							</div>
+							<div
+								class="settings-row"
+								id="settings-accent-row"
+								hidden
+							>
+								<label>种子色</label>
+								<!--
 							⚠️ 这里**不能**用 `<input type="color">`。
 							点开它弹出的是**操作系统**的取色器 —— 那是个 OS 窗口，
 							CSS 碰不到它，所以"圆角 / 主题色"从原理上就做不到
@@ -536,520 +776,568 @@
 							既不需要那个无法主题化的 OS 弹框，也不用自己做一整套
 							色相/明度取色器 —— 桌面用户给十六进制是最快的路径。
 						-->
-						<div
-							class="swatches"
-							id="settings-accent-swatches"
-							data-testid="settings-accent-swatches"
-						></div>
-						<input
-							id="settings-accent-hex-input"
-							data-testid="settings-accent-hex-input"
-							type="text"
-							spellcheck="false"
-							maxlength="7"
-							placeholder="#6750A4"
-							aria-label="十六进制颜色"
-						/>
-					</div>
+								<div
+									class="swatches"
+									id="settings-accent-swatches"
+									data-testid="settings-accent-swatches"
+								></div>
+								<input
+									id="settings-accent-hex-input"
+									data-testid="settings-accent-hex-input"
+									type="text"
+									spellcheck="false"
+									maxlength="7"
+									placeholder="#6750A4"
+									aria-label="十六进制颜色"
+								/>
+							</div>
 
-					<h3>材质</h3>
-					<p class="muted settings-hint">
-						顶栏、弹窗与设置面板的模糊强度。
-					</p>
-					<div class="segmented" data-testid="settings-material">
-						<button data-material-choice="none" data-testid="material-none">
-							无
-						</button>
-						<button data-material-choice="blur" data-testid="material-blur">
-							模糊
-						</button>
-						<button
-							data-material-choice="gradient"
-							data-testid="material-gradient"
+							<h3>材质</h3>
+							<p class="muted settings-hint">
+								顶栏、弹窗与设置面板的模糊强度。
+							</p>
+							<div
+								class="segmented"
+								data-testid="settings-material"
+							>
+								<button
+									data-material-choice="none"
+									data-testid="material-none"
+								>
+									无
+								</button>
+								<button
+									data-material-choice="blur"
+									data-testid="material-blur"
+								>
+									模糊
+								</button>
+								<button
+									data-material-choice="gradient"
+									data-testid="material-gradient"
+								>
+									渐变模糊
+								</button>
+							</div>
+						</section>
+
+						<!-- 播放 -->
+						<section
+							class="settings-panel"
+							data-settings-panel="playback"
+							data-testid="settings-panel-playback"
 						>
-							渐变模糊
-						</button>
-					</div>
-				</section>
+							<h3>定时关闭</h3>
+							<p class="muted settings-hint">
+								到点前 5 秒开始淡出，然后暂停播放并还原音量。
+							</p>
+							<div
+								class="segmented segmented--wrap"
+								id="settings-sleep-presets"
+								data-testid="settings-sleep-presets"
+							></div>
+							<div class="settings-row">
+								<input
+									id="settings-sleep-custom"
+									data-testid="settings-sleep-custom"
+									type="number"
+									min="1"
+									placeholder="自定义分钟"
+								/>
+								<button
+									id="settings-sleep-set"
+									data-testid="settings-sleep-set"
+								>
+									设置
+								</button>
+								<button
+									id="settings-sleep-cancel"
+									data-testid="settings-sleep-cancel"
+								>
+									取消
+								</button>
+							</div>
+							<p
+								class="settings-status"
+								id="settings-sleep-status"
+								data-testid="settings-sleep-status"
+							></p>
 
-				<!-- 播放 -->
-				<section
-					class="settings-panel"
-					data-settings-panel="playback"
-					data-testid="settings-panel-playback"
-				>
-					<h3>定时关闭</h3>
-					<p class="muted settings-hint">
-						到点前 5 秒开始淡出，然后暂停播放并还原音量。
-					</p>
-					<div
-						class="segmented segmented--wrap"
-						id="settings-sleep-presets"
-						data-testid="settings-sleep-presets"
-					></div>
-					<div class="settings-row">
-						<input
-							id="settings-sleep-custom"
-							data-testid="settings-sleep-custom"
-							type="number"
-							min="1"
-							placeholder="自定义分钟"
-						/>
-						<button id="settings-sleep-set" data-testid="settings-sleep-set">
-							设置
-						</button>
-						<button
-							id="settings-sleep-cancel"
-							data-testid="settings-sleep-cancel"
-						>
-							取消
-						</button>
-					</div>
-					<p
-						class="settings-status"
-						id="settings-sleep-status"
-						data-testid="settings-sleep-status"
-					></p>
-
-					<h3>响度均衡</h3>
-					<!--
+							<h3>响度均衡</h3>
+							<!--
 						M3 开关。原生 checkbox 在设置里被当成开关用，是「默认 HTML 样式」
 						最明显的一处；组件层的 .switch 提供 52×32 轨道 + 圆形滑块。
 						label 包住 input，所以点文字也能切换（原生行为，不需要额外 JS）。
 					-->
-					<label class="settings-toggle">
-						<input
-							id="settings-loudness"
-							data-testid="settings-loudness"
-							class="switch"
-							type="checkbox"
-						/>
-						<span>启用响度均衡</span>
-					</label>
-					<div class="settings-row">
-						<label for="settings-loudness-target">目标电平</label>
-						<input
-							id="settings-loudness-target"
-							data-testid="settings-loudness-target"
-							type="range"
-							min="5"
-							max="30"
-							step="1"
-							value="14"
-						/>
-						<span
-							class="mono"
-							id="settings-loudness-target-value"
-							data-testid="settings-loudness-target-value"
-							>-14 dB</span
+							<label class="settings-toggle">
+								<input
+									id="settings-loudness"
+									data-testid="settings-loudness"
+									class="switch"
+									type="checkbox"
+								/>
+								<span>启用响度均衡</span>
+							</label>
+							<div class="settings-row">
+								<label for="settings-loudness-target">目标电平</label>
+								<input
+									id="settings-loudness-target"
+									data-testid="settings-loudness-target"
+									type="range"
+									min="5"
+									max="30"
+									step="1"
+									value="14"
+								/>
+								<span
+									class="mono"
+									id="settings-loudness-target-value"
+									data-testid="settings-loudness-target-value"
+									>-14 dB</span
+								>
+							</div>
+							<p
+								class="settings-status"
+								id="settings-loudness-status"
+								data-testid="settings-loudness-status"
+							></p>
+						</section>
+
+						<!-- 歌词 -->
+						<section
+							class="settings-panel"
+							data-settings-panel="lyrics"
+							data-testid="settings-panel-lyrics"
 						>
-					</div>
-					<p
-						class="settings-status"
-						id="settings-loudness-status"
-						data-testid="settings-loudness-status"
-					></p>
-				</section>
+							<h3>歌词来源</h3>
+							<p class="muted settings-hint">
+								关掉之后不会自动为每首歌去找歌词；需要时可以在歌词面板里手动匹配。
+							</p>
+							<label class="settings-toggle">
+								<input
+									id="settings-lyrics-auto"
+									data-testid="settings-lyrics-auto"
+									class="switch"
+									type="checkbox"
+								/>
+								<span>自动匹配歌词</span>
+							</label>
+							<div class="settings-row">
+								<button
+									id="settings-lyrics-window"
+									data-testid="settings-lyrics-window"
+									class="btn--outlined"
+								>
+									打开独立歌词窗口
+								</button>
+							</div>
+						</section>
 
-				<!-- 歌词 -->
-				<section
-					class="settings-panel"
-					data-settings-panel="lyrics"
-					data-testid="settings-panel-lyrics"
-				>
-					<h3>歌词来源</h3>
-					<p class="muted settings-hint">
-						关掉之后不会自动为每首歌去找歌词；需要时可以在歌词面板里手动匹配。
-					</p>
-					<label class="settings-toggle">
-						<input
-							id="settings-lyrics-auto"
-							data-testid="settings-lyrics-auto"
-							class="switch"
-							type="checkbox"
-						/>
-						<span>自动匹配歌词</span>
-					</label>
-					<div class="settings-row">
-						<button
-							id="settings-lyrics-window"
-							data-testid="settings-lyrics-window"
-							class="btn--outlined"
+						<!-- 下载 -->
+						<section
+							class="settings-panel"
+							data-settings-panel="download"
+							data-testid="settings-panel-download"
 						>
-							打开独立歌词窗口
-						</button>
-					</div>
-				</section>
+							<h3>下载目录</h3>
+							<p
+								class="muted mono settings-path"
+								id="settings-download-dir"
+							></p>
+							<div class="settings-row">
+								<button
+									id="settings-download-open"
+									data-testid="settings-download-open"
+								>
+									在文件管理器中打开
+								</button>
+								<label for="settings-download-parallel">并发</label>
+								<input
+									id="settings-download-parallel"
+									data-testid="settings-download-parallel"
+									type="number"
+									min="1"
+									max="6"
+									value="2"
+								/>
+							</div>
 
-				<!-- 下载 -->
-				<section
-					class="settings-panel"
-					data-settings-panel="download"
-					data-testid="settings-panel-download"
-				>
-					<h3>下载目录</h3>
-					<p class="muted mono settings-path" id="settings-download-dir"></p>
-					<div class="settings-row">
-						<button
-							id="settings-download-open"
-							data-testid="settings-download-open"
+							<h3>进行中的下载</h3>
+							<div
+								id="settings-download-tasks"
+								data-testid="settings-download-tasks"
+							></div>
+
+							<h3>已下载</h3>
+							<div class="settings-row">
+								<button
+									id="settings-download-refresh"
+									data-testid="settings-download-refresh"
+								>
+									刷新
+								</button>
+							</div>
+							<div
+								id="settings-download-list"
+								data-testid="settings-download-list"
+							></div>
+							<p
+								class="settings-status"
+								id="settings-download-status"
+								data-testid="settings-download-status"
+							></p>
+						</section>
+
+						<!-- Bilibili 账号 -->
+						<section
+							class="settings-panel"
+							data-settings-panel="account-bili"
+							data-testid="settings-panel-account-bili"
 						>
-							在文件管理器中打开
-						</button>
-						<label for="settings-download-parallel">并发</label>
-						<input
-							id="settings-download-parallel"
-							data-testid="settings-download-parallel"
-							type="number"
-							min="1"
-							max="6"
-							value="2"
-						/>
-					</div>
-
-					<h3>进行中的下载</h3>
-					<div
-						id="settings-download-tasks"
-						data-testid="settings-download-tasks"
-					></div>
-
-					<h3>已下载</h3>
-					<div class="settings-row">
-						<button
-							id="settings-download-refresh"
-							data-testid="settings-download-refresh"
-						>
-							刷新
-						</button>
-					</div>
-					<div
-						id="settings-download-list"
-						data-testid="settings-download-list"
-					></div>
-					<p
-						class="settings-status"
-						id="settings-download-status"
-						data-testid="settings-download-status"
-					></p>
-				</section>
-
-				<!-- Bilibili 账号 -->
-				<section
-					class="settings-panel"
-					data-settings-panel="account-bili"
-					data-testid="settings-panel-account-bili"
-				>
-					<!--
+							<!--
 						⚠️ 只显示**头像 + 昵称**（用户明确要求）。
 						账号页要回答的是"我现在是谁"，不是"你的凭据存在哪"——
 						后者属于「关于 › 诊断信息」。
 					-->
-					<div class="account-summary" data-testid="settings-bili-summary">
-						<div class="account-summary__avatar" data-testid="settings-bili-avatar">
-							<span class="icon icon--lg">person</span>
-						</div>
-						<div class="account-summary__main">
 							<div
-								class="account-summary__name"
-								id="settings-bili-name"
-								data-testid="settings-bili-name"
+								class="account-summary"
+								data-testid="settings-bili-summary"
 							>
-								未登录
+								<div
+									class="account-summary__avatar"
+									data-testid="settings-bili-avatar"
+								>
+									<span class="icon icon--lg">person</span>
+								</div>
+								<div class="account-summary__main">
+									<div
+										class="account-summary__name"
+										id="settings-bili-name"
+										data-testid="settings-bili-name"
+									>
+										未登录
+									</div>
+									<div
+										class="account-summary__sub muted"
+										id="settings-bili-sub"
+										data-testid="settings-bili-sub"
+									></div>
+								</div>
 							</div>
-							<div
-								class="account-summary__sub muted"
-								id="settings-bili-sub"
-								data-testid="settings-bili-sub"
-							></div>
-						</div>
-					</div>
-					<div class="settings-row settings-row--wrap">
-						<button
-							id="settings-bili-login"
-							data-testid="settings-bili-login"
-							class="btn--filled"
-						>
-							登录 B 站
-						</button>
-						<button
-							id="settings-bili-logout"
-							data-testid="settings-bili-logout"
-							class="btn--outlined"
-							hidden
-						>
-							退出登录
-						</button>
-					</div>
-					<p
-						class="settings-status"
-						id="settings-bili-status"
-						data-testid="settings-bili-status"
-					></p>
-				</section>
+							<div class="settings-row settings-row--wrap">
+								<button
+									id="settings-bili-login"
+									data-testid="settings-bili-login"
+									class="btn--filled"
+								>
+									登录 B 站
+								</button>
+								<button
+									id="settings-bili-logout"
+									data-testid="settings-bili-logout"
+									class="btn--outlined"
+									hidden
+								>
+									退出登录
+								</button>
+							</div>
+							<p
+								class="settings-status"
+								id="settings-bili-status"
+								data-testid="settings-bili-status"
+							></p>
+						</section>
 
-				<!-- BBPlayer 账号 -->
-				<section
-					class="settings-panel"
-					data-settings-panel="account-bbplayer"
-					data-testid="settings-panel-account-bbplayer"
-				>
-					<p class="muted settings-hint">
-						共享歌单用的账号。与 B 站账号是两回事 —— 它只用来把歌单同步给协作者。
-					</p>
-					<div class="account-summary" data-testid="settings-bbplayer-summary">
-						<div
-							class="account-summary__avatar"
-							data-testid="settings-bbplayer-avatar"
+						<!-- BBPlayer 账号 -->
+						<section
+							class="settings-panel"
+							data-settings-panel="account-bbplayer"
+							data-testid="settings-panel-account-bbplayer"
 						>
-							<span class="icon icon--lg">group</span>
-						</div>
-						<div class="account-summary__main">
+							<p class="muted settings-hint">
+								共享歌单用的账号。与 B 站账号是两回事 ——
+								它只用来把歌单同步给协作者。
+							</p>
 							<div
-								class="account-summary__name"
-								id="settings-bbplayer-name"
-								data-testid="settings-bbplayer-name"
+								class="account-summary"
+								data-testid="settings-bbplayer-summary"
 							>
-								未登录
+								<div
+									class="account-summary__avatar"
+									data-testid="settings-bbplayer-avatar"
+								>
+									<span class="icon icon--lg">group</span>
+								</div>
+								<div class="account-summary__main">
+									<div
+										class="account-summary__name"
+										id="settings-bbplayer-name"
+										data-testid="settings-bbplayer-name"
+									>
+										未登录
+									</div>
+									<div
+										class="account-summary__sub muted"
+										id="settings-bbplayer-sub"
+										data-testid="settings-bbplayer-sub"
+									></div>
+								</div>
 							</div>
+							<div class="settings-row">
+								<button
+									id="settings-bbplayer-open"
+									data-testid="settings-bbplayer-open"
+									class="btn--tonal"
+								>
+									去共享面板管理
+								</button>
+							</div>
+						</section>
+
+						<!-- 备份与恢复 -->
+						<section
+							class="settings-panel"
+							data-settings-panel="backup"
+							data-testid="settings-panel-backup"
+						>
+							<h3>WebDAV</h3>
+							<p class="muted settings-hint">
+								填好后可以「立即备份并上传」，换设备时在下面挑一份恢复回来。
+							</p>
+							<div class="settings-grid">
+								<label for="settings-webdav-url">地址</label>
+								<input
+									id="settings-webdav-url"
+									data-testid="settings-webdav-url"
+									type="text"
+									placeholder="https://dav.example.com/dav"
+									spellcheck="false"
+								/>
+								<label for="settings-webdav-user">用户名</label>
+								<input
+									id="settings-webdav-user"
+									data-testid="settings-webdav-user"
+									type="text"
+									spellcheck="false"
+									autocomplete="off"
+								/>
+								<label for="settings-webdav-password">密码</label>
+								<input
+									id="settings-webdav-password"
+									data-testid="settings-webdav-password"
+									type="password"
+									autocomplete="off"
+								/>
+								<label for="settings-webdav-directory">远端目录</label>
+								<input
+									id="settings-webdav-directory"
+									data-testid="settings-webdav-directory"
+									type="text"
+									placeholder="/BBPlayer"
+									spellcheck="false"
+								/>
+							</div>
+							<div class="settings-row settings-row--wrap">
+								<button
+									id="settings-webdav-save"
+									data-testid="settings-webdav-save"
+								>
+									保存
+								</button>
+								<button
+									id="settings-webdav-test"
+									data-testid="settings-webdav-test"
+									class="btn--outlined"
+								>
+									测试连接
+								</button>
+								<button
+									id="settings-webdav-upload"
+									data-testid="settings-webdav-upload"
+									class="btn--filled"
+								>
+									立即备份并上传
+								</button>
+								<button
+									id="settings-webdav-refresh"
+									data-testid="settings-webdav-refresh"
+									class="btn--text"
+								>
+									刷新远端列表
+								</button>
+							</div>
+
+							<h3>本地导出</h3>
+							<div class="settings-row settings-row--wrap">
+								<button
+									id="settings-backup-export"
+									data-testid="settings-backup-export"
+								>
+									导出到本地
+								</button>
+								<button
+									id="settings-backup-open-folder"
+									data-testid="settings-backup-open-folder"
+									class="btn--outlined"
+								>
+									打开所在文件夹
+								</button>
+							</div>
+
+							<h3>远端备份</h3>
 							<div
-								class="account-summary__sub muted"
-								id="settings-bbplayer-sub"
-								data-testid="settings-bbplayer-sub"
+								id="settings-backup-list"
+								data-testid="settings-backup-list"
 							></div>
-						</div>
-					</div>
-					<div class="settings-row">
-						<button
-							id="settings-bbplayer-open"
-							data-testid="settings-bbplayer-open"
-							class="btn--tonal"
-						>
-							去共享面板管理
-						</button>
-					</div>
-				</section>
-
-				<!-- 备份与恢复 -->
-				<section
-					class="settings-panel"
-					data-settings-panel="backup"
-					data-testid="settings-panel-backup"
-				>
-					<h3>WebDAV</h3>
-					<p class="muted settings-hint">
-						填好后可以「立即备份并上传」，换设备时在下面挑一份恢复回来。
-					</p>
-					<div class="settings-grid">
-						<label for="settings-webdav-url">地址</label>
-						<input
-							id="settings-webdav-url"
-							data-testid="settings-webdav-url"
-							type="text"
-							placeholder="https://dav.example.com/dav"
-							spellcheck="false"
-						/>
-						<label for="settings-webdav-user">用户名</label>
-						<input
-							id="settings-webdav-user"
-							data-testid="settings-webdav-user"
-							type="text"
-							spellcheck="false"
-							autocomplete="off"
-						/>
-						<label for="settings-webdav-password">密码</label>
-						<input
-							id="settings-webdav-password"
-							data-testid="settings-webdav-password"
-							type="password"
-							autocomplete="off"
-						/>
-						<label for="settings-webdav-directory">远端目录</label>
-						<input
-							id="settings-webdav-directory"
-							data-testid="settings-webdav-directory"
-							type="text"
-							placeholder="/BBPlayer"
-							spellcheck="false"
-						/>
-					</div>
-					<div class="settings-row settings-row--wrap">
-						<button id="settings-webdav-save" data-testid="settings-webdav-save">
-							保存
-						</button>
-						<button
-							id="settings-webdav-test"
-							data-testid="settings-webdav-test"
-							class="btn--outlined"
-						>
-							测试连接
-						</button>
-						<button
-							id="settings-webdav-upload"
-							data-testid="settings-webdav-upload"
-							class="btn--filled"
-						>
-							立即备份并上传
-						</button>
-						<button
-							id="settings-webdav-refresh"
-							data-testid="settings-webdav-refresh"
-							class="btn--text"
-						>
-							刷新远端列表
-						</button>
-					</div>
-
-					<h3>本地导出</h3>
-					<div class="settings-row settings-row--wrap">
-						<button
-							id="settings-backup-export"
-							data-testid="settings-backup-export"
-						>
-							导出到本地
-						</button>
-						<button
-							id="settings-backup-open-folder"
-							data-testid="settings-backup-open-folder"
-							class="btn--outlined"
-						>
-							打开所在文件夹
-						</button>
-					</div>
-
-					<h3>远端备份</h3>
-					<div id="settings-backup-list" data-testid="settings-backup-list"></div>
-					<p
-						class="settings-status"
-						id="settings-backup-status"
-						data-testid="settings-backup-status"
-					></p>
-					<!--
+							<p
+								class="settings-status"
+								id="settings-backup-status"
+								data-testid="settings-backup-status"
+							></p>
+							<!--
 						恢复备份之后数据库连接已关闭、数据文件已替换，必须重启才能继续用。
 						与其让用户自己去关掉再打开，不如把「下一步做什么」直接做成一个按钮。
 						默认隐藏，只有恢复成功后才出现。
 					-->
-					<div class="settings-row">
-						<button
-							id="settings-restart"
-							data-testid="settings-restart"
-							class="btn--filled"
-							hidden
-						>
-							立即重启应用
-						</button>
-					</div>
-				</section>
+							<div class="settings-row">
+								<button
+									id="settings-restart"
+									data-testid="settings-restart"
+									class="btn--filled"
+									hidden
+								>
+									立即重启应用
+								</button>
+							</div>
+						</section>
 
-				<!-- 通用 -->
-				<section
-					class="settings-panel"
-					data-settings-panel="general"
-					data-testid="settings-panel-general"
-				>
-					<h3>存储位置</h3>
-					<p class="muted mono settings-path" id="settings-general-dir"></p>
-					<div class="settings-row">
-						<button
-							id="settings-general-open-folder"
-							data-testid="settings-general-open-folder"
-							class="btn--outlined"
+						<!-- 通用 -->
+						<section
+							class="settings-panel"
+							data-settings-panel="general"
+							data-testid="settings-panel-general"
 						>
-							打开所在文件夹
-						</button>
-					</div>
-					<!--
+							<h3>存储位置</h3>
+							<p
+								class="muted mono settings-path"
+								id="settings-general-dir"
+							></p>
+							<div class="settings-row">
+								<button
+									id="settings-general-open-folder"
+									data-testid="settings-general-open-folder"
+									class="btn--outlined"
+								>
+									打开所在文件夹
+								</button>
+							</div>
+							<!--
 						⚠️ 这一格必须有：通用页的所有动作（打开目录…）以前没有
 						自己的状态行，出错时只能往「备份」页的状态行里写 ——
 						用户在当前页面**什么都看不到**。
 					-->
-					<p
-						class="settings-status"
-						id="settings-general-status"
-						data-testid="settings-general-status"
-					></p>
+							<p
+								class="settings-status"
+								id="settings-general-status"
+								data-testid="settings-general-status"
+							></p>
 
-					<h3>快捷键</h3>
-					<div class="settings-row">
-						<button
-							id="settings-general-shortcuts"
-							data-testid="settings-general-shortcuts"
-							class="btn--outlined"
+							<h3>快捷键</h3>
+							<div class="settings-row">
+								<button
+									id="settings-general-shortcuts"
+									data-testid="settings-general-shortcuts"
+									class="btn--outlined"
+								>
+									查看全部快捷键
+								</button>
+							</div>
+						</section>
+
+						<!-- 关于 -->
+						<section
+							class="settings-panel"
+							data-settings-panel="about"
+							data-testid="settings-panel-about"
 						>
-							查看全部快捷键
-						</button>
-					</div>
-				</section>
+							<h3>关于 BBPlayer</h3>
+							<p class="muted settings-hint">
+								桌面端
+								<span
+									class="mono"
+									id="settings-about-version"
+									data-testid="settings-about-version"
+									>—</span
+								>
+							</p>
 
-				<!-- 关于 -->
-				<section
-					class="settings-panel"
-					data-settings-panel="about"
-					data-testid="settings-panel-about"
-				>
-					<h3>关于 BBPlayer</h3>
-					<p class="muted settings-hint">
-						桌面端 <span class="mono" id="settings-about-version" data-testid="settings-about-version">—</span>
-					</p>
-
-					<!--
+							<!--
 						关于页的主操作：去仓库看看。
 						用户复审时提的「预留个点击前往 github 的按钮」。
 						⚠️ 链接走 `bbplayer.openExternal`，主进程有**白名单**校验 ——
 						不给它拼任意 URL 的能力。
 					-->
-					<div class="row-actions">
-						<button
-							class="btn--filled"
-							id="settings-about-github"
-							data-testid="settings-about-github"
-						>
-							<span class="icon icon--sm">open_in_new</span>
-							<span>前往 GitHub</span>
-						</button>
-					</div>
+							<div class="row-actions">
+								<button
+									class="btn--filled"
+									id="settings-about-github"
+									data-testid="settings-about-github"
+								>
+									<span class="icon icon--sm">open_in_new</span>
+									<span>前往 GitHub</span>
+								</button>
+							</div>
 
-					<!--
+							<!--
 						「诊断信息」是**实现细节唯一的去处**（阶段 0 定下的规矩）。
 						主流程里不出现密钥环 / 明文 / 格式 / 绝对路径这些东西：
 						用户不需要在保存密码的同一屏里读到「未加密存储」，
 						但他确实有权在自己想看的时候查到。
 					-->
-					<details class="settings-diagnostics" data-testid="settings-diagnostics">
-						<summary>诊断信息</summary>
-						<dl class="settings-diagnostics__list">
-							<dt>凭据存储</dt>
-							<dd
-								id="settings-credential-storage"
-								data-testid="settings-credential-storage"
+							<details
+								class="settings-diagnostics"
+								data-testid="settings-diagnostics"
 							>
-								—
-							</dd>
-							<dt>WebDAV 密码存储</dt>
-							<dd
-								id="settings-backup-security"
-								data-testid="settings-backup-security"
-							>
-								—
-							</dd>
-							<dt>后端地址</dt>
-							<dd>
-								<input
-									id="settings-share-base-url"
-									data-testid="settings-share-base-url"
-									type="text"
-									spellcheck="false"
-									placeholder="https://be.bbplayer.roitium.com"
-								/>
-							</dd>
-							<dt>数据目录</dt>
-							<dd id="settings-data-dir" data-testid="settings-data-dir">—</dd>
-						</dl>
-					</details>
+								<summary>诊断信息</summary>
+								<dl class="settings-diagnostics__list">
+									<dt>凭据存储</dt>
+									<dd
+										id="settings-credential-storage"
+										data-testid="settings-credential-storage"
+									>
+										—
+									</dd>
+									<dt>WebDAV 密码存储</dt>
+									<dd
+										id="settings-backup-security"
+										data-testid="settings-backup-security"
+									>
+										—
+									</dd>
+									<dt>后端地址</dt>
+									<dd>
+										<input
+											id="settings-share-base-url"
+											data-testid="settings-share-base-url"
+											type="text"
+											spellcheck="false"
+											placeholder="https://be.bbplayer.roitium.com"
+										/>
+									</dd>
+									<dt>数据目录</dt>
+									<dd
+										id="settings-data-dir"
+										data-testid="settings-data-dir"
+									>
+										—
+									</dd>
+								</dl>
+							</details>
+						</section>
+					</div>
 				</section>
-			</div>
-		</section>
 
-			<!--
+				<!--
 				── 正在播放（阶段 4b）────────────────────────────────
 				⚠️ 与 `#content` / `#view-share` / `#view-settings` **互斥**
 				（见 renderer.js 的 showMainPane）。点播放条的封面/标题进来，
@@ -1061,42 +1349,46 @@
 				队列不复制：`#queue-list` 会被搬进 `#nowplaying-queue-slot`
 				（见 placeQueue 的注释）。
 			-->
-			<section
-				class="nowplaying"
-				id="view-nowplaying"
-				data-testid="view-nowplaying"
-				hidden
-			>
-				<!-- 从封面派生的模糊背景；没有封面时用主色的柔和渐变 -->
-				<div class="nowplaying__bg" id="nowplaying-bg" data-testid="nowplaying-bg"></div>
+				<section
+					class="nowplaying"
+					id="view-nowplaying"
+					data-testid="view-nowplaying"
+					hidden
+				>
+					<!-- 从封面派生的模糊背景；没有封面时用主色的柔和渐变 -->
+					<div
+						class="nowplaying__bg"
+						id="nowplaying-bg"
+						data-testid="nowplaying-bg"
+					></div>
 
-				<div class="nowplaying__inner">
-					<header class="nowplaying__topbar">
-						<button
-							class="icon-button icon-only nowplaying__back"
-							id="nowplaying-close"
-							data-testid="nowplaying-close"
-							title="返回"
-							aria-label="返回"
-						>
-							<span class="icon icon--md">expand_more</span>
-						</button>
-						<div class="nowplaying__crumb">
-							<span class="nowplaying__crumb-label">正在播放</span>
-						</div>
-						<button
-							class="icon-button icon-only"
-							id="nowplaying-toggle-queue"
-							data-testid="nowplaying-toggle-queue"
-							title="呼出 / 收起播放列表"
-							aria-label="呼出 / 收起播放列表"
-							aria-expanded="false"
-						>
-							<span class="icon icon--md">queue_music</span>
-						</button>
-					</header>
+					<div class="nowplaying__inner">
+						<header class="nowplaying__topbar">
+							<button
+								class="icon-button icon-only nowplaying__back"
+								id="nowplaying-close"
+								data-testid="nowplaying-close"
+								title="返回"
+								aria-label="返回"
+							>
+								<span class="icon icon--md">expand_more</span>
+							</button>
+							<div class="nowplaying__crumb">
+								<span class="nowplaying__crumb-label">正在播放</span>
+							</div>
+							<button
+								class="icon-button icon-only"
+								id="nowplaying-toggle-queue"
+								data-testid="nowplaying-toggle-queue"
+								title="呼出 / 收起播放列表"
+								aria-label="呼出 / 收起播放列表"
+								aria-expanded="false"
+							>
+								<span class="icon icon--md">queue_music</span>
+							</button>
+						</header>
 
-					<!--
+						<!--
 						三栏卡片（对齐网易云布局，但视觉卡片化对齐设置/音乐库页）：
 						  左卡 = 封面 + 曲名/歌手/进度/主控
 						  中卡 = 歌词
@@ -1104,139 +1396,312 @@
 						⚠️ 歌词与队列都是**同一份 DOM 搬进来**的，不复制：
 						   队列见 renderer.js 的 placeQueue，歌词见 placeLyrics。
 					-->
-					<div
-						class="nowplaying__columns is-queue-hidden"
-						id="nowplaying-columns"
-						data-testid="nowplaying-columns"
-					>
-						<!-- 左卡：封面 + 元信息 + 进度 + 主控 -->
-						<article class="nowplaying__card nowplaying__card--left">
-							<div class="nowplaying__art" data-testid="nowplaying-art">
-								<img id="nowplaying-cover" data-testid="nowplaying-cover" alt="" hidden />
-								<span class="icon icon--xl" id="nowplaying-placeholder">music_note</span>
-							</div>
+						<div
+							class="nowplaying__columns is-queue-hidden"
+							id="nowplaying-columns"
+							data-testid="nowplaying-columns"
+						>
+							<!-- 左卡：封面 + 元信息 + 进度 + 主控 -->
+							<article class="nowplaying__card nowplaying__card--left">
+								<div
+									class="nowplaying__art"
+									data-testid="nowplaying-art"
+								>
+									<img
+										id="nowplaying-cover"
+										data-testid="nowplaying-cover"
+										alt=""
+										hidden
+									/>
+									<span
+										class="icon icon--xl"
+										id="nowplaying-placeholder"
+										>music_note</span
+									>
+								</div>
 
-							<div class="nowplaying__meta">
-								<h2
-									class="nowplaying__title"
-									id="nowplaying-title"
-									data-testid="nowplaying-title"
-								>
-									未在播放
-								</h2>
-								<p
-									class="nowplaying__artist muted"
-									id="nowplaying-artist"
-									data-testid="nowplaying-artist"
-								>
-									—
-								</p>
-							</div>
+								<div class="nowplaying__meta">
+									<h2
+										class="nowplaying__title"
+										id="nowplaying-title"
+										data-testid="nowplaying-title"
+									>
+										未在播放
+									</h2>
+									<p
+										class="nowplaying__artist muted"
+										id="nowplaying-artist"
+										data-testid="nowplaying-artist"
+									>
+										—
+									</p>
+								</div>
 
-							<!-- 进度条：复用播放条的元素，但放在卡片里 -->
-							<div class="nowplaying__progress">
-								<span class="mono" id="nowplaying-time-current">0:00</span>
-								<input
-									id="nowplaying-progress"
-									data-testid="nowplaying-progress"
-									type="range"
-									min="0"
-									max="1000"
-									value="0"
-									aria-label="播放进度"
-								/>
-								<span class="mono" id="nowplaying-time-total">0:00</span>
-							</div>
-
-							<!-- 主控制（对齐移动端）：上一首 / 播放 / 下一首 -->
-							<div class="nowplaying__controls">
-								<button
-									class="icon-button icon-only"
-									id="nowplaying-prev"
-									data-testid="nowplaying-prev"
-									title="上一首"
-									aria-label="上一首"
-								>
-									<span class="icon icon--lg">skip_previous</span>
-								</button>
-								<button
-									class="nowplaying__play"
-									id="nowplaying-play"
-									data-testid="nowplaying-play"
-									title="播放/暂停"
-									aria-label="播放/暂停"
-								>
-									<span class="icon icon--xl">play_arrow</span>
-								</button>
-								<button
-									class="icon-button icon-only"
-									id="nowplaying-next"
-									data-testid="nowplaying-next"
-									title="下一首"
-									aria-label="下一首"
-								>
-									<span class="icon icon--lg">skip_next</span>
-								</button>
-							</div>
-
-							<!-- 辅助控制（对齐移动端）：模式 / 音量 -->
-							<div class="nowplaying__secondary">
-								<button
-									class="icon-button icon-only"
-									id="nowplaying-mode"
-									data-testid="nowplaying-mode"
-									title="顺序播放"
-									aria-label="播放模式"
-								>
-									<span class="icon icon--md">repeat</span>
-								</button>
-								<div class="nowplaying__volume">
-									<span class="icon icon--sm">volume_up</span>
+								<!-- 进度条：复用播放条的元素，但放在卡片里 -->
+								<div class="nowplaying__progress">
+									<span
+										class="mono"
+										id="nowplaying-time-current"
+										>0:00</span
+									>
 									<input
-										id="nowplaying-volume"
-										data-testid="nowplaying-volume"
+										id="nowplaying-progress"
+										data-testid="nowplaying-progress"
 										type="range"
 										min="0"
-										max="100"
-										value="100"
-										aria-label="音量"
+										max="1000"
+										value="0"
+										aria-label="播放进度"
 									/>
+									<span
+										class="mono"
+										id="nowplaying-time-total"
+										>0:00</span
+									>
 								</div>
-							</div>
-						</article>
 
-						<!-- 中卡：歌词 -->
-						<article
-							class="nowplaying__card nowplaying__card--lyrics"
-							id="nowplaying-lyrics-slot"
-							data-testid="nowplaying-lyrics-slot"
-						></article>
+								<!-- 主控制（对齐移动端）：上一首 / 播放 / 下一首 -->
+								<div class="nowplaying__controls">
+									<button
+										class="icon-button icon-only"
+										id="nowplaying-prev"
+										data-testid="nowplaying-prev"
+										title="上一首"
+										aria-label="上一首"
+									>
+										<span class="icon icon--lg">skip_previous</span>
+									</button>
+									<button
+										class="nowplaying__play"
+										id="nowplaying-play"
+										data-testid="nowplaying-play"
+										title="播放/暂停"
+										aria-label="播放/暂停"
+									>
+										<span class="icon icon--xl">play_arrow</span>
+									</button>
+									<button
+										class="icon-button icon-only"
+										id="nowplaying-next"
+										data-testid="nowplaying-next"
+										title="下一首"
+										aria-label="下一首"
+									>
+										<span class="icon icon--lg">skip_next</span>
+									</button>
+								</div>
 
-						<!-- 右卡：播放队列（可收起） -->
-						<article
-							class="nowplaying__card nowplaying__card--queue"
-							id="nowplaying-queue-column"
-							data-testid="nowplaying-queue-column"
-						>
-							<header class="nowplaying__card-head">
-								<h3 class="nowplaying__card-title">播放队列</h3>
-								<span
-									class="muted mono"
-									id="nowplaying-count"
-									data-testid="nowplaying-count"
-									>0</span
-								>
-							</header>
-							<div
-								class="nowplaying__queue"
-								id="nowplaying-queue-slot"
-								data-testid="nowplaying-queue-slot"
-							></div>
-						</article>
+								<!-- 辅助控制（对齐移动端）：模式 / 音量 -->
+								<div class="nowplaying__secondary">
+									<button
+										class="icon-button icon-only"
+										id="nowplaying-mode"
+										data-testid="nowplaying-mode"
+										title="列表循环"
+										aria-label="播放模式"
+									>
+										<span class="icon icon--md">repeat</span>
+									</button>
+									<div class="nowplaying__volume">
+										<span class="icon icon--sm">volume_up</span>
+										<input
+											id="nowplaying-volume"
+											data-testid="nowplaying-volume"
+											type="range"
+											min="0"
+											max="100"
+											value="100"
+											aria-label="音量"
+										/>
+									</div>
+								</div>
+							</article>
+
+							<!-- 中卡：歌词 -->
+							<article
+								class="nowplaying__card nowplaying__card--lyrics"
+								id="nowplaying-lyrics-slot"
+								data-testid="nowplaying-lyrics-slot"
+							></article>
+
+							<!-- 右卡：播放队列（可收起） -->
+							<article
+								class="nowplaying__card nowplaying__card--queue"
+								id="nowplaying-queue-column"
+								data-testid="nowplaying-queue-column"
+							>
+								<header class="nowplaying__card-head">
+									<h3 class="nowplaying__card-title">播放队列</h3>
+									<span
+										class="muted mono"
+										id="nowplaying-count"
+										data-testid="nowplaying-count"
+										>0</span
+									>
+								</header>
+								<div
+									class="nowplaying__queue"
+									id="nowplaying-queue-slot"
+									data-testid="nowplaying-queue-slot"
+								></div>
+							</article>
+						</div>
 					</div>
-				</div>
-			</section>
+				</section>
 
+				<!--
+				── 播放卡（卡片化阶段 0）────────────────────────────
+				⚠️ 它原来是 `.app` 的直接子项、横跨三栏的底部通栏
+				（`grid-area: playbar`，`grid-template-rows: 1fr 72px`）。
+				现在它是**中栏里的第二行** —— 草图上播放条画在中栏内部、
+				左右有留白。
+
+				为什么放进 `.main` 而不是继续留在 `.app`：
+				  * 它属于"我正在看的内容"这一列，不属于窗口；
+				  * `.main` 是两行网格（内容 `1fr` + 播放卡 `auto`），
+				    换任何页面播放卡都在同一个位置 —— 布局保证的，
+				    不是靠"每个页面都记得给它留位置"。
+
+				⚠️ 里面的 id / testid **一个都不能改**：`player.js` 在脚本解析期
+				就把 `#audio` / `#play` / `#prev` / `#next` / `#progress` /
+				`#volume` / `#mode` / `#time-current` / `#time-total` /
+				`#now-title` / `#now-artist` / `#now-cover` 一次性
+				`getElementById` 缓存（`els` 表），而 `els.audio` 上直接
+				`addEventListener`、**没有 null 保护** —— 少一个就整个
+				player IIFE 抛错，队列/进度/模式全废，**且界面看起来还在**。
+			-->
+				<footer
+					class="playbar"
+					data-testid="playbar"
+				>
+					<!-- 音频元素：自定义协议代理，由主进程注入 Referer 并透传 Range -->
+					<audio
+						id="audio"
+						preload="metadata"
+					></audio>
+
+					<!-- 封面缩略图：没有时显示一个中性占位（不留空白洞） -->
+					<div
+						class="playbar__cover"
+						data-testid="playbar-cover"
+					>
+						<img
+							id="now-cover"
+							data-testid="now-cover"
+							alt=""
+							hidden
+						/>
+						<span
+							class="icon icon--md"
+							id="now-cover-placeholder"
+							>music_note</span
+						>
+					</div>
+
+					<div class="playbar__meta">
+						<div
+							class="playbar__title"
+							id="now-title"
+							data-testid="now-title"
+						>
+							未在播放
+						</div>
+						<div
+							class="playbar__artist muted"
+							id="now-artist"
+							data-testid="now-artist"
+						>
+							—
+						</div>
+					</div>
+
+					<div class="playbar__controls">
+						<button
+							id="prev"
+							class="icon-only"
+							data-testid="btn-prev"
+							title="上一首"
+						>
+							<span class="icon icon--md">skip_previous</span>
+						</button>
+						<button
+							id="play"
+							data-testid="btn-play"
+							class="playbar__play icon-only"
+							title="播放/暂停"
+							aria-label="播放/暂停"
+						>
+							<span class="icon icon--md">play_arrow</span>
+						</button>
+						<button
+							id="next"
+							class="icon-only"
+							data-testid="btn-next"
+							title="下一首"
+						>
+							<span class="icon icon--md">skip_next</span>
+						</button>
+						<!--
+						「呼出 / 收起播放列表」（阶段 D-1b）。
+						位置按用户给的网易云参考图：**传输控制条上、「下一首」右边**
+						（用户在那张图上特意圈出了这个按钮，并说明"它是呼出播放列表的"）。
+					-->
+						<button
+							id="playbar-queue"
+							class="icon-only"
+							data-testid="playbar-queue"
+							title="呼出 / 收起播放列表"
+							aria-label="呼出 / 收起播放列表"
+						>
+							<span class="icon icon--md">queue_music</span>
+						</button>
+					</div>
+
+					<div class="playbar__progress">
+						<span
+							class="mono"
+							id="time-current"
+							data-testid="time-current"
+							>0:00</span
+						>
+						<input
+							id="progress"
+							data-testid="progress"
+							type="range"
+							min="0"
+							max="1000"
+							value="0"
+							aria-label="播放进度"
+						/>
+						<span
+							class="mono"
+							id="time-total"
+							data-testid="time-total"
+							>0:00</span
+						>
+					</div>
+
+					<div class="playbar__extra">
+						<button
+							id="mode"
+							class="icon-only"
+							data-testid="btn-mode"
+							title="列表循环"
+						>
+							<span class="icon icon--md">repeat</span>
+						</button>
+						<input
+							id="volume"
+							data-testid="volume"
+							type="range"
+							min="0"
+							max="100"
+							value="100"
+							title="音量"
+							aria-label="音量"
+						/>
+					</div>
+				</footer>
 			</main>
 
 			<!-- ── 右栏：播放队列 ────────────────────────────────── -->
@@ -1245,10 +1710,24 @@
 				原来还有一个「歌词」页签，但歌词已经搬进「正在播放」页的中栏
 				（见 renderer.js 的 placeLyrics），页签背后的容器是个空壳 ——
 				用户点进去只会看到空白。同一个功能也不该有两个入口。
+
+				⚠️ 它是 `.app` 的**第三个网格列**（`grid-column: 3`），不是
+				`.main` 的子项 —— 收起时是"列宽 0 + overflow hidden"，
+				DOM 仍然在文档里（探针要读队列/歌词，用 display:none 会读不到）。
 			-->
-			<aside class="rightbar" data-testid="rightbar">
-				<div class="tabs" data-testid="rightbar-tabs">
-					<button class="tab is-active" data-panel="queue" data-testid="tab-queue">
+			<aside
+				class="rightbar"
+				data-testid="rightbar"
+			>
+				<div
+					class="tabs"
+					data-testid="rightbar-tabs"
+				>
+					<button
+						class="tab is-active"
+						data-panel="queue"
+						data-testid="tab-queue"
+					>
 						播放队列
 					</button>
 				</div>
@@ -1263,25 +1742,55 @@
 					`querySelectorAll('[data-queue-index]')` 会数出两倍，
 					拖拽/点击也会落到错误的那一棵上。
 				-->
-				<div class="panel is-active" data-panel="queue" data-testid="panel-queue">
+				<div
+					class="panel is-active"
+					data-panel="queue"
+					data-testid="panel-queue"
+				>
 					<!--
 						⚠️ 列表本身要**留在 HTML 里**（而不是由 JS 创建）：
 						`renderer.js` 的 placeQueue() 只是把它在两个槽位之间搬动，
 						元素必须一开始就存在。第一版把这段换成了空的槽位 div，
 						结果 `#queue-list` 根本不存在 —— 队列永远是空的。
 					-->
-					<div id="queue-slot" data-testid="queue-slot">
-						<ol class="queue-list" id="queue-list" data-testid="queue-list"></ol>
+					<div
+						id="queue-slot"
+						data-testid="queue-slot"
+					>
+						<ol
+							class="queue-list"
+							id="queue-list"
+							data-testid="queue-list"
+						></ol>
 					</div>
-					<p class="empty muted" id="queue-empty" data-testid="queue-empty">
+					<p
+						class="empty muted"
+						id="queue-empty"
+						data-testid="queue-empty"
+					>
 						队列为空
 					</p>
 				</div>
 
-				<div class="panel" data-panel="lyrics" data-testid="panel-lyrics">
-					<div class="lyrics" id="lyrics-panel" data-testid="lyrics-panel"></div>
-					<div class="lyrics-toolbar" data-testid="lyrics-toolbar">
-						<button id="lyrics-reload" data-testid="lyrics-reload" title="重新匹配歌词">
+				<div
+					class="panel"
+					data-panel="lyrics"
+					data-testid="panel-lyrics"
+				>
+					<div
+						class="lyrics"
+						id="lyrics-panel"
+						data-testid="lyrics-panel"
+					></div>
+					<div
+						class="lyrics-toolbar"
+						data-testid="lyrics-toolbar"
+					>
+						<button
+							id="lyrics-reload"
+							data-testid="lyrics-reload"
+							title="重新匹配歌词"
+						>
 							重新匹配
 						</button>
 						<button
@@ -1291,108 +1800,15 @@
 						>
 							独立窗口
 						</button>
-						<span class="muted" id="lyrics-status" data-testid="lyrics-status"
+						<span
+							class="muted"
+							id="lyrics-status"
+							data-testid="lyrics-status"
 							>未加载歌词</span
 						>
 					</div>
 				</div>
 			</aside>
-
-			<!--
-				── 底部：悬浮播放条 ───────────────────────────────
-				⚠️ 原来它是一条**贴底的直角横条**（`grid-area: playbar`，
-				背景与主区同色、顶上一条分隔线），观感就是"窗口的分区"。
-
-				阶段 2 改成**悬浮圆角卡**：左右留白、圆角、投影，
-				并从内容区"浮"起来（`margin` + `border-radius` + 阴影），
-				同时补上**封面缩略图** —— 播放条没有封面就像在看文件名。
-			-->
-			<footer class="playbar" data-testid="playbar">
-				<!-- 音频元素：自定义协议代理，由主进程注入 Referer 并透传 Range -->
-				<audio id="audio" preload="metadata"></audio>
-
-				<!-- 封面缩略图：没有时显示一个中性占位（不留空白洞） -->
-				<div class="playbar__cover" data-testid="playbar-cover">
-					<img id="now-cover" data-testid="now-cover" alt="" hidden />
-					<span class="icon icon--md" id="now-cover-placeholder"
-						>music_note</span
-					>
-				</div>
-
-				<div class="playbar__meta">
-					<div class="playbar__title" id="now-title" data-testid="now-title">未在播放</div>
-					<div class="playbar__artist muted" id="now-artist" data-testid="now-artist">—</div>
-				</div>
-
-				<div class="playbar__controls">
-					<button
-						id="prev"
-						class="icon-only"
-						data-testid="btn-prev"
-						title="上一首"
-					><span class="icon icon--md">skip_previous</span></button>
-					<button
-						id="play"
-						data-testid="btn-play"
-						class="playbar__play icon-only"
-						title="播放/暂停"
-						aria-label="播放/暂停"
-					>
-						<span class="icon icon--md">play_arrow</span>
-					</button>
-					<button
-						id="next"
-						class="icon-only"
-						data-testid="btn-next"
-						title="下一首"
-					><span class="icon icon--md">skip_next</span></button>
-					<!--
-						「呼出 / 收起播放列表」（阶段 D-1b）。
-						位置按用户给的网易云参考图：**传输控制条上、「下一首」右边**
-						（用户在那张图上特意圈出了这个按钮，并说明"它是呼出播放列表的"）。
-					-->
-					<button
-						id="playbar-queue"
-						class="icon-only"
-						data-testid="playbar-queue"
-						title="呼出 / 收起播放列表"
-						aria-label="呼出 / 收起播放列表"
-					><span class="icon icon--md">queue_music</span></button>
-				</div>
-
-				<div class="playbar__progress">
-					<span class="mono" id="time-current" data-testid="time-current">0:00</span>
-					<input
-						id="progress"
-						data-testid="progress"
-						type="range"
-						min="0"
-						max="1000"
-						value="0"
-						aria-label="播放进度"
-					/>
-					<span class="mono" id="time-total" data-testid="time-total">0:00</span>
-				</div>
-
-				<div class="playbar__extra">
-					<button
-						id="mode"
-						class="icon-only"
-						data-testid="btn-mode"
-						title="顺序播放"
-					><span class="icon icon--md">repeat</span></button>
-					<input
-						id="volume"
-						data-testid="volume"
-						type="range"
-						min="0"
-						max="100"
-						value="100"
-						title="音量"
-						aria-label="音量"
-					/>
-				</div>
-			</footer>
 		</div>
 
 		<!--
@@ -1412,7 +1828,10 @@
 			都是**静默**的。`role="status"` + `aria-live="polite"` 让它在内容
 			变化时被念出来（错误用 assertive 会打断用户，故仍用 polite）。
 		-->
-		<div class="status-host" data-testid="status-host">
+		<div
+			class="status-host"
+			data-testid="status-host"
+		>
 			<span
 				id="status"
 				data-testid="status"
@@ -1422,7 +1841,11 @@
 			></span>
 		</div>
 		<!-- 构建号挪到设置 › 关于 里（诊断信息的去处），不再占界面 -->
-		<span class="visually-hidden" id="build-info" data-testid="build-info"></span>
+		<span
+			class="visually-hidden"
+			id="build-info"
+			data-testid="build-info"
+		></span>
 
 		<!-- ── 登录弹窗 ──────────────────────────────────────── -->
 		<div
@@ -1448,7 +1871,10 @@
 					</button>
 				</header>
 
-				<div class="tabs tabs--inline" data-testid="login-tabs">
+				<div
+					class="tabs tabs--inline"
+					data-testid="login-tabs"
+				>
 					<button
 						class="tab is-active"
 						data-login-tab="qr"
@@ -1456,7 +1882,11 @@
 					>
 						扫码登录
 					</button>
-					<button class="tab" data-login-tab="cookie" data-testid="login-tab-cookie">
+					<button
+						class="tab"
+						data-login-tab="cookie"
+						data-testid="login-tab-cookie"
+					>
 						粘贴 Cookie
 					</button>
 					<button
@@ -1490,22 +1920,34 @@
 							height="220"
 						/>
 					</div>
-					<p class="login-status" id="login-qr-status" data-testid="login-qr-status">
+					<p
+						class="login-status"
+						id="login-qr-status"
+						data-testid="login-qr-status"
+					>
 						正在获取二维码…
 					</p>
 					<div class="row-actions">
-						<button id="login-qr-refresh" data-testid="login-qr-refresh">
+						<button
+							id="login-qr-refresh"
+							data-testid="login-qr-refresh"
+						>
 							刷新二维码
 						</button>
 					</div>
 					<p class="muted login-hint">
-						用 <strong>哔哩哔哩 App</strong> 扫描上方二维码并在手机上确认。二维码约 3
-						分钟过期。
+						用
+						<strong>哔哩哔哩 App</strong> 扫描上方二维码并在手机上确认。二维码约
+						3 分钟过期。
 					</p>
 				</section>
 
 				<!-- 粘贴 Cookie -->
-				<section class="login-panel" data-login-panel="cookie" data-testid="login-panel-cookie">
+				<section
+					class="login-panel"
+					data-login-panel="cookie"
+					data-testid="login-panel-cookie"
+				>
 					<p class="muted login-hint">
 						在浏览器中登录 B 站后，按 F12 → Application → Cookies →
 						<code>https://www.bilibili.com</code>，至少复制
@@ -1520,7 +1962,10 @@
 						spellcheck="false"
 					></textarea>
 					<div class="row-actions">
-						<button id="login-cookie-submit" data-testid="login-cookie-submit">
+						<button
+							id="login-cookie-submit"
+							data-testid="login-cookie-submit"
+						>
 							导入并校验
 						</button>
 					</div>
@@ -1544,10 +1989,15 @@
 						应用里所有图标都来自同一套图标字体，警告也不例外。
 					-->
 					<p class="muted login-hint login-hint--warn">
-						<span class="icon icon--sm" aria-hidden="true">warning</span>
+						<span
+							class="icon icon--sm"
+							aria-hidden="true"
+							>warning</span
+						>
 						<span
 							>密码登录受 B 站风控约束：若服务端要求验证码，本应用无法完成，
-							请改用扫码或粘贴 Cookie。密码只在本地做 RSA 加密后提交，不落盘。</span
+							请改用扫码或粘贴 Cookie。密码只在本地做 RSA
+							加密后提交，不落盘。</span
 						>
 					</p>
 					<input
@@ -1586,15 +2036,28 @@
 					data-login-panel="account"
 					data-testid="login-panel-account"
 				>
-					<div id="login-account" data-testid="login-account"></div>
+					<div
+						id="login-account"
+						data-testid="login-account"
+					></div>
 					<div class="row-actions">
-						<button id="login-logout" data-testid="login-logout">退出登录</button>
+						<button
+							id="login-logout"
+							data-testid="login-logout"
+						>
+							退出登录
+						</button>
 					</div>
 				</section>
 			</div>
 		</div>
 
-		<pre id="log" data-testid="log" class="log" hidden></pre>
+		<pre
+			id="log"
+			data-testid="log"
+			class="log"
+			hidden
+		></pre>
 
 		<!--
 			theme.js 必须排在所有脚本**最前面**：它把主进程下发的设计令牌写成
@@ -1630,4 +2093,3 @@
 		<script src="renderer.js"></script>
 	</body>
 </html>
-

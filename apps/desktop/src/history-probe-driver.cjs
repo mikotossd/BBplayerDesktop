@@ -108,7 +108,11 @@ async function run(window) {
 			history: typeof window.bbHistory,
 			bridge: typeof window.bbplayer?.history,
 			finder: typeof window.bbplayer?.findTrackByBvid,
-			navItem: Boolean(document.querySelector('[data-testid="nav-home"]')),
+			/*
+			 * ⚠️ 主页入口在卡片化阶段 1 从"左栏导航项"改成"用户卡本体"
+			 * （点卡片回主页）。判据本身没变：主页这个目的地有入口、点得到。
+			 */
+			navItem: Boolean(document.querySelector('[data-testid="sidebar-brand"]')),
 			session: window.bbUI?.playSession?.() ?? null,
 		}))()`,
 	)
@@ -123,7 +127,7 @@ async function run(window) {
 	)
 
 	// ---------- 2. 空历史的视图 ----------
-	await click(window, '[data-testid="nav-home"]')
+	await click(window, '[data-testid="sidebar-brand"]')
 	const emptyView = await waitFor(
 		window,
 		`(() => {
@@ -166,7 +170,7 @@ async function run(window) {
 	await shot(window, 'history-01-empty')
 
 	// ---------- 3. 造数据：导入一个真实合集 ----------
-	await click(window, '[data-testid="nav-library"]')
+	await click(window, '[data-testid="sidebar-card"]')
 	await sleep(400)
 	const seeded = await waitFor(
 		window,
@@ -317,7 +321,7 @@ async function run(window) {
 		JSON.stringify(partial),
 	)
 
-	await click(window, '[data-testid="nav-home"]')
+	await click(window, '[data-testid="sidebar-brand"]')
 	await click(window, '[data-testid="history-tab-resume"]')
 	const resumeRows = await waitFor(
 		window,

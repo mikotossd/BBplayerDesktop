@@ -202,9 +202,26 @@ export function deriveSchemeFromAccent(accent: string, mode: Mode) {
 	const rgb = parseHex(accent)
 	if (!rgb) return null
 	const seed = rgbToHsl(rgb)
-	// 饱和度太低的种子（灰、近黑近白）派生出来会是一片灰 ——
-	// 给一个下限，至少还有点色相可分。调用方也可以据此决定退回基线。
-	const usable = { h: seed.h, s: Math.max(seed.s, 0.18), l: seed.l }
+	/*
+	 * ⚠️ **无彩色种子（灰 / 近黑 / 近白）必须走"中性"分支**。
+	 *
+	 * 原来的做法是无条件给饱和度一个下限（`max(s, 0.18)`），理由是
+	 * "饱和度太低的种子派生出来会是一片灰，给个下限至少还有点色相可分"。
+	 * 但那个下限配上 `rgbToHsl` 对灰返回的色相（0°，也就是**红**），
+	 * 会把"白色"派生成淡红色 —— 用户明确要的中性配色会变成粉色系。
+	 *
+	 * 所以：种子饱和度低于这个阈值时，**色相不参与派生**，
+	 * 整组颜色按纯灰阶生成（`hueShift` 无效、饱和度保持 0）。
+	 * 亮度与对比度校正照旧 —— 保证可读性。
+	 */
+	const ACHROMATIC_S_MAX = 0.04
+	const achromatic = seed.s < ACHROMATIC_S_MAX
+	// 饱和度太低的种子给一个下限，至少还有点色相可分；无彩色例外
+	const usable = {
+		h: seed.h,
+		s: achromatic ? 0 : Math.max(seed.s, 0.18),
+		l: seed.l,
+	}
 
 	/** 一组"背景 + 它的前景"，生成后做对比度校正 */
 	const family = ({
@@ -221,7 +238,8 @@ export function deriveSchemeFromAccent(accent: string, mode: Mode) {
 			onContainer: ToneSpec
 		}
 	}) => {
-		const spec = { hueOffset, satScale }
+		// 无彩色种子：色相偏移与饱和度缩放都不参与，避免派生出色偏
+		const spec = achromatic ? {} : { hueOffset, satScale }
 		const on = role(usable, mode, {
 			...spec,
 			tone: tones.on,

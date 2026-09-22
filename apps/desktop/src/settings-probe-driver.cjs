@@ -140,8 +140,11 @@ async function run(window) {
 			panel: typeof window.bbSettings,
 			viaUI: typeof window.bbUI?.settingsPanel,
 			gear: Boolean(document.getElementById('settings-open')),
-			// 设置作为**目的地**在左栏导航里（顶部齿轮已移除，见下面的断言）
-			navSettings: Boolean(document.querySelector('[data-testid="nav-settings"]')),
+			// 设置作为**目的地**在左栏卡片里（卡片化阶段 1：导航项已删除，
+			// 「设置」现在是歌单卡页脚的入口；顶部齿轮早已移除）
+			navSettings: Boolean(
+				document.querySelector('[data-testid="sidebar-settings"]'),
+			),
 			theme: document.documentElement.getAttribute('data-theme'),
 		}))()`,
 	)
@@ -152,7 +155,7 @@ async function run(window) {
 	// 左栏导航里已经有「设置」，顶部再放一个齿轮就是同一个入口两次
 	// （截图审查发现的）。现在断言反过来：**不该有齿轮，且导航里有设置**。
 	check('侧栏没有重复的设置入口（齿轮已移除）', modules.gear === false)
-	check('设置作为目的地存在于左栏导航', modules.navSettings === true)
+	check('设置作为目的地在左栏卡片里', modules.navSettings === true)
 	await shot(window, 'settings-01-boot')
 
 	// ---------- 2. 打开抽屉 ----------
@@ -160,7 +163,8 @@ async function run(window) {
 		'设置抽屉初始隐藏',
 		await evaluate(window, `document.getElementById('view-settings').hidden`),
 	)
-	await click(window, '[data-testid="nav-settings"]')
+	// ⚠️ 入口从「左栏导航项」改成「歌单卡页脚的『设置』」（卡片化阶段 1）
+	await click(window, '[data-testid="sidebar-settings"]')
 	await sleep(400)
 	check(
 		'点左栏「设置」后设置页可见',
@@ -208,8 +212,16 @@ async function run(window) {
 		String(initial.theme),
 	)
 	check(
-		'默认偏好是「跟随系统」（由主进程用 nativeTheme 解析）',
-		initial.described?.preference === 'system',
+		/*
+		 * ⚠️ 判据在卡片化改造里改过：默认偏好从 `system` 改成 **`light`**。
+		 *
+		 * 用户明确要求"主题色默认是白色，而不是现在的粉色"。跟随系统在
+		 * 深色系统上会立刻变深色，与"默认白色"矛盾。三态本身没变
+		 * （跟随系统 / 浅色 / 深色仍然都能选，下面照样往返验证），
+		 * 变的只是**默认值**。
+		 */
+		'默认偏好是「浅色」（用户要求默认白色）',
+		initial.described?.preference === 'light',
 		`preference=${initial.described?.preference} → ${initial.theme}`,
 	)
 	check(
@@ -477,13 +489,23 @@ async function run(window) {
 		`${accentControl.swatchWidth}px 宽，圆角 ${accentControl.swatchRadius}`,
 	)
 
-	// 点一个**不在预设里**的色块不行 —— 用一个预设色块验证真的换主题
+	/*
+	 * 点一个**真实存在的**预设色块，验证真的换主题。
+	 *
+	 * ⚠️ 这里原来点的是 `[data-accent-swatch="#0078d4"]` —— 那个值
+	 * **不在** `ACCENT_PRESETS` 里（见 settings-panel.js），所以
+	 * `swatch.click()` 一直是空转。它以前能"通过"，是因为当时的默认
+	 * 种子色（跟随系统 = 品牌紫）与预设色恰好不同，于是"点完之后主色变了"
+	 * 这个判据被**别的原因**满足了（默认值恰好对不上）。
+	 * 改成中性默认色之后就暴露了：两次量到同一个颜色。
+	 * 现在改点一个真的在列表里的蓝，判据不变（"换了种子色，主色真的变了"）。
+	 */
 	await evaluate(
 		window,
 		`(() => {
-			const swatch = document.querySelector('[data-accent-swatch="#0078d4"]')
+			const swatch = document.querySelector('[data-accent-swatch="#0061A4"]')
 			if (swatch) swatch.click()
-			return true
+			return Boolean(swatch)
 		})()`,
 	)
 	await sleep(900)
@@ -1254,11 +1276,21 @@ async function run(window) {
 			: JSON.stringify(deadHost.value),
 	)
 
-	// ---------- 9. 关闭 ----------
-	await click(window, '[data-testid="nav-library"]')
+	// ---------- 9. 离开设置 ----------
+	/*
+	 * ⚠️ 判据在卡片化阶段 1 改过。
+	 *
+	 * 原来这里点的是左栏的 `nav-library` 导航项 —— 那个元素已经删了
+	 * （左栏现在是两张卡片），于是点击落空、设置页仍然可见，
+	 * 断言报的是"关闭按钮隐藏抽屉"失败，**而真实原因是入口不存在**。
+	 *
+	 * 语义没变：离开设置靠的是**切到别处**，不是那个从来不存在的关闭按钮。
+	 * 现在点"歌单卡本体"回音乐库，与用户的实际路径一致。
+	 */
+	await click(window, '[data-testid="sidebar-card"]')
 	await sleep(300)
 	check(
-		'关闭按钮隐藏抽屉',
+		'切到别的目的地后设置页让位',
 		await evaluate(window, `document.getElementById('view-settings').hidden`),
 	)
 

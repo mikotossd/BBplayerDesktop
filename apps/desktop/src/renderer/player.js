@@ -21,7 +21,19 @@
 		return `<span class="icon ${extraClass}">${name}</span>`
 	}
 
-	const PLAY_MODES = ['order', 'repeat-one', 'shuffle']
+	/**
+	 * 播放模式（四档）。
+	 *
+	 * ⚠️ 原先只有三档（order / repeat-one / shuffle），而 order 的行为是
+	 * "放完最后一首回到第一首" —— 也就是说它**实际上是列表循环**，却叫「顺序播放」。
+	 * 用户确认要四档，于是把语义拆开：
+	 *
+	 *   list-loop  列表循环：自动续播，队尾回到队首（＝原 order 的行为）
+	 *   repeat-one 单曲循环：自动续播只重播当前这一首
+	 *   shuffle    随机播放：按洗牌序走，走到末尾重洗
+	 *   order      顺序播放：**放完最后一首就停**（新增行为）
+	 */
+	const PLAY_MODES = ['list-loop', 'repeat-one', 'shuffle', 'order']
 	/**
 	 * 播放模式的图标与无障碍名。
 	 *
@@ -30,14 +42,16 @@
 	 * 所以鼠标悬停与读屏仍然能知道当前是什么模式。
 	 */
 	const MODE_ICON = {
-		order: 'repeat',
+		'list-loop': 'repeat',
 		'repeat-one': 'repeat_one',
 		shuffle: 'shuffle',
+		order: 'arrow_forward',
 	}
 	const MODE_LABEL = {
-		order: '顺序播放',
+		'list-loop': '列表循环',
 		'repeat-one': '单曲循环',
 		shuffle: '随机播放',
+		order: '顺序播放',
 	}
 
 	const els = {
@@ -86,7 +100,12 @@
 	const state = {
 		queue: [],
 		index: -1,
-		mode: 'order',
+		/*
+		 * 默认「列表循环」。⚠️ 这是**用户可见的行为**：打开应用点「播放全部」后，
+		 * 播到最后一首会回到第一首，而不是停下。默认值从 `order` 改成 `list-loop`
+		 * 是为了保持改造前 `order` 的实际行为不变（见上面 PLAY_MODES 的注释）。
+		 */
+		mode: 'list-loop',
 		/** 随机播放的洗牌顺序（队列下标的排列）与当前所处位置 */
 		shuffleOrder: [],
 		shufflePos: -1,
@@ -250,11 +269,17 @@
 		if (mode === 'shuffle') {
 			if (queue.length === 1) return index
 			if (state.shuffleOrder.length !== queue.length) reshuffle()
-			// 走到洗牌顺序的末尾就重洗一轮（对应"顺序播放"的回到队首）
+			// 走到洗牌顺序的末尾就重洗一轮（对应"列表循环"的回到队首）
 			const nextPos = (state.shufflePos + 1) % state.shuffleOrder.length
 			if (nextPos === 0) reshuffle()
 			return state.shuffleOrder[nextPos]
 		}
+		/*
+		 * 顺序播放：自动续播走到**最后一首就停**（返回 -1）。
+		 * 手动点「下一首」仍然回绕 —— 用户的意图明确，不该被模式挡住。
+		 * 其余模式（list-loop）保持原有的 `%` 回绕。
+		 */
+		if (mode === 'order' && auto && index >= queue.length - 1) return -1
 		return (index + 1) % queue.length
 	}
 
@@ -907,6 +932,17 @@
 		getIndex: () => state.index,
 		getCurrent: () => state.queue[state.index] || null,
 		getMode: () => state.mode,
+		/** 当前模式的显示名与图标名（探针断言"四档都不同"用） */
+		getModeLabel: () => MODE_LABEL[state.mode] ?? '',
+		getModeIcon: () => MODE_ICON[state.mode] ?? '',
+		/**
+		 * **只看**自动/手动续播会落到哪个下标，不改任何状态、不播放。
+		 *
+		 * 有这个只读探针，断言才能在不发网络请求、不等音频的前提下验证四档语义
+		 * （`playNext` 会真的换曲并 `play()`，在探针里代价太大）。
+		 * 返回值与 `playNext()` 实际会用的完全一致 —— 两者共用 `nextIndex()`。
+		 */
+		peekNextIndex: (auto = false) => nextIndex(auto),
 		getAudio: () => els.audio,
 		describeError,
 		bufferedRanges,

@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<title>歌单 · BBPlayer Desktop 原型</title>
+		<link
+			rel="stylesheet"
+			href="../assets/proto.css"
+		/>
+	</head>
+	<body>
+		<div class="window">
+			<div class="titlebar">
+				<div class="titlebar__brand">
+					<span class="titlebar__mark"
+						><i
+							class="ic"
+							data-i="music_note"
+						></i
+					></span>
+					BBPlayer
+					<span class="titlebar__where">我喜欢的音乐</span>
+				</div>
+				<div class="titlebar__spacer"></div>
+				<div class="titlebar__controls">
+					<button
+						class="tb-btn"
+						title="最小化"
+					>
+						<i
+							class="ic"
+							data-i="min"
+						></i>
+					</button>
+					<button
+						class="tb-btn"
+						title="最大化"
+					>
+						<i
+							class="ic"
+							data-i="max"
+						></i>
+					</button>
+					<button
+						class="tb-btn tb-btn--close"
+						title="关闭"
+					>
+						<i
+							class="ic"
+							data-i="close"
+						></i>
+					</button>
+				</div>
+			</div>
+
+			<div class="body">
+				<div class="sidebar">
+					<div class="user-card">
+						<span class="user-card__avatar"
+							><i
+								class="ic"
+								data-i="person"
+							></i
+						></span>
+						<span class="user-card__body">
+							<span class="user-card__brand">BBPlayer</span>
+							<span class="user-card__name">御坂代理服务</span>
+						</span>
+					</div>
+
+					<div class="card playlist-card">
+						<div class="card__head">
+							<button
+								class="foot-link"
+								style="width: auto"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="star"
+								></i>
+								收藏夹
+							</button>
+						</div>
+						<div
+							class="card__head"
+							style="min-height: 30px; padding-top: 0"
+						>
+							<span class="card__title">本地歌单</span>
+							<span class="card__actions">
+								<button
+									class="icon-btn icon-btn--sm"
+									title="新建歌单"
+								>
+									<i
+										class="ic ic--sm"
+										data-i="add"
+									></i>
+								</button>
+							</span>
+						</div>
+						<div class="card__body card__body--scroll">
+							<ul class="pl-list">
+								<li class="pl-item is-active">
+									<span class="pl-item__cover"
+										><span class="cover cover--a"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">我喜欢的音乐</span>
+										<span class="pl-item__sub">128 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--b"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">深夜循环</span>
+										<span class="pl-item__sub">42 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="sync"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--c"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">B 站神曲合集</span>
+										<span class="pl-item__sub">76 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--d"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">钢琴与雨</span>
+										<span class="pl-item__sub">31 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--e"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">电子</span>
+										<span class="pl-item__sub">214 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+							</ul>
+						</div>
+						<div
+							style="
+								flex: none;
+								border-top: 1px solid var(--line);
+								padding: 4px;
+							"
+						>
+							<button class="foot-link">
+								<i
+									class="ic ic--sm"
+									data-i="settings"
+								></i>
+								设置
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="page">
+					<div
+						class="card"
+						style="flex: 1 1 auto"
+					>
+						<!-- 页头：封面 / 标题 / 简介 / 作者 / 首数 / 总时长 -->
+						<div class="pl-head">
+							<span class="pl-head__cover"
+								><span class="cover cover--a"
+									><i
+										class="ic ic--xl"
+										data-i="music_note"
+									></i></span
+							></span>
+							<div class="pl-head__body">
+								<h1 class="pl-head__title">我喜欢的音乐</h1>
+								<p class="pl-head__desc">收藏的 B 站音乐与视频投稿。</p>
+								<div class="pl-head__meta">
+									<span>作者 <b>御坂代理服务</b></span>
+									<span><b>128</b> 首</span>
+									<span>总时长 <b>8 小时 41 分</b></span>
+									<span class="dim">3 天前更新</span>
+								</div>
+								<div class="row row--wrap">
+									<button class="btn btn--filled">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+										播放全部
+									</button>
+									<button class="btn btn--outlined">
+										<i
+											class="ic"
+											data-i="queue"
+										></i>
+										加入队列
+									</button>
+									<button class="btn btn--outlined">
+										<i
+											class="ic"
+											data-i="checklist"
+										></i>
+										多选
+									</button>
+									<button
+										class="icon-btn"
+										title="更多"
+									>
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</div>
+							</div>
+						</div>
+
+						<!-- 多选工具条 -->
+						<div class="sel-bar">
+							<span class="sel-bar__count">已选 2 首</span>
+							<button class="btn btn--text btn--sm">全选</button>
+							<button class="btn btn--text btn--sm">反选</button>
+							<span class="spacer"></span>
+							<button class="btn btn--filled">
+								<i
+									class="ic"
+									data-i="playlist_add"
+								></i>
+								添加到歌单
+							</button>
+							<button class="btn btn--outlined">
+								<i
+									class="ic"
+									data-i="delete"
+								></i>
+								移除
+							</button>
+							<button class="btn btn--text">取消</button>
+						</div>
+
+						<!-- 歌曲行 -->
+						<div class="card__body card__body--scroll">
+							<ul class="song-list">
+								<li class="song-row is-playing">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">01</span>
+									<span class="song-row__cover"
+										><span class="cover cover--a"></span
+									></span>
+									<span class="song-row__title">【初音ミク】千本桜</span>
+									<span class="song-row__artist">初音未来</span>
+									<span class="song-row__time">4:03</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row is-checked">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">02</span>
+									<span class="song-row__cover"
+										><span class="cover cover--c"></span
+									></span>
+									<span class="song-row__title">Bad Apple!! feat. nomico</span>
+									<span class="song-row__artist">nomico</span>
+									<span class="song-row__time">3:41</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row is-checked">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">03</span>
+									<span class="song-row__cover"
+										><span class="cover cover--e"></span
+									></span>
+									<span class="song-row__title">Night of Knights</span>
+									<span class="song-row__artist">COOL&amp;CREATE</span>
+									<span class="song-row__time">5:12</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">04</span>
+									<span class="song-row__cover"
+										><span class="cover cover--b"></span
+									></span>
+									<span class="song-row__title">少女レイ</span>
+									<span class="song-row__artist">みきとP</span>
+									<span class="song-row__time">4:28</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">05</span>
+									<span class="song-row__cover"
+										><span class="cover cover--d"></span
+									></span>
+									<span class="song-row__title">命に嫌われている。</span>
+									<span class="song-row__artist">カンザキイオリ</span>
+									<span class="song-row__time">3:56</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">06</span>
+									<span class="song-row__cover"
+										><span class="cover cover--f"></span
+									></span>
+									<span class="song-row__title">ロキ</span>
+									<span class="song-row__artist">みきとP</span>
+									<span class="song-row__time">3:37</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">07</span>
+									<span class="song-row__cover"
+										><span class="cover cover--a"></span
+									></span>
+									<span class="song-row__title">神っぽいな</span>
+									<span class="song-row__artist">ピノキオピー</span>
+									<span class="song-row__time">3:30</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">08</span>
+									<span class="song-row__cover"
+										><span class="cover cover--c"></span
+									></span>
+									<span class="song-row__title">ベノム</span>
+									<span class="song-row__artist">かいりきベア</span>
+									<span class="song-row__time">3:15</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">09</span>
+									<span class="song-row__cover"
+										><span class="cover cover--e"></span
+									></span>
+									<span class="song-row__title">ヴァンパイア</span>
+									<span class="song-row__artist">DECO*27</span>
+									<span class="song-row__time">3:06</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">10</span>
+									<span class="song-row__cover"
+										><span class="cover cover--b"></span
+									></span>
+									<span class="song-row__title">グッバイ宣言</span>
+									<span class="song-row__artist">Chinozo</span>
+									<span class="song-row__time">2:58</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="playbar">
+				<span class="playbar__cover"
+					><span class="cover cover--a"
+						><i
+							class="ic ic--sm"
+							data-i="music_note"
+						></i></span
+				></span>
+				<div class="playbar__meta">
+					<span class="playbar__title">【初音ミク】千本桜</span>
+					<span class="playbar__artist">初音未来 · 我喜欢的音乐</span>
+				</div>
+				<div class="playbar__center">
+					<div
+						class="row"
+						style="gap: 2px"
+					>
+						<button
+							class="icon-btn icon-btn--round"
+							title="上一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="prev"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--play"
+							title="播放"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="play"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--round"
+							title="下一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="next"
+							></i>
+						</button>
+					</div>
+					<div class="progress">
+						<span class="time">1:32</span>
+						<span class="progress__bar"></span>
+						<span class="time">4:03</span>
+					</div>
+				</div>
+				<div class="playbar__side">
+					<button
+						class="icon-btn"
+						title="列表循环"
+					>
+						<i
+							class="ic"
+							data-i="repeat"
+						></i>
+					</button>
+					<button
+						class="icon-btn"
+						title="播放列表"
+					>
+						<i
+							class="ic"
+							data-i="queue"
+						></i>
+					</button>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

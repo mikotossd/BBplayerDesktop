@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<title>收藏夹 · BBPlayer Desktop 原型</title>
+		<link
+			rel="stylesheet"
+			href="../assets/proto.css"
+		/>
+	</head>
+	<body>
+		<div class="window">
+			<div class="titlebar">
+				<div class="titlebar__brand">
+					<span class="titlebar__mark"
+						><i
+							class="ic"
+							data-i="music_note"
+						></i
+					></span>
+					BBPlayer
+					<span class="titlebar__where">收藏夹</span>
+				</div>
+				<div class="titlebar__spacer"></div>
+				<div class="titlebar__controls">
+					<button
+						class="tb-btn"
+						title="最小化"
+					>
+						<i
+							class="ic"
+							data-i="min"
+						></i>
+					</button>
+					<button
+						class="tb-btn"
+						title="最大化"
+					>
+						<i
+							class="ic"
+							data-i="max"
+						></i>
+					</button>
+					<button
+						class="tb-btn tb-btn--close"
+						title="关闭"
+					>
+						<i
+							class="ic"
+							data-i="close"
+						></i>
+					</button>
+				</div>
+			</div>
+
+			<div class="body">
+				<div class="sidebar">
+					<div class="user-card">
+						<span class="user-card__avatar"
+							><i
+								class="ic"
+								data-i="person"
+							></i
+						></span>
+						<span class="user-card__body">
+							<span class="user-card__brand">BBPlayer</span>
+							<span class="user-card__name">御坂代理服务</span>
+						</span>
+					</div>
+
+					<div class="card playlist-card">
+						<div class="card__head">
+							<button
+								class="foot-link foot-link--active"
+								style="width: auto"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="star"
+								></i>
+								收藏夹
+							</button>
+						</div>
+						<div
+							class="card__head"
+							style="min-height: 30px; padding-top: 0"
+						>
+							<span class="card__title">本地歌单</span>
+							<span class="card__actions">
+								<button
+									class="icon-btn icon-btn--sm"
+									title="新建歌单"
+								>
+									<i
+										class="ic ic--sm"
+										data-i="add"
+									></i>
+								</button>
+							</span>
+						</div>
+						<div class="card__body card__body--scroll">
+							<ul class="pl-list">
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--a"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">我喜欢的音乐</span>
+										<span class="pl-item__sub">128 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--b"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">深夜循环</span>
+										<span class="pl-item__sub">42 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="sync"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--c"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">B 站神曲合集</span>
+										<span class="pl-item__sub">76 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--d"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">钢琴与雨</span>
+										<span class="pl-item__sub">31 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+							</ul>
+						</div>
+						<div
+							style="
+								flex: none;
+								border-top: 1px solid var(--line);
+								padding: 4px;
+							"
+						>
+							<button class="foot-link">
+								<i
+									class="ic ic--sm"
+									data-i="settings"
+								></i>
+								设置
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="page">
+					<div
+						class="card"
+						style="flex: 1 1 auto"
+					>
+						<div class="page__top">
+							<label class="search">
+								<i
+									class="ic ic--sm"
+									data-i="search"
+								></i>
+								<input placeholder="搜索视频、BV 号或链接" />
+							</label>
+							<span class="spacer"></span>
+							<div class="tabs">
+								<button class="tab">播放列表</button>
+								<button class="tab is-active">收藏夹</button>
+								<button class="tab">合集</button>
+								<button class="tab">导入</button>
+							</div>
+						</div>
+
+						<!-- UID 工具条 -->
+						<div class="bar">
+							<span
+								class="muted"
+								style="font-size: 12px"
+								>UID</span
+							>
+							<input
+								class="field"
+								value="8047632"
+							/>
+							<button class="btn btn--outlined">用我的 UID</button>
+							<button class="btn">读取</button>
+							<span class="spacer"></span>
+							<span
+								class="dim"
+								style="font-size: 11px"
+								>12 个收藏夹</span
+							>
+							<button
+								class="icon-btn"
+								title="刷新"
+							>
+								<i
+									class="ic"
+									data-i="refresh"
+								></i>
+							</button>
+							<button class="btn btn--text">换个 UID</button>
+						</div>
+
+						<div class="card__body card__body--scroll page__body">
+							<div class="fav-list">
+								<div class="fav-card">
+									<span class="fav-card__cover"
+										><span class="cover cover--a"
+											><i
+												class="ic ic--lg"
+												data-i="video_library"
+											></i></span
+									></span>
+									<span class="fav-card__body">
+										<span class="fav-card__name">默认收藏夹</span>
+										<span class="fav-card__sub">328 个视频</span>
+									</span>
+									<span class="fav-card__act">
+										<button class="btn btn--outlined btn--sm">
+											<i
+												class="ic"
+												data-i="playlist_add"
+											></i>
+											加入本地歌单
+										</button>
+									</span>
+								</div>
+
+								<div class="fav-card">
+									<span class="fav-card__cover"
+										><span class="cover cover--b"
+											><i
+												class="ic ic--lg"
+												data-i="video_library"
+											></i></span
+									></span>
+									<span class="fav-card__body">
+										<span class="fav-card__name">VOCALOID</span>
+										<span class="fav-card__sub">156 个视频</span>
+									</span>
+									<span class="fav-card__act">
+										<button class="btn btn--outlined btn--sm">
+											<i
+												class="ic"
+												data-i="playlist_add"
+											></i>
+											加入本地歌单
+										</button>
+									</span>
+								</div>
+
+								<div class="fav-card">
+									<span class="fav-card__cover"
+										><span class="cover cover--c"
+											><i
+												class="ic ic--lg"
+												data-i="video_library"
+											></i></span
+									></span>
+									<span class="fav-card__body">
+										<span class="fav-card__name">钢琴 / 纯音乐</span>
+										<span class="fav-card__sub">89 个视频</span>
+									</span>
+									<span class="fav-card__act">
+										<button class="btn btn--outlined btn--sm">
+											<i
+												class="ic"
+												data-i="playlist_add"
+											></i>
+											加入本地歌单
+										</button>
+									</span>
+								</div>
+
+								<div class="fav-card">
+									<span class="fav-card__cover"
+										><span class="cover cover--d"
+											><i
+												class="ic ic--lg"
+												data-i="video_library"
+											></i></span
+									></span>
+									<span class="fav-card__body">
+										<span class="fav-card__name">电音</span>
+										<span class="fav-card__sub">241 个视频</span>
+									</span>
+									<span class="fav-card__act">
+										<button class="btn btn--outlined btn--sm">
+											<i
+												class="ic"
+												data-i="playlist_add"
+											></i>
+											加入本地歌单
+										</button>
+									</span>
+								</div>
+
+								<div class="fav-card">
+									<span class="fav-card__cover"
+										><span class="cover cover--e"
+											><i
+												class="ic ic--lg"
+												data-i="video_library"
+											></i></span
+									></span>
+									<span class="fav-card__body">
+										<span class="fav-card__name">和风</span>
+										<span class="fav-card__sub">63 个视频</span>
+									</span>
+									<span class="fav-card__act">
+										<button class="btn btn--outlined btn--sm">
+											<i
+												class="ic"
+												data-i="playlist_add"
+											></i>
+											加入本地歌单
+										</button>
+									</span>
+								</div>
+
+								<div class="fav-card">
+									<span class="fav-card__cover"
+										><span class="cover cover--f"
+											><i
+												class="ic ic--lg"
+												data-i="video_library"
+											></i></span
+									></span>
+									<span class="fav-card__body">
+										<span class="fav-card__name">稍后再看</span>
+										<span class="fav-card__sub">17 个视频</span>
+									</span>
+									<span class="fav-card__act">
+										<button class="btn btn--outlined btn--sm">
+											<i
+												class="ic"
+												data-i="playlist_add"
+											></i>
+											加入本地歌单
+										</button>
+									</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="playbar">
+				<span class="playbar__cover"
+					><span class="cover cover--b"
+						><i
+							class="ic ic--sm"
+							data-i="music_note"
+						></i></span
+				></span>
+				<div class="playbar__meta">
+					<span class="playbar__title">少女レイ</span>
+					<span class="playbar__artist">みきとP · VOCALOID</span>
+				</div>
+				<div class="playbar__center">
+					<div
+						class="row"
+						style="gap: 2px"
+					>
+						<button
+							class="icon-btn icon-btn--round"
+							title="上一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="prev"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--play"
+							title="暂停"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="pause"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--round"
+							title="下一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="next"
+							></i>
+						</button>
+					</div>
+					<div class="progress">
+						<span class="time">2:04</span>
+						<span class="progress__bar"></span>
+						<span class="time">4:28</span>
+					</div>
+				</div>
+				<div class="playbar__side">
+					<button
+						class="icon-btn"
+						title="单曲循环"
+					>
+						<i
+							class="ic"
+							data-i="repeat_one"
+						></i>
+					</button>
+					<button
+						class="icon-btn"
+						title="播放列表"
+					>
+						<i
+							class="ic"
+							data-i="queue"
+						></i>
+					</button>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<title>弹层 · BBPlayer Desktop 原型</title>
+		<link
+			rel="stylesheet"
+			href="../assets/proto.css"
+		/>
+		<style>
+			/* 本页把三层浮层并排静置展示；真实交互里一次只出现一个 */
+			.float-layer {
+				position: absolute;
+				inset: 0;
+				pointer-events: none;
+				z-index: 60;
+			}
+			.float-layer > * {
+				pointer-events: auto;
+			}
+			.float-menu {
+				position: absolute;
+				left: 268px;
+				top: 226px;
+			}
+			.float-add {
+				position: absolute;
+				right: 36px;
+				top: 74px;
+			}
+			.float-new {
+				position: absolute;
+				left: 320px;
+				top: 368px;
+				width: 300px;
+			}
+			.float-label {
+				position: absolute;
+				font-size: var(--fs-label);
+				color: var(--text-2);
+				background: var(--surface-1);
+				border: 1px solid var(--line);
+				border-radius: var(--r-full);
+				padding: 2px 8px;
+				white-space: nowrap;
+				box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+			}
+			.label-menu {
+				left: 268px;
+				top: 198px;
+			}
+			.label-add {
+				right: 36px;
+				top: 48px;
+			}
+			.label-new {
+				left: 320px;
+				top: 340px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="window">
+			<div class="titlebar">
+				<div class="titlebar__brand">
+					<span class="titlebar__mark"
+						><i
+							class="ic"
+							data-i="music_note"
+						></i
+					></span>
+					BBPlayer
+					<span class="titlebar__where">弹层</span>
+				</div>
+				<div class="titlebar__spacer"></div>
+				<div class="titlebar__controls">
+					<button
+						class="tb-btn"
+						title="最小化"
+					>
+						<i
+							class="ic"
+							data-i="min"
+						></i>
+					</button>
+					<button
+						class="tb-btn"
+						title="最大化"
+					>
+						<i
+							class="ic"
+							data-i="max"
+						></i>
+					</button>
+					<button
+						class="tb-btn tb-btn--close"
+						title="关闭"
+					>
+						<i
+							class="ic"
+							data-i="close"
+						></i>
+					</button>
+				</div>
+			</div>
+
+			<div class="body">
+				<div class="sidebar">
+					<div class="user-card">
+						<span class="user-card__avatar"
+							><i
+								class="ic"
+								data-i="person"
+							></i
+						></span>
+						<span class="user-card__body">
+							<span class="user-card__brand">BBPlayer</span>
+							<span class="user-card__name">御坂代理服务</span>
+						</span>
+					</div>
+
+					<div class="card playlist-card">
+						<div class="card__head">
+							<button
+								class="foot-link"
+								style="width: auto"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="star"
+								></i>
+								收藏夹
+							</button>
+						</div>
+						<div
+							class="card__head"
+							style="min-height: 30px; padding-top: 0"
+						>
+							<span class="card__title">本地歌单</span>
+							<span class="card__actions">
+								<button
+									class="icon-btn icon-btn--sm"
+									title="新建歌单"
+								>
+									<i
+										class="ic ic--sm"
+										data-i="add"
+									></i>
+								</button>
+							</span>
+						</div>
+						<div class="card__body card__body--scroll">
+							<ul class="pl-list">
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--a"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">我喜欢的音乐</span>
+										<span class="pl-item__sub">128 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--b"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">深夜循环</span>
+										<span class="pl-item__sub">42 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="sync"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--c"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">B 站神曲合集</span>
+										<span class="pl-item__sub">76 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+							</ul>
+						</div>
+						<div
+							style="
+								flex: none;
+								border-top: 1px solid var(--line);
+								padding: 4px;
+							"
+						>
+							<button class="foot-link">
+								<i
+									class="ic ic--sm"
+									data-i="settings"
+								></i>
+								设置
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="page">
+					<div
+						class="card"
+						style="flex: 1 1 auto"
+					>
+						<div class="page__top">
+							<label class="search">
+								<i
+									class="ic ic--sm"
+									data-i="search"
+								></i>
+								<input placeholder="搜索视频、BV 号或链接" />
+							</label>
+							<span class="spacer"></span>
+							<div class="tabs">
+								<button class="tab is-active">播放列表</button>
+								<button class="tab">收藏夹</button>
+								<button class="tab">合集</button>
+								<button class="tab">导入</button>
+							</div>
+						</div>
+
+						<div class="card__body card__body--scroll page__body">
+							<div class="section__head">
+								<h2 class="section__title">我喜欢的音乐</h2>
+								<span class="spacer"></span>
+								<span class="section__meta mono">128 首</span>
+							</div>
+
+							<ul class="song-list">
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">01</span>
+									<span class="song-row__cover"
+										><span class="cover cover--a"></span
+									></span>
+									<span class="song-row__title">【初音ミク】千本桜</span>
+									<span class="song-row__artist">初音未来</span>
+									<span class="song-row__time">4:03</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">02</span>
+									<span class="song-row__cover"
+										><span class="cover cover--c"></span
+									></span>
+									<span class="song-row__title">Bad Apple!! feat. nomico</span>
+									<span class="song-row__artist">nomico</span>
+									<span class="song-row__time">3:41</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">03</span>
+									<span class="song-row__cover"
+										><span class="cover cover--e"></span
+									></span>
+									<span class="song-row__title">Night of Knights</span>
+									<span class="song-row__artist">COOL&amp;CREATE</span>
+									<span class="song-row__time">5:12</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">04</span>
+									<span class="song-row__cover"
+										><span class="cover cover--b"></span
+									></span>
+									<span class="song-row__title">少女レイ</span>
+									<span class="song-row__artist">みきとP</span>
+									<span class="song-row__time">4:28</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">05</span>
+									<span class="song-row__cover"
+										><span class="cover cover--d"></span
+									></span>
+									<span class="song-row__title">命に嫌われている。</span>
+									<span class="song-row__artist">カンザキイオリ</span>
+									<span class="song-row__time">3:56</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+								<li class="song-row">
+									<button class="song-row__play">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+									</button>
+									<span class="song-row__index">06</span>
+									<span class="song-row__cover"
+										><span class="cover cover--f"></span
+									></span>
+									<span class="song-row__title">ロキ</span>
+									<span class="song-row__artist">みきとP</span>
+									<span class="song-row__time">3:37</span>
+									<button class="song-row__more">
+										<i
+											class="ic"
+											data-i="more"
+										></i>
+									</button>
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- 播放条：把「播放列表」按钮点亮，队列浮层锚在它正上方 -->
+			<div
+				class="playbar"
+				style="position: relative"
+			>
+				<span class="playbar__cover"
+					><span class="cover cover--a"
+						><i
+							class="ic ic--sm"
+							data-i="music_note"
+						></i></span
+				></span>
+				<div class="playbar__meta">
+					<span class="playbar__title">【初音ミク】千本桜</span>
+					<span class="playbar__artist">初音未来 · 我喜欢的音乐</span>
+				</div>
+				<div class="playbar__center">
+					<div
+						class="row"
+						style="gap: 2px"
+					>
+						<button
+							class="icon-btn icon-btn--round"
+							title="上一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="prev"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--play"
+							title="播放"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="play"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--round"
+							title="下一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="next"
+							></i>
+						</button>
+					</div>
+					<div class="progress">
+						<span class="time">1:32</span>
+						<span class="progress__bar"></span>
+						<span class="time">4:03</span>
+					</div>
+				</div>
+				<div class="playbar__side">
+					<!-- 播放模式四档：列表循环 / 单曲循环 / 随机播放 / 顺序播放 -->
+					<button
+						class="icon-btn"
+						title="列表循环"
+					>
+						<i
+							class="ic"
+							data-i="repeat"
+						></i>
+					</button>
+					<button
+						class="icon-btn is-on"
+						title="播放列表"
+					>
+						<i
+							class="ic"
+							data-i="queue"
+						></i>
+					</button>
+				</div>
+
+				<!-- 队列浮层（全局层，锚在上方按钮正上方） -->
+				<div class="popover popover--anchor">
+					<div class="popover__head">
+						<span class="popover__title">播放队列</span>
+						<span class="popover__count">18</span>
+						<span class="spacer"></span>
+						<button
+							class="icon-btn icon-btn--sm"
+							title="清空队列"
+						>
+							<i
+								class="ic ic--sm"
+								data-i="delete_sweep"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--sm"
+							title="收起"
+						>
+							<i
+								class="ic ic--sm"
+								data-i="expand"
+							></i>
+						</button>
+					</div>
+					<div class="popover__body">
+						<div class="q-row is-playing">
+							<span class="q-row__idx">1</span>
+							<span class="q-row__cover"
+								><span class="cover cover--a"></span
+							></span>
+							<span class="q-row__body">
+								<span class="q-row__title">【初音ミク】千本桜</span>
+								<span class="q-row__sub">初音未来</span>
+							</span>
+							<span class="q-row__time">4:03</span>
+							<button
+								class="icon-btn icon-btn--sm"
+								title="更多"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="more"
+								></i>
+							</button>
+						</div>
+						<div class="q-row">
+							<span class="q-row__idx">2</span>
+							<span class="q-row__cover"
+								><span class="cover cover--c"></span
+							></span>
+							<span class="q-row__body">
+								<span class="q-row__title">Bad Apple!! feat. nomico</span>
+								<span class="q-row__sub">nomico</span>
+							</span>
+							<span class="q-row__time">3:41</span>
+							<button
+								class="icon-btn icon-btn--sm"
+								title="更多"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="more"
+								></i>
+							</button>
+						</div>
+						<div class="q-row">
+							<span class="q-row__idx">3</span>
+							<span class="q-row__cover"
+								><span class="cover cover--e"></span
+							></span>
+							<span class="q-row__body">
+								<span class="q-row__title">Night of Knights</span>
+								<span class="q-row__sub">COOL&amp;CREATE</span>
+							</span>
+							<span class="q-row__time">5:12</span>
+							<button
+								class="icon-btn icon-btn--sm"
+								title="更多"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="more"
+								></i>
+							</button>
+						</div>
+						<div class="q-row">
+							<span class="q-row__idx">4</span>
+							<span class="q-row__cover"
+								><span class="cover cover--b"></span
+							></span>
+							<span class="q-row__body">
+								<span class="q-row__title">少女レイ</span>
+								<span class="q-row__sub">みきとP</span>
+							</span>
+							<span class="q-row__time">4:28</span>
+							<button
+								class="icon-btn icon-btn--sm"
+								title="更多"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="more"
+								></i>
+							</button>
+						</div>
+						<div class="q-row">
+							<span class="q-row__idx">5</span>
+							<span class="q-row__cover"
+								><span class="cover cover--d"></span
+							></span>
+							<span class="q-row__body">
+								<span class="q-row__title">命に嫌われている。</span>
+								<span class="q-row__sub">カンザキイオリ</span>
+							</span>
+							<span class="q-row__time">3:56</span>
+							<button
+								class="icon-btn icon-btn--sm"
+								title="更多"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="more"
+								></i>
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- 另外两层浮层（列表行「⋯」菜单 / 添加到歌单 / 新建歌单） -->
+			<div class="float-layer">
+				<span class="float-label label-menu">歌曲行「⋯」</span>
+				<div class="menu float-menu">
+					<button class="menu__item">
+						<i
+							class="ic ic--sm"
+							data-i="playlist_play"
+						></i>
+						下一首播放
+					</button>
+					<button class="menu__item">
+						<i
+							class="ic ic--sm"
+							data-i="playlist_add"
+						></i>
+						添加到歌单
+					</button>
+					<div class="menu__sep"></div>
+					<button class="menu__item menu__item--danger">
+						<i
+							class="ic ic--sm"
+							data-i="delete"
+						></i>
+						从歌单移除
+					</button>
+				</div>
+
+				<span class="float-label label-add">添加到歌单</span>
+				<div class="dialog float-add">
+					<div class="dialog__head">
+						<h2 class="dialog__title">添加到歌单</h2>
+						<button
+							class="icon-btn dialog__close"
+							title="关闭"
+						>
+							<i
+								class="ic ic--sm"
+								data-i="close"
+							></i>
+						</button>
+					</div>
+					<div class="dialog__body">
+						<ul class="dialog-list">
+							<li>
+								<button class="dialog-option">
+									<span class="check is-on"
+										><i
+											class="ic"
+											data-i="check"
+										></i
+									></span>
+									<span class="dialog-option__body">
+										<span class="dialog-option__title">我喜欢的音乐</span>
+										<span class="dialog-option__sub">128 首</span>
+									</span>
+								</button>
+							</li>
+							<li>
+								<button class="dialog-option">
+									<span class="check"></span>
+									<span class="dialog-option__body">
+										<span class="dialog-option__title">深夜循环</span>
+										<span class="dialog-option__sub">42 首</span>
+									</span>
+								</button>
+							</li>
+							<li>
+								<button class="dialog-option">
+									<span class="check is-on"
+										><i
+											class="ic"
+											data-i="check"
+										></i
+									></span>
+									<span class="dialog-option__body">
+										<span class="dialog-option__title">B 站神曲合集</span>
+										<span class="dialog-option__sub">76 首</span>
+									</span>
+								</button>
+							</li>
+							<li>
+								<button class="dialog-option">
+									<span class="check"></span>
+									<span class="dialog-option__body">
+										<span class="dialog-option__title">钢琴与雨</span>
+										<span class="dialog-option__sub">31 首</span>
+									</span>
+								</button>
+							</li>
+							<li>
+								<button class="dialog-option">
+									<span class="check"></span>
+									<span class="dialog-option__body">
+										<span class="dialog-option__title">电子</span>
+										<span class="dialog-option__sub">214 首</span>
+									</span>
+								</button>
+							</li>
+						</ul>
+					</div>
+					<p class="dialog__note">已选 2 个歌单，重复曲目会跳过。</p>
+					<div class="dialog__foot">
+						<button class="btn btn--text">新建歌单</button>
+						<span class="spacer"></span>
+						<button class="btn btn--text">取消</button>
+						<button class="btn btn--filled">添加</button>
+					</div>
+				</div>
+
+				<span class="float-label label-new">新建歌单</span>
+				<div class="dialog float-new">
+					<div class="dialog__head">
+						<h2 class="dialog__title">新建播放列表</h2>
+						<button
+							class="icon-btn dialog__close"
+							title="关闭"
+						>
+							<i
+								class="ic ic--sm"
+								data-i="close"
+							></i>
+						</button>
+					</div>
+					<div
+						class="dialog__body"
+						style="padding: 0 16px 12px"
+					>
+						<input
+							class="field field--wide"
+							placeholder="歌单名称"
+						/>
+					</div>
+					<div class="dialog__foot">
+						<span class="spacer"></span>
+						<button class="btn btn--text">取消</button>
+						<button class="btn btn--filled">创建</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

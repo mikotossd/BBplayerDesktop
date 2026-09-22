@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<title>音乐库 · BBPlayer Desktop 原型</title>
+		<link
+			rel="stylesheet"
+			href="../assets/proto.css"
+		/>
+	</head>
+	<body>
+		<div class="window">
+			<div class="titlebar">
+				<div class="titlebar__brand">
+					<span class="titlebar__mark"
+						><i
+							class="ic"
+							data-i="music_note"
+						></i
+					></span>
+					BBPlayer
+					<span class="titlebar__where">音乐库</span>
+				</div>
+				<div class="titlebar__spacer"></div>
+				<div class="titlebar__controls">
+					<button
+						class="tb-btn"
+						title="最小化"
+					>
+						<i
+							class="ic"
+							data-i="min"
+						></i>
+					</button>
+					<button
+						class="tb-btn"
+						title="最大化"
+					>
+						<i
+							class="ic"
+							data-i="max"
+						></i>
+					</button>
+					<button
+						class="tb-btn tb-btn--close"
+						title="关闭"
+					>
+						<i
+							class="ic"
+							data-i="close"
+						></i>
+					</button>
+				</div>
+			</div>
+
+			<div class="body">
+				<div class="sidebar">
+					<div class="user-card">
+						<span class="user-card__avatar"
+							><i
+								class="ic"
+								data-i="person"
+							></i
+						></span>
+						<span class="user-card__body">
+							<span class="user-card__brand">BBPlayer</span>
+							<span class="user-card__name">御坂代理服务</span>
+						</span>
+					</div>
+
+					<div class="card playlist-card">
+						<div class="card__head">
+							<button
+								class="foot-link"
+								style="width: auto"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="star"
+								></i>
+								收藏夹
+							</button>
+						</div>
+						<div
+							class="card__head"
+							style="min-height: 30px; padding-top: 0"
+						>
+							<span class="card__title">本地歌单</span>
+							<span class="card__actions">
+								<button
+									class="icon-btn icon-btn--sm"
+									title="新建歌单"
+								>
+									<i
+										class="ic ic--sm"
+										data-i="add"
+									></i>
+								</button>
+							</span>
+						</div>
+						<div class="card__body card__body--scroll">
+							<ul class="pl-list">
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--a"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">我喜欢的音乐</span>
+										<span class="pl-item__sub">128 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--b"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">深夜循环</span>
+										<span class="pl-item__sub">42 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="sync"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--c"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">B 站神曲合集</span>
+										<span class="pl-item__sub">76 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--d"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">钢琴与雨</span>
+										<span class="pl-item__sub">31 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+							</ul>
+						</div>
+						<div
+							style="
+								flex: none;
+								border-top: 1px solid var(--line);
+								padding: 4px;
+							"
+						>
+							<button class="foot-link">
+								<i
+									class="ic ic--sm"
+									data-i="settings"
+								></i>
+								设置
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="page">
+					<div
+						class="card"
+						style="flex: 1 1 auto"
+					>
+						<div class="page__top">
+							<label class="search">
+								<i
+									class="ic ic--sm"
+									data-i="search"
+								></i>
+								<input placeholder="搜索视频、BV 号或链接" />
+							</label>
+							<span class="spacer"></span>
+							<div class="tabs">
+								<button class="tab is-active">播放列表</button>
+								<button class="tab">收藏夹</button>
+								<button class="tab">合集</button>
+								<button class="tab">导入</button>
+							</div>
+						</div>
+
+						<div class="card__body card__body--scroll page__body">
+							<div class="section__head">
+								<h2 class="section__title">播放列表</h2>
+								<span class="spacer"></span>
+								<span class="section__meta mono">6 个</span>
+								<button
+									class="icon-btn icon-btn--sm"
+									title="新建播放列表"
+								>
+									<i
+										class="ic"
+										data-i="add"
+									></i>
+								</button>
+							</div>
+
+							<div
+								class="grid"
+								style="margin-top: 10px"
+							>
+								<button class="media-card">
+									<span class="media-card__cover"
+										><span class="cover cover--a"
+											><i
+												class="ic ic--lg"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="media-card__title">我喜欢的音乐</span>
+									<span class="media-card__sub"
+										><i
+											class="ic"
+											data-i="library"
+										></i>
+										128 首</span
+									>
+								</button>
+								<button class="media-card">
+									<span class="media-card__cover"
+										><span class="cover cover--b"
+											><i
+												class="ic ic--lg"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="media-card__title">深夜循环</span>
+									<span class="media-card__sub"
+										><i
+											class="ic"
+											data-i="sync"
+										></i>
+										42 首</span
+									>
+								</button>
+								<button class="media-card">
+									<span class="media-card__cover"
+										><span class="cover cover--c"
+											><i
+												class="ic ic--lg"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="media-card__title">B 站神曲合集</span>
+									<span class="media-card__sub"
+										><i
+											class="ic"
+											data-i="group"
+										></i>
+										76 首</span
+									>
+								</button>
+								<button class="media-card">
+									<span class="media-card__cover"
+										><span class="cover cover--d"
+											><i
+												class="ic ic--lg"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="media-card__title">钢琴与雨</span>
+									<span class="media-card__sub"
+										><i
+											class="ic"
+											data-i="library"
+										></i>
+										31 首</span
+									>
+								</button>
+								<button class="media-card">
+									<span class="media-card__cover"
+										><span class="cover cover--e"
+											><i
+												class="ic ic--lg"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="media-card__title">电子</span>
+									<span class="media-card__sub"
+										><i
+											class="ic"
+											data-i="library"
+										></i>
+										214 首</span
+									>
+								</button>
+								<button class="media-card">
+									<span class="media-card__cover"
+										><span class="cover cover--f"
+											><i
+												class="ic ic--lg"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="media-card__title">两行标题的截断是否整齐</span>
+									<span class="media-card__sub"
+										><i
+											class="ic"
+											data-i="library"
+										></i>
+										9 首</span
+									>
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="playbar">
+				<span class="playbar__cover"
+					><span class="cover cover--c"
+						><i
+							class="ic ic--sm"
+							data-i="music_note"
+						></i></span
+				></span>
+				<div class="playbar__meta">
+					<span class="playbar__title">Bad Apple!! feat. nomico</span>
+					<span class="playbar__artist">nomico · B 站神曲合集</span>
+				</div>
+				<div class="playbar__center">
+					<div
+						class="row"
+						style="gap: 2px"
+					>
+						<button
+							class="icon-btn icon-btn--round"
+							title="上一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="prev"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--play"
+							title="播放"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="play"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--round"
+							title="下一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="next"
+							></i>
+						</button>
+					</div>
+					<div class="progress">
+						<span class="time">0:48</span>
+						<span class="progress__bar"></span>
+						<span class="time">3:41</span>
+					</div>
+				</div>
+				<div class="playbar__side">
+					<button
+						class="icon-btn"
+						title="随机播放"
+					>
+						<i
+							class="ic"
+							data-i="shuffle"
+						></i>
+					</button>
+					<button
+						class="icon-btn"
+						title="播放列表"
+					>
+						<i
+							class="ic"
+							data-i="queue"
+						></i>
+					</button>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

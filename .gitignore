@@ -69,5 +69,7 @@ codedb.snapshot
 severs/
 # 安卓端实机截图（只作本地视觉对照，不进仓库）
 UIreferance/
+# 卡片化改造的参考图（用户手绘草图 + 网易云歌词截图；只作本地对照，不进仓库）
+ui_reference/
 # 歌词匹配命中率基准（本地实验：含三源真实候选池与 1MB+ 搜索缓存，不进仓库）
 lyrics_hit_rate_test_molde/

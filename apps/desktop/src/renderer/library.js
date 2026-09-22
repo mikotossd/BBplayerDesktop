@@ -2047,6 +2047,39 @@
 	}
 
 	/**
+	 * 「＋」菜单：新建 / 导入 / 订阅（卡片化阶段 1）。
+	 *
+	 * ⚠️ 抽出来是因为**两个地方**都要它：左栏歌单卡的「＋」与
+	 * 音乐库页头的「＋」。第一版各自抄一份，第三项就漂了。
+	 *
+	 * 传进来的 `anchor` 只用来定位浮层（`bbComponents.menu` 需要它算坐标）。
+	 */
+	function openNewPlaylistMenu(anchor) {
+		// ⚠️ 菜单项复用**已有的入口**，不另起一套：
+		// 「导入」是音乐库自己的页签，「订阅共享歌单」是共享面板。
+		window.bbComponents.menu(anchor, [
+			{
+				label: '新建播放列表',
+				icon: 'add',
+				testid: 'playlist-new-local',
+				onSelect: () => openCreatePlaylistDialog(),
+			},
+			{
+				label: '导入外部歌单',
+				icon: 'playlist_add',
+				testid: 'playlist-new-import',
+				onSelect: () => window.bbUI?.setLibraryTab?.('import'),
+			},
+			{
+				label: '订阅共享歌单',
+				icon: 'group',
+				testid: 'playlist-new-share',
+				onSelect: () => window.bbUI?.openView?.('share'),
+			},
+		])
+	}
+
+	/**
 	 * 音乐库 › 播放列表 页签（阶段 6d）。
 	 *
 	 * ## 安卓端怎么做 → 桌面端怎么做
@@ -2118,34 +2151,17 @@
 
 		const addButton = document.createElement('button')
 		addButton.className = 'icon-only icon-button'
-		addButton.dataset.testid = 'playlist-new'
+		/*
+		 * ⚠️ testid 从 `playlist-new` 改成 `playlist-new-head`
+		 * （卡片化阶段 1）：`playlist-new` 这个名字给了**左栏歌单卡**的「＋」，
+		 * 因为那个入口在任何页面都在，而页头这个只在「音乐库 › 播放列表」里。
+		 * 两处共用 `openNewPlaylistMenu()`，所以行为完全一致。
+		 */
+		addButton.dataset.testid = 'playlist-new-head'
 		addButton.title = '新建播放列表'
 		addButton.setAttribute('aria-label', '新建播放列表')
 		addButton.innerHTML = window.bbComponents.iconHtml('add', 'icon--md')
-		addButton.addEventListener('click', () => {
-			// ⚠️ 菜单项复用**已有的入口**，不另起一套：
-			// 「导入」是音乐库自己的页签，「订阅共享歌单」是共享面板。
-			window.bbComponents.menu(addButton, [
-				{
-					label: '新建播放列表',
-					icon: 'add',
-					testid: 'playlist-new-local',
-					onSelect: () => openCreatePlaylistDialog(),
-				},
-				{
-					label: '导入外部歌单',
-					icon: 'playlist_add',
-					testid: 'playlist-new-import',
-					onSelect: () => window.bbUI?.setLibraryTab?.('import'),
-				},
-				{
-					label: '订阅共享歌单',
-					icon: 'group',
-					testid: 'playlist-new-share',
-					onSelect: () => window.bbUI?.openView?.('share'),
-				},
-			])
-		})
+		addButton.addEventListener('click', () => openNewPlaylistMenu(addButton))
 		actions.appendChild(addButton)
 		head.appendChild(actions)
 		els.content.appendChild(head)
@@ -2424,6 +2440,20 @@
 		els.searchInput.addEventListener('keydown', (event) => {
 			if (event.key === 'Enter') void runSearch(els.searchInput.value)
 		})
+	}
+
+	/*
+	 * 左栏歌单卡的「＋」（卡片化阶段 1）。
+	 *
+	 * ⚠️ 它在**任何页面**都该能用（草图上左栏是常驻的），所以绑定在这里
+	 * 而不是在 `showPlaylistsTab()` 里 —— 后者只在"音乐库 › 播放列表"
+	 * 这一屏才跑，绑在那里的话用户在主页点「＋」会毫无反应。
+	 */
+	const sidebarNewPlaylist = document.getElementById('sidebar-new-playlist')
+	if (sidebarNewPlaylist) {
+		sidebarNewPlaylist.addEventListener('click', () =>
+			openNewPlaylistMenu(sidebarNewPlaylist),
+		)
 	}
 
 	window.bbLibrary = {

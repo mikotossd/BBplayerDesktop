@@ -117,6 +117,15 @@
 	--lh-title-large: 28px;
 	--fs-headline-small: 24px;
 	--lh-headline-small: 32px;
+
+	/*
+	 * 自绘标题栏高度（卡片化改造）。
+	 *
+	 * ⚠️ 放在令牌兜底块里，而不是只写在 `.titlebar` 上：`.app` 的
+	 * `height: calc(100vh - var(--titlebar-h))` 也要用它，
+	 * 变量没定义时那条 `calc` 整条失效（height 会退回 auto）。
+	 */
+	--titlebar-h: 38px;
 }
 
 * {
@@ -133,7 +142,11 @@ body {
 	background: var(--bg);
 	color: var(--on-surface);
 	font-family:
-		'Segoe UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+		'Segoe UI',
+		'Microsoft YaHei',
+		system-ui,
+		-apple-system,
+		sans-serif;
 	/* 正文基准 = body-medium(14)。所有字号都从令牌的字阶里取，
 	   不再手写 px —— 手写的结果就是全站压在 11–13px。 */
 	font-size: var(--fs-body-medium);
@@ -162,8 +175,98 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════
-   三栏网格 + 底部播放条 + 状态栏
+   自绘标题栏（卡片化改造）
    ────────────────────────────────────────────────────────── */
+/*
+ * 窗口已经去掉原生 frame（main.cjs 的 `titleBarStyle: 'hidden'`），
+ * 这一条就是新的"窗口顶部"。
+ *
+ * ⚠️ `-webkit-app-region: drag` 让整条可以拖动窗口；里面的按钮必须
+ * `no-drag`，否则点不动（表现是"按钮点了没反应"，很容易误判成 IPC 坏了）。
+ *
+ * ⚠️ `.app` 的高度从 `100vh` 改成 `calc(100vh - var(--titlebar-h))`：
+ * 标题栏占了真实像素，不减掉的话窗口底部会被挤出去（播放卡看不全）。
+ */
+.titlebar {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	height: var(--titlebar-h);
+	padding-left: var(--sp-md);
+	background: var(--surface);
+	border-bottom: 1px solid var(--outline-variant);
+	-webkit-app-region: drag;
+	user-select: none;
+}
+.titlebar__brand {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	font-size: var(--fs-body-small);
+	font-weight: 600;
+	min-width: 0;
+}
+.titlebar__mark {
+	width: 18px;
+	height: 18px;
+	border-radius: 5px;
+	background: var(--primary);
+	color: var(--on-primary);
+	display: grid;
+	place-items: center;
+	font-size: 12px;
+	flex: none;
+}
+.titlebar__name {
+	flex: none;
+}
+.titlebar__where {
+	color: var(--on-surface-variant);
+	font-weight: 400;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.titlebar__spacer {
+	flex: 1 1 auto;
+}
+.titlebar__controls {
+	display: flex;
+	align-self: stretch;
+	-webkit-app-region: no-drag;
+}
+.titlebar__btn {
+	width: 46px;
+	border: 0;
+	background: transparent;
+	color: var(--on-surface-variant);
+	display: grid;
+	place-items: center;
+	cursor: default;
+	transition: background var(--motion-duration-fast) ease;
+}
+.titlebar__btn:hover {
+	background: var(--surface-container-high);
+	color: var(--on-surface);
+}
+/* 关闭键的 hover 用系统惯例的红色（用户不会误点） */
+.titlebar__btn--close:hover {
+	background: #e81123;
+	color: #ffffff;
+}
+
+/* ══════════════════════════════════════════════════════════
+   两栏（左栏 + 中栏）+ 中栏内的播放卡
+   ────────────────────────────────────────────────────────── */
+/*
+ * ⚠️ 播放条从"横跨三栏的底行"改成**中栏里的一张卡**（卡片化阶段 0）。
+ *
+ * 草图上播放条画在中栏内部、左右有留白 —— 它属于"我正在看的内容"这一列，
+ * 不属于窗口。于是网格少了一行，播放卡由 `.main` 自己的两行网格安排。
+ *
+ * 左栏用 `grid-row: 1 / 3` 跨两行，所以它仍然是通高的一列。
+ */
 .app {
 	display: grid;
 	/*
@@ -173,12 +276,15 @@ body {
 	 * 那种覆盖在界面上表现为"某次展开/收起莫名失灵"。
 	 */
 	grid-template-columns: var(--sidebar-width, 240px) minmax(0, 1fr) 320px;
-	grid-template-rows: minmax(0, 1fr) 72px;
-	grid-template-areas:
-		'sidebar main rightbar'
-		'playbar playbar playbar';
-	/* 状态栏已删除（改成浮动提示胶囊），所以整屏都归内容 */
-	height: 100vh;
+	grid-template-rows: minmax(0, 1fr);
+	grid-template-areas: 'sidebar main rightbar';
+	/*
+	 * ⚠️ 高度要**减掉自绘标题栏**（卡片化改造）。
+	 * 原来写 `100vh` 时窗口只有原生标题栏、页面从最顶上开始；
+	 * 现在 `.titlebar` 是文档流里的真实一行，不减掉的话底部会被挤出窗口
+	 * （表现是播放卡只露出一半）。
+	 */
+	height: calc(100vh - var(--titlebar-h));
 	/* 分隔条绝对定位在左栏右边缘上（不参与网格） */
 	position: relative;
 }
@@ -215,8 +321,8 @@ body {
 .sidebar-splitter {
 	position: absolute;
 	top: 0;
-	/* 播放条占底部 72px，那一行横跨三栏，不属于左栏 */
-	bottom: 72px;
+	/* 播放卡现在在中栏内部，不再占窗口底部一整条 —— 手柄通到底 */
+	bottom: 0;
 	left: calc(var(--sidebar-width, 240px) - 3px);
 	width: 6px;
 	z-index: 5;
@@ -248,25 +354,55 @@ body {
 	border-left-width: 0;
 }
 
+/*
+ * 左栏：跨两行（内容 + 播放卡），所以它仍然是通高的一列。
+ * ⚠️ 具体的**卡片化**样式在下面「左栏：① 用户卡 + ② 歌单卡」那一段 ——
+ * 这里只负责它在 `.app` 网格里的位置。
+ */
 .sidebar {
 	grid-area: sidebar;
+	grid-row: 1 / 3;
 	background: var(--surface);
 	border-right: 1px solid var(--outline-variant);
-	display: flex;
-	flex-direction: column;
 	min-height: 0;
+	/*
+	 * ⚠️ 横向内边距必须走 `--sidebar-width` 的**比例**，而不是写死 `--sp-sm`。
+	 *
+	 * `splitter.js` 拖到极窄时把列宽写成 `0px`，但写死的 padding 仍然占
+	 * 24px —— 于是"收起"之后左栏还剩 24px 空白，探针量到 24px 判"没有真的收起"
+	 * （实测就是这个数字）。用 `min()` 让 padding 跟着列宽一起归零。
+	 */
+	padding: var(--sp-sm) min(var(--sp-sm), var(--sidebar-width, 240px));
 }
 
+/*
+ * 中栏：**两行网格** —— 内容区吃剩余高度、播放卡按内容高度。
+ *
+ * ⚠️ 用 grid 而不是 flex：内容区与播放卡的"塌陷"行为要明确。
+ * flex 下 `flex: 1` + `min-height: 0` 也能用，但嵌套滚动容器里容易出现
+ * "内部滚动条把播放卡顶出视口"。
+ *
+ * ⚠️ 中栏**没有水平内边距**：内容区（`.content` / `.settings-view` /
+ * `.share-view`）自己带 `margin: … var(--sp-md) …`，播放卡也带同样的 margin
+ * —— 两边由同一个值决定，所以**左边缘天然对齐**（探针断言的就是这件事）。
+ * 给中栏加 padding 会让两者正好差一个 padding 的宽度（实测差 16px）。
+ */
 .main {
 	grid-area: main;
-	display: flex;
-	flex-direction: column;
+	display: grid;
+	grid-template-rows: minmax(0, 1fr) auto;
 	min-height: 0;
 	min-width: 0;
+	padding: var(--sp-xs) 0 0;
 }
 
 .rightbar {
-	grid-area: rightbar;
+	/*
+	 * ⚠️ `grid-template-areas` 里已经没有右栏了，所以必须**显式钉列**。
+	 * 不写 `grid-column` 的话它会被自动放进下一个空单元格 ——
+	 * 表现是"右栏跑到中栏下面/右边去了"，而 CSS 看着完全正常。
+	 */
+	grid-column: 3;
 	background: var(--surface);
 	/*
 	 * ⚠️ `min-width: 0` 是**必须的**，否则收起不生效。
@@ -286,26 +422,41 @@ body {
 }
 
 /*
- * 悬浮播放条。
+ * 播放卡（原「悬浮播放条」）。
  *
- * ⚠️ 原来是一条**贴底的直角横条**：与主区同色 + 顶上一根分隔线，
- * 观感是"窗口被切成了几块"，而不是"播放器浮在上面"。
+ * ⚠️ 它现在是**中栏网格的第二行**，不再是 `grid-area: playbar`。
+ * 布局上仍然圆角 + 投影 + 从内容区浮起来，但位置由中栏决定 ——
+ * 换任何页面它都在同一个地方，因为它是窗口的一部分，不是页面的。
  *
- * 现在：圆角 + 投影 + 左右留白，从内容区浮起来。
- * 网格行高留出了下边距（见 `.app` 的 `grid-template-rows`），
- * 所以它是"悬浮"而不是"贴底"。
+ * ⚠️ 列数必须与**直接子元素个数**一致：现在的子元素是
+ * `#audio`（display:none，不参与网格）+ 封面 + 信息 + 传输 + 进度 + 模式/音量
+ * = **5 个可见子元素**。
+ * 第一版按 4 列写（把"传输"和"进度"当成同一格），结果第 5 个子元素落到
+ * **隐式的第二行** —— 播放条被撑高一倍、内容区被挤扁，而 CSS 看着没问题。
+ * 所以这里写 5 列，并在 `.icon-only` 上补一条（`.playbar > *` 的显式列位置）
+ * 作为兜底。
  */
 .playbar {
-	grid-area: playbar;
+	/*
+	 * ⚠️ 必须显式跨满两行 —— 它是 `.main` 网格的第二行，
+	 * 不给 `grid-column` 的话只会占第一列的宽度。
+	 */
+	grid-column: 1 / -1;
 	background: var(--surface-container);
 	display: grid;
-	grid-template-columns: 48px 240px auto minmax(0, 1fr) auto;
+	/*
+	 * 列：封面 │ 曲名+歌手 │ 传输控制 │ 进度条 │ 模式+队列
+	 * ⚠️ 曲名列从写死的 240px 改成 `minmax(0, 1fr)` ——
+	 * 写死 240px 是"标题被截断"的根因：窗口再宽，标题也只有 240px。
+	 */
+	grid-template-columns: 44px minmax(160px, 1fr) auto minmax(120px, 1fr) auto;
 	align-items: center;
 	gap: var(--sp-md);
-	margin: 0 var(--sp-sm) var(--sp-sm);
+	/* 与 `.content` 的 `margin: … var(--sp-md) …` 取同一个值 → 左边缘对齐 */
+	margin: 0 var(--sp-md) var(--sp-md);
 	padding: 0 var(--sp-lg);
 	border-radius: var(--r-lg);
-	box-shadow: 0 4px 18px rgb(0 0 0 / 16%);
+	box-shadow: 0 4px 18px rgb(0 0 0 / 10%);
 }
 
 /*
@@ -345,25 +496,163 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════
-   左栏
+   左栏：① 用户卡 + ② 歌单卡（卡片化阶段 1）
    ────────────────────────────────────────────────────────── */
+/*
+ * 左栏本身：纵向排列两张卡片，卡片之间有间距。
+ * ⚠️ `padding` 在上一段（`.app` 网格那一节）里与列宽挂钩，
+ * 这里**不要再写一次** —— 写死会让"收起时 padding 归零"失效。
+ */
+.sidebar {
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-sm);
+	min-height: 0;
+}
+
+/*
+ * ① 用户卡：整卡可点（去主页），右上角的头像按钮去账号。
+ *
+ * ⚠️ 它是 `<div>` + `role="button"`（`renderer.js` 按 `[data-nav]` 补的），
+ * 所以焦点环要自己写 —— `button:focus-visible` 管不到它。
+ */
 .sidebar__brand {
 	display: flex;
 	align-items: center;
 	/*
 	 * ⚠️ 用 `flex-start` + 给动作区 `margin-left: auto`，不要 `space-between`。
-	 *
-	 * 现在这一行有三个元素：品牌名 / 用户名 / 动作按钮。
+	 * 现在这一行有三个元素：品牌名 / 用户名 / 账号按钮。
 	 * `space-between` 会把用户名推到**中间**去，看起来像"居中标题"。
-	 * 用户名应该紧跟在品牌名右边。
 	 */
 	justify-content: flex-start;
 	gap: var(--sp-sm);
-	padding: var(--sp-md);
-	/*
-	 * ⚠️ 这里原来有一条通栏细线（`border-bottom`），阶段 6b 去通栏线时**漏了它**。
-	 * 侧栏与主区靠底色分层，不需要这条线。
-	 */
+	padding: var(--sp-sm) var(--sp-md);
+	/* 卡片化：靠"面"分层 —— 圆角面 + 不描边 */
+	background: var(--surface-container);
+	border-radius: var(--r-lg);
+	cursor: pointer;
+	flex: none;
+	transition: background var(--motion-duration-fast) ease;
+}
+.sidebar__brand:hover {
+	background: var(--surface-container-high);
+}
+.sidebar__brand:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: -2px;
+}
+
+/*
+ * ② 歌单卡：三段式（页头 / 中段滚动 / 页脚）。
+ *
+ * ⚠️ 中段必须 `min-height: 0` + `overflow-y: auto`：
+ * 歌单可能几百个，而**页头与页脚要固定在卡片首尾**（草图上
+ * 「收藏夹」在最上、「设置」在最下，只有中间那段滚动）。
+ * 不写 `min-height: 0` 的话 flex 子项会被内容顶高，整张卡把左栏撑破。
+ */
+.sidebar__card {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	background: var(--surface-container);
+	/* 卡片用 `--r-lg`（与设置页的分类卡同一档），不是胶囊 */
+	border-radius: var(--r-lg);
+	overflow: hidden;
+}
+/*
+ * 卡片本体也是 `data-nav="library"` 的入口（点卡片回音乐库），所以要跟
+ * `.sidebar__entry` 用**同一套**选中态 —— 否则"当前在音乐库"这件事
+ * 在左栏看不出来。用同一个令牌组，视觉完全一致。
+ */
+.sidebar__card.is-active {
+	background: var(--secondary-container);
+	color: var(--on-secondary-container);
+}
+/* 选中时把卡内分隔线也调淡，否则深底上会出现一道突兀的亮线 */
+.sidebar__card.is-active .sidebar__card-head {
+	border-bottom-color: color-mix(
+		in srgb,
+		var(--on-secondary-container) 18%,
+		transparent
+	);
+}
+.sidebar__card.is-active .sidebar__card-foot {
+	border-top-color: color-mix(
+		in srgb,
+		var(--on-secondary-container) 18%,
+		transparent
+	);
+}
+.sidebar__card-head,
+.sidebar__card-foot {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	padding: var(--sp-xs);
+}
+.sidebar__card-head {
+	border-bottom: 1px solid var(--outline-variant);
+}
+.sidebar__card-foot {
+	border-top: 1px solid var(--outline-variant);
+}
+.sidebar__card-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding-bottom: var(--sp-xs);
+}
+.sidebar__card-title {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xxs);
+	padding: var(--sp-xs) var(--sp-xs) 0 var(--sp-sm);
+	font-size: var(--fs-label-medium);
+	color: var(--on-surface-variant);
+}
+.sidebar__card-title > span:first-child {
+	flex: 1 1 auto;
+}
+
+/*
+ * 卡片里的入口（收藏夹 / 设置）。
+ * 与 `.nav__item` 同一套选中态（`secondary-container`），只是更矮。
+ */
+.sidebar__entry {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 7px var(--sp-xs);
+	border: 0;
+	border-radius: var(--r-full);
+	background: transparent;
+	color: var(--on-surface);
+	font: inherit;
+	font-size: var(--fs-body-medium);
+	text-align: left;
+	cursor: pointer;
+	transition:
+		background var(--motion-duration-fast) ease,
+		color var(--motion-duration-fast) ease;
+}
+.sidebar__entry:hover {
+	background: var(--surface-container-high);
+}
+.sidebar__entry.is-active {
+	background: var(--secondary-container);
+	color: var(--on-secondary-container);
+}
+
+/* 歌单数量：页头右端的小字，不抢「收藏夹」的宽度 */
+.sidebar__count {
+	flex: none;
+	font-size: var(--fs-label-medium);
+	padding-right: var(--sp-xs);
 }
 
 /*
@@ -1465,7 +1754,11 @@ button.btn--tonal {
 }
 
 button.btn--tonal:hover:not(:disabled) {
-	background: color-mix(in srgb, var(--secondary-container) 82%, var(--on-secondary-container));
+	background: color-mix(
+		in srgb,
+		var(--secondary-container) 82%,
+		var(--on-secondary-container)
+	);
 }
 
 /* 纯文字动作 */
@@ -1515,7 +1808,8 @@ select {
  * `flex: 1 1 160px` 的意思是"以 160px 为基准伸缩"，
  * 再兜一个 `min-width` 保证极端情况下也不至于读不出内容。
  */
-.settings-row input:not([type='range']):not([type='checkbox']):not([type='color']),
+.settings-row
+	input:not([type='range']):not([type='checkbox']):not([type='color']),
 .row-actions input:not([type='range']):not([type='checkbox']) {
 	flex: 1 1 160px;
 	min-width: 120px;
@@ -1538,7 +1832,11 @@ input[type='password']:hover:not(:disabled),
 input[type='number']:hover:not(:disabled),
 textarea:hover:not(:disabled),
 select:hover:not(:disabled) {
-	border-color: color-mix(in srgb, var(--outline-variant) 60%, var(--on-surface-variant));
+	border-color: color-mix(
+		in srgb,
+		var(--outline-variant) 60%,
+		var(--on-surface-variant)
+	);
 }
 
 input[type='text']:focus,
@@ -2975,4 +3273,3 @@ input[type='range']:focus-visible {
 .queue-list__item.is-drop-after {
 	box-shadow: inset 0 -2px 0 0 var(--primary);
 }
-

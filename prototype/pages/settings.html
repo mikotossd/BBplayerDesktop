@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<title>设置 · BBPlayer Desktop 原型</title>
+		<link
+			rel="stylesheet"
+			href="../assets/proto.css"
+		/>
+		<style>
+			/* 设置页：分类列表 + 子页（真实交互里是分类列表 → 点进子页） */
+			.set-split {
+				display: grid;
+				grid-template-columns: 264px 1px minmax(0, 1fr);
+				flex: 1 1 auto;
+				min-height: 0;
+			}
+			.set-split__col {
+				min-height: 0;
+				overflow-y: auto;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="window">
+			<div class="titlebar">
+				<div class="titlebar__brand">
+					<span class="titlebar__mark"
+						><i
+							class="ic"
+							data-i="music_note"
+						></i
+					></span>
+					BBPlayer
+					<span class="titlebar__where">设置</span>
+				</div>
+				<div class="titlebar__spacer"></div>
+				<div class="titlebar__controls">
+					<button
+						class="tb-btn"
+						title="最小化"
+					>
+						<i
+							class="ic"
+							data-i="min"
+						></i>
+					</button>
+					<button
+						class="tb-btn"
+						title="最大化"
+					>
+						<i
+							class="ic"
+							data-i="max"
+						></i>
+					</button>
+					<button
+						class="tb-btn tb-btn--close"
+						title="关闭"
+					>
+						<i
+							class="ic"
+							data-i="close"
+						></i>
+					</button>
+				</div>
+			</div>
+
+			<div class="body">
+				<div class="sidebar">
+					<div class="user-card">
+						<span class="user-card__avatar"
+							><i
+								class="ic"
+								data-i="person"
+							></i
+						></span>
+						<span class="user-card__body">
+							<span class="user-card__brand">BBPlayer</span>
+							<span class="user-card__name">御坂代理服务</span>
+						</span>
+					</div>
+
+					<div class="card playlist-card">
+						<div class="card__head">
+							<button
+								class="foot-link"
+								style="width: auto"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="star"
+								></i>
+								收藏夹
+							</button>
+						</div>
+						<div
+							class="card__head"
+							style="min-height: 30px; padding-top: 0"
+						>
+							<span class="card__title">本地歌单</span>
+							<span class="card__actions">
+								<button
+									class="icon-btn icon-btn--sm"
+									title="新建歌单"
+								>
+									<i
+										class="ic ic--sm"
+										data-i="add"
+									></i>
+								</button>
+							</span>
+						</div>
+						<div class="card__body card__body--scroll">
+							<ul class="pl-list">
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--a"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">我喜欢的音乐</span>
+										<span class="pl-item__sub">128 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--b"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">深夜循环</span>
+										<span class="pl-item__sub">42 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="sync"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--c"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">B 站神曲合集</span>
+										<span class="pl-item__sub">76 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+							</ul>
+						</div>
+						<div
+							style="
+								flex: none;
+								border-top: 1px solid var(--line);
+								padding: 4px;
+							"
+						>
+							<button class="foot-link foot-link--active">
+								<i
+									class="ic ic--sm"
+									data-i="settings"
+								></i>
+								设置
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="page">
+					<div
+						class="card"
+						style="flex: 1 1 auto"
+					>
+						<div class="set-split">
+							<!-- 左：分类列表 -->
+							<div class="set-split__col">
+								<div class="set-cats">
+									<button class="set-cat">
+										<span class="set-cat__icon"
+											><i
+												class="ic"
+												data-i="contrast"
+											></i
+										></span>
+										<span class="set-cat__body">
+											<span class="set-cat__title">主题</span>
+											<span class="set-cat__sub">跟随系统</span>
+										</span>
+										<i
+											class="ic set-cat__chev"
+											data-i="chev"
+										></i>
+									</button>
+									<button
+										class="set-cat"
+										style="background: var(--surface-hover)"
+									>
+										<span class="set-cat__icon"
+											><i
+												class="ic"
+												data-i="palette"
+											></i
+										></span>
+										<span class="set-cat__body">
+											<span class="set-cat__title">外观</span>
+											<span class="set-cat__sub">中性配色</span>
+										</span>
+										<i
+											class="ic set-cat__chev"
+											data-i="chev"
+										></i>
+									</button>
+									<button class="set-cat">
+										<span class="set-cat__icon"
+											><i
+												class="ic"
+												data-i="graphic_eq"
+											></i
+										></span>
+										<span class="set-cat__body">
+											<span class="set-cat__title">播放</span>
+											<span class="set-cat__sub">定时关闭、响度均衡</span>
+										</span>
+										<i
+											class="ic set-cat__chev"
+											data-i="chev"
+										></i>
+									</button>
+									<button class="set-cat">
+										<span class="set-cat__icon"
+											><i
+												class="ic"
+												data-i="lyrics"
+											></i
+										></span>
+										<span class="set-cat__body">
+											<span class="set-cat__title">歌词</span>
+											<span class="set-cat__sub">自动匹配</span>
+										</span>
+										<i
+											class="ic set-cat__chev"
+											data-i="chev"
+										></i>
+									</button>
+									<button class="set-cat">
+										<span class="set-cat__icon"
+											><i
+												class="ic"
+												data-i="download"
+											></i
+										></span>
+										<span class="set-cat__body">
+											<span class="set-cat__title">下载</span>
+											<span class="set-cat__sub">目录、并发</span>
+										</span>
+										<i
+											class="ic set-cat__chev"
+											data-i="chev"
+										></i>
+									</button>
+									<button class="set-cat">
+										<span class="set-cat__icon"
+											><i
+												class="ic"
+												data-i="person"
+											></i
+										></span>
+										<span class="set-cat__body">
+											<span class="set-cat__title">Bilibili 账号</span>
+											<span class="set-cat__sub">御坂代理服务</span>
+										</span>
+										<i
+											class="ic set-cat__chev"
+											data-i="chev"
+										></i>
+									</button>
+									<button class="set-cat">
+										<span class="set-cat__icon"
+											><i
+												class="ic"
+												data-i="group"
+											></i
+										></span>
+										<span class="set-cat__body">
+											<span class="set-cat__title">BBPlayer 账号</span>
+											<span class="set-cat__sub">共享歌单用</span>
+										</span>
+										<i
+											class="ic set-cat__chev"
+											data-i="chev"
+										></i>
+									</button>
+									<button class="set-cat">
+										<span class="set-cat__icon"
+											><i
+												class="ic"
+												data-i="upload"
+											></i
+										></span>
+										<span class="set-cat__body">
+											<span class="set-cat__title">备份与恢复</span>
+											<span class="set-cat__sub">WebDAV、本地导出</span>
+										</span>
+										<i
+											class="ic set-cat__chev"
+											data-i="chev"
+										></i>
+									</button>
+									<button class="set-cat">
+										<span class="set-cat__icon"
+											><i
+												class="ic"
+												data-i="folder"
+											></i
+										></span>
+										<span class="set-cat__body">
+											<span class="set-cat__title">通用</span>
+											<span class="set-cat__sub">存储位置、快捷键</span>
+										</span>
+										<i
+											class="ic set-cat__chev"
+											data-i="chev"
+										></i>
+									</button>
+									<button class="set-cat">
+										<span class="set-cat__icon"
+											><i
+												class="ic"
+												data-i="info"
+											></i
+										></span>
+										<span class="set-cat__body">
+											<span class="set-cat__title">关于</span>
+											<span class="set-cat__sub">版本、诊断</span>
+										</span>
+										<i
+											class="ic set-cat__chev"
+											data-i="chev"
+										></i>
+									</button>
+								</div>
+							</div>
+
+							<div class="card__divider"></div>
+
+							<!-- 右：子页（外观） -->
+							<div class="set-split__col">
+								<div class="set-panel">
+									<div
+										class="row"
+										style="margin-bottom: var(--sp-sm)"
+									>
+										<button
+											class="icon-btn icon-btn--sm"
+											title="返回"
+										>
+											<i
+												class="ic"
+												data-i="back"
+											></i>
+										</button>
+										<span
+											style="font-size: var(--fs-title-sm); font-weight: 600"
+											>外观</span
+										>
+									</div>
+
+									<h3>配色</h3>
+									<p class="set-hint">默认中性配色，封面是屏幕上唯一的彩色。</p>
+									<div
+										class="segmented"
+										style="margin-bottom: var(--sp-sm)"
+									>
+										<button class="is-active">中性</button>
+										<button>自定义</button>
+									</div>
+									<div class="set-row">
+										<button
+											class="swatch is-active"
+											style="background: #ffffff"
+											title="#FFFFFF"
+										></button>
+										<button
+											class="swatch"
+											style="background: #2f2f35"
+											title="#2F2F35"
+										></button>
+										<button
+											class="swatch"
+											style="background: #6750a4"
+											title="#6750A4"
+										></button>
+										<button
+											class="swatch"
+											style="background: #2e7d32"
+											title="#2E7D32"
+										></button>
+										<input
+											class="hex-input"
+											value="#FFFFFF"
+										/>
+									</div>
+
+									<div class="set-sep"></div>
+
+									<h3>显示模式</h3>
+									<div class="segmented">
+										<button class="is-active">跟随系统</button>
+										<button>浅色</button>
+										<button>深色</button>
+									</div>
+
+									<div class="set-sep"></div>
+
+									<h3>材质</h3>
+									<p class="set-hint">顶栏与弹层的模糊强度。</p>
+									<div class="segmented">
+										<button class="is-active">无</button>
+										<button>模糊</button>
+										<button>渐变模糊</button>
+									</div>
+
+									<div class="set-sep"></div>
+
+									<h3>播放</h3>
+									<label class="set-toggle">
+										<span class="switch is-on"></span>
+										<span>响度均衡</span>
+									</label>
+									<p
+										class="set-hint"
+										style="margin-top: var(--sp-sm)"
+									>
+										音量用 Ctrl + ←/→ 调节。
+									</p>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="playbar">
+				<span class="playbar__cover"
+					><span class="cover cover--c"
+						><i
+							class="ic ic--sm"
+							data-i="music_note"
+						></i></span
+				></span>
+				<div class="playbar__meta">
+					<span class="playbar__title">Night of Knights</span>
+					<span class="playbar__artist">COOL&amp;CREATE · B 站神曲合集</span>
+				</div>
+				<div class="playbar__center">
+					<div
+						class="row"
+						style="gap: 2px"
+					>
+						<button
+							class="icon-btn icon-btn--round"
+							title="上一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="prev"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--play"
+							title="播放"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="play"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--round"
+							title="下一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="next"
+							></i>
+						</button>
+					</div>
+					<div class="progress">
+						<span class="time">2:20</span>
+						<span class="progress__bar"></span>
+						<span class="time">5:12</span>
+					</div>
+				</div>
+				<div class="playbar__side">
+					<button
+						class="icon-btn"
+						title="列表循环"
+					>
+						<i
+							class="ic"
+							data-i="repeat"
+						></i>
+					</button>
+					<button
+						class="icon-btn"
+						title="播放列表"
+					>
+						<i
+							class="ic"
+							data-i="queue"
+						></i>
+					</button>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

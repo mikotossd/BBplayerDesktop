@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<title>主页 · BBPlayer Desktop 原型</title>
+		<link
+			rel="stylesheet"
+			href="../assets/proto.css"
+		/>
+	</head>
+	<body>
+		<div class="window">
+			<!-- ══ 自绘标题栏 ══════════════════════════════════════════════ -->
+			<div class="titlebar">
+				<div class="titlebar__brand">
+					<span class="titlebar__mark"
+						><i
+							class="ic"
+							data-i="music_note"
+						></i
+					></span>
+					BBPlayer
+					<span class="titlebar__where">主页</span>
+				</div>
+				<div class="titlebar__spacer"></div>
+				<div class="titlebar__controls">
+					<button
+						class="tb-btn"
+						title="最小化"
+					>
+						<i
+							class="ic"
+							data-i="min"
+						></i>
+					</button>
+					<button
+						class="tb-btn"
+						title="最大化"
+					>
+						<i
+							class="ic"
+							data-i="max"
+						></i>
+					</button>
+					<button
+						class="tb-btn tb-btn--close"
+						title="关闭"
+					>
+						<i
+							class="ic"
+							data-i="close"
+						></i>
+					</button>
+				</div>
+			</div>
+
+			<!-- ══ 主体：左栏 + 页面 ══════════════════════════════════════ -->
+			<div class="body">
+				<div class="sidebar">
+					<!-- ① 用户卡 -->
+					<div class="user-card">
+						<span class="user-card__avatar"
+							><i
+								class="ic"
+								data-i="person"
+							></i
+						></span>
+						<span class="user-card__body">
+							<span class="user-card__brand">BBPlayer</span>
+							<span class="user-card__name">御坂代理服务</span>
+						</span>
+						<span class="tag">①</span>
+					</div>
+
+					<!-- ② 歌单卡：页头 / 中段滚动 / 页脚 -->
+					<div class="card playlist-card">
+						<div class="card__head">
+							<button
+								class="foot-link"
+								style="width: auto"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="star"
+								></i>
+								收藏夹
+							</button>
+							<span class="spacer"></span>
+							<span class="tag">②</span>
+						</div>
+
+						<div
+							class="card__head"
+							style="min-height: 30px; padding-top: 0"
+						>
+							<span class="card__title">本地歌单</span>
+							<span class="card__actions">
+								<button
+									class="icon-btn icon-btn--sm"
+									title="新建歌单"
+								>
+									<i
+										class="ic ic--sm"
+										data-i="add"
+									></i>
+								</button>
+							</span>
+						</div>
+
+						<div class="card__body card__body--scroll">
+							<ul class="pl-list">
+								<li class="pl-item is-active">
+									<span class="pl-item__cover"
+										><span class="cover cover--a"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">我喜欢的音乐</span>
+										<span class="pl-item__sub">128 首</span>
+									</span>
+									<button
+										class="pl-item__act"
+										title="分享"
+									>
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--b"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">深夜循环</span>
+										<span class="pl-item__sub">42 首</span>
+									</span>
+									<button
+										class="pl-item__act"
+										title="同步"
+									>
+										<i
+											class="ic ic--sm"
+											data-i="sync"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--c"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">B 站神曲合集</span>
+										<span class="pl-item__sub">76 首</span>
+									</span>
+									<button
+										class="pl-item__act"
+										title="分享"
+									>
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--d"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">钢琴与雨</span>
+										<span class="pl-item__sub">31 首</span>
+									</span>
+									<button
+										class="pl-item__act"
+										title="分享"
+									>
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--e"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">名字很长的歌单</span>
+										<span class="pl-item__sub">9 首</span>
+									</span>
+									<button
+										class="pl-item__act"
+										title="分享"
+									>
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--f"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">电子</span>
+										<span class="pl-item__sub">214 首</span>
+									</span>
+									<button
+										class="pl-item__act"
+										title="分享"
+									>
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+							</ul>
+						</div>
+
+						<div
+							style="
+								flex: none;
+								border-top: 1px solid var(--line);
+								padding: 4px;
+							"
+						>
+							<button class="foot-link">
+								<i
+									class="ic ic--sm"
+									data-i="settings"
+								></i>
+								设置
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- ③ 内容卡 -->
+				<div class="page">
+					<div
+						class="card"
+						style="flex: 1 1 auto"
+					>
+						<div class="page__top">
+							<label class="search">
+								<i
+									class="ic ic--sm"
+									data-i="search"
+								></i>
+								<input placeholder="搜索视频、BV 号或链接" />
+							</label>
+							<span class="spacer"></span>
+							<span class="tag">③</span>
+						</div>
+
+						<div class="card__body card__body--scroll page__body">
+							<!-- ⑤ 最近播放 + area ① 快捷入口 -->
+							<div class="split">
+								<div class="split__col">
+									<div class="section__head">
+										<h2 class="section__title">最近播放</h2>
+										<span class="tag">⑤</span>
+									</div>
+									<div class="recent">
+										<span class="recent__cover"
+											><span class="cover cover--a"
+												><i
+													class="ic ic--sm"
+													data-i="music_note"
+												></i></span
+										></span>
+										<span class="recent__body">
+											<span class="recent__name">【初音ミク】千本桜</span>
+											<span class="recent__sub">初音未来 · 4:03</span>
+										</span>
+										<button
+											class="recent__go"
+											title="继续播放"
+										>
+											<i
+												class="ic ic--sm"
+												data-i="play"
+											></i>
+										</button>
+									</div>
+								</div>
+
+								<div class="card__divider"></div>
+
+								<div class="split__col">
+									<div class="section__head">
+										<h2 class="section__title">快捷入口</h2>
+										<span class="tag">title ①</span>
+									</div>
+									<div class="quick">
+										<button class="quick__card">
+											<span class="quick__icon"
+												><i
+													class="ic"
+													data-i="history"
+												></i
+											></span>
+											最近播放
+										</button>
+										<button class="quick__card">
+											<span class="quick__icon"
+												><i
+													class="ic"
+													data-i="play_circle"
+												></i
+											></span>
+											继续收听
+										</button>
+										<button class="quick__card">
+											<span class="quick__icon"
+												><i
+													class="ic"
+													data-i="star"
+												></i
+											></span>
+											收藏夹
+										</button>
+										<button class="quick__card">
+											<span class="quick__icon"
+												><i
+													class="ic"
+													data-i="library"
+												></i
+											></span>
+											音乐库
+										</button>
+									</div>
+								</div>
+							</div>
+
+							<!-- 听歌频率：GitHub 贡献墙 -->
+							<div class="section">
+								<div class="section__head">
+									<h2 class="section__title">听歌频率</h2>
+									<span class="spacer"></span>
+									<span class="section__meta mono">近一年 1,284 次</span>
+								</div>
+								<div class="heat">
+									<span class="l1"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l2"></span><span></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span></span><span class="l2"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span><span></span
+									><span></span><span class="l4"></span><span></span
+									><span class="l1"></span><span class="l2"></span><span></span
+									><span></span><span class="l4"></span><span class="l3"></span
+									><span></span><span class="l4"></span><span class="l4"></span
+									><span class="l2"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span></span><span class="l4"></span
+									><span></span><span></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span></span><span class="l4"></span
+									><span></span><span class="l4"></span><span class="l4"></span
+									><span class="l3"></span><span></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l2"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l3"></span><span></span
+									><span></span><span class="l4"></span><span class="l4"></span
+									><span></span><span class="l4"></span><span class="l1"></span
+									><span class="l3"></span><span class="l3"></span
+									><span class="l4"></span><span></span><span></span
+									><span></span><span></span><span></span
+									><span class="l1"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l1"></span><span class="l4"></span><span></span
+									><span></span><span class="l4"></span><span class="l4"></span
+									><span class="l2"></span><span class="l1"></span><span></span
+									><span></span><span class="l1"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span></span><span class="l1"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l3"></span
+									><span class="l4"></span><span></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span></span><span></span
+									><span></span><span class="l1"></span><span class="l4"></span
+									><span class="l4"></span><span></span><span></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span></span><span class="l3"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span></span><span></span
+									><span></span><span class="l4"></span><span></span
+									><span class="l4"></span><span></span><span class="l4"></span
+									><span class="l4"></span><span></span><span class="l4"></span
+									><span class="l3"></span><span class="l4"></span
+									><span class="l2"></span><span class="l4"></span
+									><span class="l1"></span><span class="l4"></span
+									><span class="l4"></span><span class="l2"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span><span></span
+									><span></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l2"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l4"></span><span class="l2"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l3"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l4"></span><span class="l1"></span><span></span
+									><span class="l4"></span><span></span><span></span
+									><span class="l4"></span><span></span><span class="l3"></span
+									><span></span><span></span><span class="l4"></span
+									><span></span><span class="l3"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l3"></span><span class="l4"></span
+									><span class="l1"></span><span class="l1"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span><span></span
+									><span class="l4"></span><span class="l2"></span><span></span
+									><span></span><span class="l2"></span><span class="l4"></span
+									><span></span><span></span><span class="l4"></span
+									><span></span><span class="l4"></span><span class="l1"></span
+									><span class="l1"></span><span class="l4"></span
+									><span class="l4"></span><span></span><span class="l1"></span
+									><span></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l2"></span><span class="l3"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span></span><span class="l3"></span
+									><span class="l1"></span><span class="l1"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l1"></span><span class="l3"></span
+									><span class="l4"></span><span class="l2"></span
+									><span class="l1"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l3"></span><span class="l4"></span
+									><span class="l2"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l3"></span><span></span><span></span
+									><span class="l1"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l1"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l1"></span><span></span><span></span
+									><span class="l2"></span><span class="l4"></span><span></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l3"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span></span><span class="l4"></span><span class="l4"></span
+									><span class="l2"></span><span></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l2"></span><span class="l4"></span
+									><span class="l4"></span><span class="l4"></span><span></span
+									><span></span><span class="l4"></span><span class="l2"></span
+									><span class="l4"></span><span class="l4"></span
+									><span class="l4"></span>
+								</div>
+								<div class="heat-legend">
+									<span>少</span>
+									<span class="heat-legend__scale">
+										<span></span><span class="l1"></span><span class="l2"></span
+										><span class="l3"></span><span class="l4"></span>
+									</span>
+									<span>多</span>
+									<span class="spacer"></span>
+									<span class="mono">2025-09 至今</span>
+								</div>
+							</div>
+
+							<!-- 最近更新 -->
+							<div class="section">
+								<div class="section__head">
+									<h2 class="section__title">最近更新</h2>
+								</div>
+								<div class="grid">
+									<button class="media-card">
+										<span class="media-card__cover"
+											><span class="cover cover--a"
+												><i
+													class="ic ic--lg"
+													data-i="music_note"
+												></i></span
+										></span>
+										<span class="media-card__title">我喜欢的音乐</span>
+										<span class="media-card__sub"
+											><i
+												class="ic"
+												data-i="library"
+											></i>
+											128 首</span
+										>
+									</button>
+									<button class="media-card">
+										<span class="media-card__cover"
+											><span class="cover cover--b"
+												><i
+													class="ic ic--lg"
+													data-i="music_note"
+												></i></span
+										></span>
+										<span class="media-card__title">深夜循环</span>
+										<span class="media-card__sub"
+											><i
+												class="ic"
+												data-i="sync"
+											></i>
+											42 首</span
+										>
+									</button>
+									<button class="media-card">
+										<span class="media-card__cover"
+											><span class="cover cover--c"
+												><i
+													class="ic ic--lg"
+													data-i="music_note"
+												></i></span
+										></span>
+										<span class="media-card__title">B 站神曲合集</span>
+										<span class="media-card__sub"
+											><i
+												class="ic"
+												data-i="library"
+											></i>
+											76 首</span
+										>
+									</button>
+									<button class="media-card">
+										<span class="media-card__cover"
+											><span class="cover cover--d"
+												><i
+													class="ic ic--lg"
+													data-i="music_note"
+												></i></span
+										></span>
+										<span class="media-card__title">钢琴与雨</span>
+										<span class="media-card__sub"
+											><i
+												class="ic"
+												data-i="library"
+											></i>
+											31 首</span
+										>
+									</button>
+									<button class="media-card">
+										<span class="media-card__cover"
+											><span class="cover cover--e"
+												><i
+													class="ic ic--lg"
+													data-i="music_note"
+												></i></span
+										></span>
+										<span class="media-card__title">电子</span>
+										<span class="media-card__sub"
+											><i
+												class="ic"
+												data-i="library"
+											></i>
+											214 首</span
+										>
+									</button>
+									<button class="media-card">
+										<span class="media-card__cover"
+											><span class="cover cover--f"
+												><i
+													class="ic ic--lg"
+													data-i="music_note"
+												></i></span
+										></span>
+										<span class="media-card__title">和风器乐</span>
+										<span class="media-card__sub"
+											><i
+												class="ic"
+												data-i="library"
+											></i>
+											57 首</span
+										>
+									</button>
+								</div>
+							</div>
+
+							<!-- 播放历史：独立区块 -->
+							<div class="section">
+								<div class="section__head">
+									<div class="tabs">
+										<button class="tab is-active">继续收听</button>
+										<button class="tab">最近播放</button>
+										<button class="tab">最常播放</button>
+									</div>
+									<span class="spacer"></span>
+									<span class="section__meta mono">1,284 首 · 210 小时</span>
+									<button class="btn btn--outlined btn--sm">
+										<i
+											class="ic"
+											data-i="play"
+										></i>
+										播放全部
+									</button>
+								</div>
+								<ul class="song-list">
+									<li class="song-row">
+										<button class="song-row__play">
+											<i
+												class="ic"
+												data-i="play"
+											></i>
+										</button>
+										<span class="song-row__index">01</span>
+										<span class="song-row__cover"
+											><span class="cover cover--a"></span
+										></span>
+										<span class="song-row__title">【初音ミク】千本桜</span>
+										<span class="song-row__artist">初音未来</span>
+										<span class="song-row__time">4:03</span>
+										<button class="song-row__more">
+											<i
+												class="ic"
+												data-i="more"
+											></i>
+										</button>
+									</li>
+									<li class="song-row">
+										<button class="song-row__play">
+											<i
+												class="ic"
+												data-i="play"
+											></i>
+										</button>
+										<span class="song-row__index">02</span>
+										<span class="song-row__cover"
+											><span class="cover cover--c"></span
+										></span>
+										<span class="song-row__title"
+											>Bad Apple!! feat. nomico</span
+										>
+										<span class="song-row__artist">nomico</span>
+										<span class="song-row__time">3:41</span>
+										<button class="song-row__more">
+											<i
+												class="ic"
+												data-i="more"
+											></i>
+										</button>
+									</li>
+									<li class="song-row">
+										<button class="song-row__play">
+											<i
+												class="ic"
+												data-i="play"
+											></i>
+										</button>
+										<span class="song-row__index">03</span>
+										<span class="song-row__cover"
+											><span class="cover cover--e"></span
+										></span>
+										<span class="song-row__title">Night of Knights</span>
+										<span class="song-row__artist">COOL&amp;CREATE</span>
+										<span class="song-row__time">5:12</span>
+										<button class="song-row__more">
+											<i
+												class="ic"
+												data-i="more"
+											></i>
+										</button>
+									</li>
+									<li class="song-row">
+										<button class="song-row__play">
+											<i
+												class="ic"
+												data-i="play"
+											></i>
+										</button>
+										<span class="song-row__index">04</span>
+										<span class="song-row__cover"
+											><span class="cover cover--b"></span
+										></span>
+										<span class="song-row__title">少女レイ</span>
+										<span class="song-row__artist">みきとP</span>
+										<span class="song-row__time">4:28</span>
+										<button class="song-row__more">
+											<i
+												class="ic"
+												data-i="more"
+											></i>
+										</button>
+									</li>
+								</ul>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- ══ 播放条：窗口固定底行（所有页面共用） ═══════════════════ -->
+			<div class="playbar">
+				<span class="playbar__cover"
+					><span class="cover cover--a"
+						><i
+							class="ic ic--sm"
+							data-i="music_note"
+						></i></span
+				></span>
+				<div class="playbar__meta">
+					<span class="playbar__title">【初音ミク】千本桜</span>
+					<span class="playbar__artist">初音未来 · 我喜欢的音乐</span>
+				</div>
+				<div class="playbar__center">
+					<div
+						class="row"
+						style="gap: 2px"
+					>
+						<button
+							class="icon-btn icon-btn--round"
+							title="上一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="prev"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--play"
+							title="播放"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="play"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--round"
+							title="下一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="next"
+							></i>
+						</button>
+					</div>
+					<div class="progress">
+						<span class="time">1:32</span>
+						<span class="progress__bar"></span>
+						<span class="time">4:03</span>
+					</div>
+				</div>
+				<div class="playbar__side">
+					<button
+						class="icon-btn"
+						title="列表循环"
+					>
+						<i
+							class="ic"
+							data-i="repeat"
+						></i>
+					</button>
+					<button
+						class="icon-btn"
+						title="播放列表"
+					>
+						<i
+							class="ic"
+							data-i="queue"
+						></i>
+					</button>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

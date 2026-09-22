@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<title>正在播放 · BBPlayer Desktop 原型</title>
+		<link
+			rel="stylesheet"
+			href="../assets/proto.css"
+		/>
+	</head>
+	<body>
+		<div class="window">
+			<div class="titlebar">
+				<div class="titlebar__brand">
+					<span class="titlebar__mark"
+						><i
+							class="ic"
+							data-i="music_note"
+						></i
+					></span>
+					BBPlayer
+					<span class="titlebar__where">正在播放</span>
+				</div>
+				<div class="titlebar__spacer"></div>
+				<div class="titlebar__controls">
+					<button
+						class="tb-btn"
+						title="最小化"
+					>
+						<i
+							class="ic"
+							data-i="min"
+						></i>
+					</button>
+					<button
+						class="tb-btn"
+						title="最大化"
+					>
+						<i
+							class="ic"
+							data-i="max"
+						></i>
+					</button>
+					<button
+						class="tb-btn tb-btn--close"
+						title="关闭"
+					>
+						<i
+							class="ic"
+							data-i="close"
+						></i>
+					</button>
+				</div>
+			</div>
+
+			<div class="body">
+				<div class="sidebar">
+					<div class="user-card">
+						<span class="user-card__avatar"
+							><i
+								class="ic"
+								data-i="person"
+							></i
+						></span>
+						<span class="user-card__body">
+							<span class="user-card__brand">BBPlayer</span>
+							<span class="user-card__name">御坂代理服务</span>
+						</span>
+					</div>
+
+					<div class="card playlist-card">
+						<div class="card__head">
+							<button
+								class="foot-link"
+								style="width: auto"
+							>
+								<i
+									class="ic ic--sm"
+									data-i="star"
+								></i>
+								收藏夹
+							</button>
+						</div>
+						<div
+							class="card__head"
+							style="min-height: 30px; padding-top: 0"
+						>
+							<span class="card__title">本地歌单</span>
+							<span class="card__actions">
+								<button
+									class="icon-btn icon-btn--sm"
+									title="新建歌单"
+								>
+									<i
+										class="ic ic--sm"
+										data-i="add"
+									></i>
+								</button>
+							</span>
+						</div>
+						<div class="card__body card__body--scroll">
+							<ul class="pl-list">
+								<li class="pl-item is-active">
+									<span class="pl-item__cover"
+										><span class="cover cover--a"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">我喜欢的音乐</span>
+										<span class="pl-item__sub">128 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--b"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">深夜循环</span>
+										<span class="pl-item__sub">42 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="sync"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--c"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">B 站神曲合集</span>
+										<span class="pl-item__sub">76 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--d"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">钢琴与雨</span>
+										<span class="pl-item__sub">31 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+								<li class="pl-item">
+									<span class="pl-item__cover"
+										><span class="cover cover--e"
+											><i
+												class="ic ic--sm"
+												data-i="music_note"
+											></i></span
+									></span>
+									<span class="pl-item__body">
+										<span class="pl-item__name">电子</span>
+										<span class="pl-item__sub">214 首</span>
+									</span>
+									<button class="pl-item__act">
+										<i
+											class="ic ic--sm"
+											data-i="share"
+										></i>
+									</button>
+								</li>
+							</ul>
+						</div>
+						<div
+							style="
+								flex: none;
+								border-top: 1px solid var(--line);
+								padding: 4px;
+							"
+						>
+							<button class="foot-link">
+								<i
+									class="ic ic--sm"
+									data-i="settings"
+								></i>
+								设置
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- 播放详情：两栏（唱片 + 歌词），没有队列 -->
+				<div class="page">
+					<div
+						class="card"
+						style="flex: 1 1 auto"
+					>
+						<div class="nowplaying">
+							<!-- 左：唱片 + 曲目信息 -->
+							<div class="disc-col">
+								<div class="disc-stage">
+									<div class="disc">
+										<span class="disc__label"
+											><span class="cover cover--c"
+												><i
+													class="ic ic--xl"
+													data-i="music_note"
+												></i></span
+										></span>
+										<span class="disc__hole"></span>
+									</div>
+									<div class="tonearm">
+										<span class="tonearm__pivot"></span>
+										<span class="tonearm__bar"></span>
+										<span class="tonearm__head"></span>
+									</div>
+								</div>
+
+								<div class="disc-meta">
+									<div class="disc-meta__title">异样的风暴中心</div>
+									<div class="disc-meta__line">杉田朗 / 洛天依</div>
+									<div class="disc-meta__tabs">
+										<button class="tab is-active">歌词</button>
+										<button class="tab">相关</button>
+									</div>
+								</div>
+							</div>
+
+							<!-- 右：歌词（纯文字流：无卡片、无背景、无边框） -->
+							<div class="lyrics">
+								<div class="lyrics__scroll">
+									<div class="lyrics__spacer"></div>
+									<ul class="lyrics__list">
+										<li class="lyrics__line">作词：和田野</li>
+										<li class="lyrics__line">作曲：杉田朗</li>
+										<li class="lyrics__line">对不起</li>
+										<li class="lyrics__line is-active">我想尝试一次恶作剧</li>
+										<li class="lyrics__line">没有恶意</li>
+										<li class="lyrics__line">将我的妄想与任性</li>
+										<li class="lyrics__line">都扔进黑洞里</li>
+										<li class="lyrics__line">对不起</li>
+										<li class="lyrics__line">讨厌的东西还有喜欢的东西</li>
+										<li class="lyrics__line">和我都没关系</li>
+										<li class="lyrics__line is-dim">
+											从那以后我会变成什么样子
+										</li>
+										<li class="lyrics__line is-dim">是否还会被称作人类</li>
+										<li class="lyrics__line is-dim">我想尝试一次恶作剧</li>
+										<li class="lyrics__line is-dim">没有恶意</li>
+									</ul>
+									<div class="lyrics__spacer"></div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- 播放条（与其它页面完全相同的结构） -->
+			<div class="playbar">
+				<span class="playbar__cover"
+					><span class="cover cover--c"
+						><i
+							class="ic ic--sm"
+							data-i="music_note"
+						></i></span
+				></span>
+				<div class="playbar__meta">
+					<span class="playbar__title">异样的风暴中心</span>
+					<span class="playbar__artist">杉田朗 / 洛天依</span>
+				</div>
+				<div class="playbar__center">
+					<div
+						class="row"
+						style="gap: 2px"
+					>
+						<button
+							class="icon-btn icon-btn--round"
+							title="上一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="prev"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--play"
+							title="暂停"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="pause"
+							></i>
+						</button>
+						<button
+							class="icon-btn icon-btn--round"
+							title="下一首"
+						>
+							<i
+								class="ic ic--lg"
+								data-i="next"
+							></i>
+						</button>
+					</div>
+					<div class="progress">
+						<span class="time">1:12</span>
+						<span class="progress__bar"></span>
+						<span class="time">3:26</span>
+					</div>
+				</div>
+				<div class="playbar__side">
+					<button
+						class="icon-btn"
+						title="单曲循环"
+					>
+						<i
+							class="ic"
+							data-i="repeat_one"
+						></i>
+					</button>
+					<button
+						class="icon-btn"
+						title="播放列表"
+					>
+						<i
+							class="ic"
+							data-i="queue"
+						></i>
+					</button>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

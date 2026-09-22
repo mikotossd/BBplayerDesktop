@@ -309,21 +309,61 @@ async function run(window) {
 	// 原来是 7 个平铺入口，把"目的地"（音乐库 / 搜索）和"某个页面里的子集或
 	// 动作"（导入歌单 / 收藏夹 / 合集 / 共享 / 最近播放）混在同一层 ——
 	// 用户得先猜「导入歌单」和「合集」有什么区别。
-	const navViews = JSON.parse(
+	/*
+	 * 卡片化阶段 1：左栏从「4 个平级的导航目的地」改成**两张卡片**
+	 * （草图的 card ① 用户卡 + card ② 歌单卡）。
+	 *
+	 * ⚠️ 断言也跟着改判据，而不是只换选择器：
+	 * 原来验的是"有 4 个导航项、顺序是 home/library/search/settings"；
+	 * 现在验的是"入口仍然存在、并且能到达对应视图"——
+	 * 后者才是用户真正在意的，前者只是当时那版界面的一种实现。
+	 */
+	const sidebarProbe = JSON.parse(
 		await evaluate(
 			window,
-			`JSON.stringify([...document.querySelectorAll('.nav__item')].map((el) => el.dataset.view))`,
+			`(() => {
+				const entries = [...document.querySelectorAll('[data-nav]')].map((el) => ({
+					nav: el.dataset.nav,
+					testid: el.dataset.testid || el.id,
+					// 入口必须在**文档里且可见**（藏起来的入口等于没有）
+					visible: el.getBoundingClientRect().width > 0,
+				}))
+				return JSON.stringify({
+					entries,
+					hasBrand: Boolean(document.getElementById('sidebar-brand')),
+					/*
+					 * ⚠️ 元素 id 是 sidebar-library（它同时是 data-nav="library"
+					 * 的入口），testid 才是 sidebar-card。第一版这里按 testid
+					 * 猜 id，拿到 null，断言红了一条 —— 记下来：
+					 * **id 与 testid 不是一回事**，用错一个就是"元素明明在、
+					 * 代码说它不在"。
+					 *
+					 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
+					 */
+					hasCard: Boolean(document.getElementById('sidebar-library')),
+					hasFavorites: Boolean(document.getElementById('sidebar-favorites')),
+					hasSettings: Boolean(document.getElementById('sidebar-settings')),
+				})
+			})()`,
 		),
 	)
+	const navNames = new Set(sidebarProbe.entries.map((e) => e.nav))
 	check(
-		'左栏只剩 4 个目的地，顺序为 主页/音乐库/搜索/设置',
-		navViews.join(',') === 'home,library,search,settings',
-		navViews.join(' / '),
+		'左栏是两张卡片：① 用户卡 + ② 歌单卡',
+		sidebarProbe.hasBrand && sidebarProbe.hasCard,
+		`用户卡=${sidebarProbe.hasBrand} 歌单卡=${sidebarProbe.hasCard}`,
 	)
 	check(
-		'导入与共享已从一级入口降级为页内动作',
-		!navViews.includes('import') && !navViews.includes('share'),
-		navViews.join(' / '),
+		'四个目的地都有入口，且都可见（主页/音乐库/收藏夹/设置）',
+		['home', 'library', 'favorites', 'settings'].every((v) =>
+			navNames.has(v),
+		) && sidebarProbe.entries.every((e) => e.visible),
+		sidebarProbe.entries.map((e) => `${e.nav}(${e.testid})`).join(' / '),
+	)
+	check(
+		'收藏夹入口在歌单卡页头、设置在页脚（草图上就是这个位置）',
+		sidebarProbe.hasFavorites && sidebarProbe.hasSettings,
+		`收藏夹=${sidebarProbe.hasFavorites} 设置=${sidebarProbe.hasSettings}`,
 	)
 	const libraryTabs = JSON.parse(
 		await evaluate(
@@ -686,9 +726,8 @@ async function run(window) {
 	const activeStyles = JSON.parse(
 		await evaluate(
 			window,
-			`(() => {
-				const pick = (sel) => {
-					const el = document.querySelector(sel)
+			`(async () => {
+				const read = (el) => {
 					if (!el) return null
 					const s = getComputedStyle(el)
 					return {
@@ -699,28 +738,61 @@ async function run(window) {
 						radius: s.borderRadius,
 					}
 				}
+				/*
+				 * 基准：左栏卡片里那个入口在"选中"时的外观。
+				 *
+				 * ⚠️ 用**临时克隆**量，而不是给真实元素加类再量。
+				 *
+				 * 真实元素上有一条 transition: background 0.1s，于是
+				 * "加类 → 立刻 getComputedStyle" 读到的是**过渡的起始值**
+				 * （transparent），而不是目标值 —— 这就是前面几轮一直量到
+				 * rgba(0,0,0,0) 的原因（三条 background 规则明明都匹配、
+				 * 连内联 rgb(9,8,7) 都被动画盖住，因为过渡会接管属性）。
+				 *
+				 * 克隆出来的元素没有"上一个值"可插值，第一帧就是终值。
+				 * 量完即摘，不影响界面，也不依赖任何时序。
+				 *
+				 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
+				 */
+				const real = document.getElementById('sidebar-settings')
+				if (!real) return JSON.stringify({ nav: null })
+				const probe = document.createElement('button')
+				probe.className = 'sidebar__entry is-active'
+				probe.style.position = 'absolute'
+				probe.style.visibility = 'hidden'
+				real.parentElement?.appendChild(probe)
+				const nav = read(probe)
+				probe.remove()
 				return JSON.stringify({
-					nav: pick('.nav__item.is-active'),
+					/*
+					 * 判据本身没变：全工程只允许一种选中视觉
+					 * （secondary-container 底 + on-secondary-container 字 +
+					 * 胶囊圆角 + 无下划线）。这里验的是"右栏页签与分段控件
+					 * 跟左栏是同一套"。
+					 */
+					nav,
 					// ⚠️ 用 [data-panel] 而不是 .tab —— 音乐库的页签条也用 .tab
 					// 且 DOM 顺序在前，用 .tab.is-active 查询会先命中
 					// **音乐库页签**。那条「选中态一致性」断言因此一直在测错的
 					// 元素（两边视觉本来就一样，所以看不出来）。
-					tab: pick('[data-panel].is-active'),
-					segmented: pick('.segmented button.is-active'),
+					tab: read(document.querySelector('[data-panel].is-active')),
+					segmented: read(
+						document.querySelector('.segmented button.is-active'),
+					),
 				})
 			})()`,
 		),
 	)
 
 	check(
-		'左栏导航项处于选中态（作为基准）',
+		'左栏入口的选中态作为基准（胶囊、填充色、无下划线）',
 		activeStyles.nav !== null,
 		JSON.stringify(activeStyles.nav),
 	)
 	check(
-		'右栏页签的选中底色与左栏导航项**完全一致**（不再一套一套地写）',
+		'右栏页签的选中底色与左栏入口**完全一致**（不再一套一套地写）',
 		activeStyles.tab !== null && activeStyles.tab.bg === activeStyles.nav?.bg,
-		`nav=${activeStyles.nav?.bg} tab=${activeStyles.tab?.bg}`,
+		`nav=${activeStyles.nav?.bg} tab=${activeStyles.tab?.bg} diag=${JSON.stringify(activeStyles.diag)}`,
 	)
 	check(
 		'右栏页签的选中前景色也与左栏一致',
@@ -851,12 +923,14 @@ async function run(window) {
 			? `漏标：${centered.missingClass.join('、')}`
 			: '无遗漏',
 	)
-	// 反向：导航项是「图标 + 文字」，**不能**被当成图标按钮压缩
+	// 反向：卡片里的入口是「图标 + 文字」，**不能**被当成图标按钮压缩
+	// （卡片化阶段 1：判据从 `.nav__item` 换成 `.sidebar__entry` ——
+	//  那个"文字被压成竖排"的缺陷与具体是哪种入口无关）
 	const navWidths = JSON.parse(
 		await evaluate(
 			window,
 			`(() => {
-				const items = [...document.querySelectorAll('.nav__item')]
+				const items = [...document.querySelectorAll('.sidebar__entry')]
 				const squeezed = items
 					.filter((el) => el.getBoundingClientRect().width < 120)
 					.map((el) => (el.textContent || '').trim().slice(0, 12))
@@ -865,7 +939,7 @@ async function run(window) {
 		),
 	)
 	check(
-		'左栏导航项没有被当成图标按钮压缩（文字不竖排）',
+		'左栏卡片里的入口没有被当成图标按钮压缩（文字不竖排）',
 		navWidths.length === 0,
 		navWidths.length > 0 ? `过窄：${navWidths.join('、')}` : '全部占满整行',
 	)
@@ -913,7 +987,18 @@ async function run(window) {
 					wrappedNav,
 					playbarRadius: Number.parseFloat(playbarStyle.borderRadius),
 					playbarShadow: playbarStyle.boxShadow !== 'none',
-					playbarLeftGap: Math.round(playbar?.left ?? 0),
+					/*
+					 * ⚠️ 判据从"离窗口左边有多少留白"改成"与内容卡片**左边缘对齐**"。
+					 *
+					 * 卡片化之后播放条是**中栏里的一张卡**（.main 网格的第二行），
+					 * 它自己不再有左右 margin —— 留白由中栏的 padding 提供。
+					 * 于是播放条的 left 与内容卡的 left 应当相等，
+					 * 这正是"播放条与内容卡片同宽、左右对齐"的判据（草图上的画法）。
+					 *
+					 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**（会提前结束字符串）。
+					 */
+					playbarLeft: Math.round(playbar?.left ?? 0),
+					contentLeft: content ? Math.round(content.left) : null,
 					// 内容底边与播放条顶边的关系：内容不该压到播放条上
 					overlapPx: content && playbar
 						? Math.round(content.bottom - playbar.top)
@@ -946,11 +1031,13 @@ async function run(window) {
 			: '全部单行',
 	)
 	check(
-		'底部是悬浮圆角卡（有圆角、有投影、左右留白）',
+		'播放条是**中栏里的圆角卡**：圆角、有投影、与内容卡左右对齐',
 		shell.playbarRadius >= 12 &&
 			shell.playbarShadow &&
-			shell.playbarLeftGap >= 4,
-		`radius=${shell.playbarRadius}px shadow=${shell.playbarShadow} leftGap=${shell.playbarLeftGap}px`,
+			shell.contentLeft !== null &&
+			Math.abs(shell.playbarLeft - shell.contentLeft) <= 1,
+		`radius=${shell.playbarRadius}px shadow=${shell.playbarShadow} ` +
+			`播放条左边=${shell.playbarLeft}px 内容卡左边=${shell.contentLeft}px`,
 	)
 	check(
 		'内容区不压到播放条上（缺陷 1）',
@@ -1237,7 +1324,8 @@ async function run(window) {
 					contentBg: getComputedStyle(
 						document.getElementById('content'),
 					).backgroundColor,
-					// 新建入口：头部右边那颗「＋」
+					// 新建入口：**左栏歌单卡**的「＋」（卡片化阶段 1 之后它是主入口，
+					// 任何页面都在；页头那颗改叫 playlist-new-head）
 					hasAdd: Boolean(document.querySelector('[data-testid="playlist-new"]')),
 					hasFilter: Boolean(
 						document.querySelector('[data-testid="playlist-filter"]'),
@@ -1279,13 +1367,41 @@ async function run(window) {
 		await evaluate(
 			window,
 			`(async () => {
-				document.querySelector('[data-testid="playlist-new"]')?.click()
-				await new Promise((r) => setTimeout(r, 200))
+				const trigger = document.querySelector('[data-testid="playlist-new"]')
+				// 先把整屏滚一遍，确保触发按钮真的进了视口（这个仓库里
+				// "元素在、但点不到"已经踩过好几次）
+				trigger?.scrollIntoView({ block: 'nearest' })
+				await new Promise((r) => setTimeout(r, 100))
+				trigger?.click()
+				await new Promise((r) => setTimeout(r, 400))
 				const items = [...document.querySelectorAll('.menu__item')].map(
 					(node) => node.textContent.trim(),
 				)
 				window.bbComponents.closeMenu()
-				return JSON.stringify({ items })
+				/*
+				 * 找不到触发器时把**它能被谁替换掉**说清楚：
+				 * 左栏那个「＋」的 id 是 sidebar-new-playlist、testid 是
+				 * playlist-new；而音乐库页头那颗现在叫 playlist-new-head。
+				 * 两者混了就会"按钮明明在、选择器找不到"。
+				 */
+				return JSON.stringify({
+					items,
+					found: Boolean(trigger),
+					diag: {
+						sidebarAdd: Boolean(
+							document.getElementById('sidebar-new-playlist'),
+						),
+						headAdd: Boolean(
+							document.querySelector('[data-testid="playlist-new-head"]'),
+						),
+						view: document.querySelector('.nav__item.is-active')?.dataset?.view,
+						pageTitle: document.getElementById('page-title')?.textContent,
+					},
+					nav: (() => {
+						const r = trigger?.getBoundingClientRect()
+						return r ? [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)] : null
+					})(),
+				})
 			})()`,
 		),
 	)
@@ -1295,7 +1411,7 @@ async function run(window) {
 			newMenu.items.some((t) => t.includes('新建播放列表')) &&
 			newMenu.items.some((t) => t.includes('导入外部歌单')) &&
 			newMenu.items.some((t) => t.includes('订阅共享歌单')),
-		newMenu.items.join(' / '),
+		`${newMenu.items.join(' / ')}（按钮 ${newMenu.found}，rect=${newMenu.nav}，diag=${JSON.stringify(newMenu.diag)}）`,
 	)
 
 	// 从卡片进详情 → 有返回 → 能回来。
@@ -1813,6 +1929,86 @@ async function run(window) {
 		`5 次洗牌得到 ${reshuffleVariety.distinct} 种不同顺序`,
 	)
 
+	/*
+	 * --- 播放模式：四档 ---
+	 *
+	 * ⚠️ 原先只有三档，而且 `order` 的名字与行为不符（它其实是列表循环）。
+	 * 现在四档的语义是拆开的，所以这里要**逐档验证行为**，不能只数枚举值：
+	 *   * 数枚举 → 改个名字就能骗过断言（假绿）；
+	 *   * 验行为 → 只有真的实现了"放完就停"才过得去。
+	 */
+	const modeProbe = JSON.parse(
+		await evaluate(
+			window,
+			`(() => {
+				const player = window.bbPlayer
+				const saved = player.getQueue()
+				const savedIndex = player.getIndex()
+
+				// 用 3 首的小队列，走"自动续播"的下标计算（不真的播放）
+				player.setQueue(saved.slice(0, 3), 2)
+				const labels = []
+				const icons = []
+
+				// 顺序播放：在最后一首上自动续播 → 停（无下一首）
+				player.setMode('order')
+				const orderStops = player.peekNextIndex(true) === -1
+				// 顺序播放：手动"下一首"仍然回绕（用户的意图明确，不该被模式挡住）
+				const orderManualWraps = player.peekNextIndex(false) === 0
+
+				// 列表循环：自动续播回到队首
+				player.setMode('list-loop')
+				const listLoopWraps = player.peekNextIndex(true) === 0
+
+				// 单曲循环：自动续播停在当前这首
+				player.setMode('repeat-one')
+				const repeatOneStays = player.peekNextIndex(true) === 2
+
+				// 循环四档：枚举顺序固定，且每一档都换过 title/aria-label
+				player.setMode('list-loop')
+				for (let i = 0; i < 4; i++) {
+					labels.push(player.getModeLabel())
+					icons.push(player.getModeIcon())
+					player.cycleMode()
+				}
+				const backToStart = player.getMode() === 'list-loop'
+
+				player.setQueue(saved, savedIndex)
+				return JSON.stringify({
+					orderStops,
+					orderManualWraps,
+					listLoopWraps,
+					repeatOneStays,
+					labels,
+					icons,
+					backToStart,
+				})
+			})()`,
+		),
+	)
+	check(
+		'播放模式四档：顺序播放在队尾**停住**，手动下一首仍回绕',
+		modeProbe.orderStops && modeProbe.orderManualWraps,
+		`自动续播停在队尾=${modeProbe.orderStops}，手动下一首回绕=${modeProbe.orderManualWraps}`,
+	)
+	check(
+		'播放模式四档：列表循环自动续播回到队首',
+		modeProbe.listLoopWraps,
+		`自动续播回到队首=${modeProbe.listLoopWraps}`,
+	)
+	check(
+		'播放模式四档：单曲循环自动续播停在当前这首',
+		modeProbe.repeatOneStays,
+		`自动续播停在当前=${modeProbe.repeatOneStays}`,
+	)
+	check(
+		'播放模式四档：循环按钮走完四档回到起点，且每档都有不同的名称与图标',
+		modeProbe.backToStart &&
+			new Set(modeProbe.labels).size === 4 &&
+			new Set(modeProbe.icons).size === 4,
+		`名称 [${modeProbe.labels.join(' / ')}]，图标 [${modeProbe.icons.join(' / ')}]`,
+	)
+
 	// --- (2) 下一首播放 ---
 	const playNextProbe = JSON.parse(
 		await evaluate(
@@ -2053,7 +2249,17 @@ async function run(window) {
 	// 这一节同时是「页面真的渲染出来了」的断言 —— 截图巡检里第一版
 	// **分类列表是空白**（标题有、列表没有），而当时的断言只看了标题。
 	console.log('\n[ui] 2.7) 设置页')
-	await click(window, '[data-testid="nav-settings"]')
+	/*
+	 * ⚠️ 入口从「左栏导航项」改成「左栏歌单卡页脚的『设置』」
+	 * （卡片化阶段 1）。
+	 *
+	 * ⚠️ 而且先**回到首页**再点：左栏是常驻的，但入口的可见性依赖
+	 * 当前视图（正在播放页会把左栏留在原地，而点击落到哪一层要自己确认）。
+	 * 先回主页 = 从"普通页面"进入设置，这与用户的实际路径一致。
+	 */
+	await click(window, '[data-testid="sidebar-brand"]')
+	await sleep(300)
+	await click(window, '[data-testid="sidebar-settings"]')
 	await sleep(900)
 
 	/*
@@ -2397,7 +2603,9 @@ async function run(window) {
 	console.log('\n[ui] 2.8) 正在播放面板')
 
 	// 先让队列里有东西并把当前曲目置上
-	await click(window, '[data-testid="nav-library"]')
+	// ⚠️ 入口从「左栏导航项」改成「左栏歌单卡」（卡片化阶段 1）：点卡片本体
+	// 就是回音乐库，与原来的 `nav-library` 同一个目的地。
+	await click(window, '[data-testid="sidebar-card"]')
 	await sleep(800)
 	await openPlaylistWithTracks(window)
 	await click(window, '[data-testid="btn-play-all"]')
@@ -2545,7 +2753,7 @@ async function run(window) {
 
 	// 回到音乐库，免得影响后面的断言
 	// ⚠️ 音乐库页签现在是卡片网格，后面的断言要用曲目表，所以显式进详情
-	await click(window, '[data-testid="nav-library"]')
+	await click(window, '[data-testid="sidebar-card"]')
 	await sleep(700)
 	await openPlaylistWithTracks(window)
 
@@ -3314,7 +3522,8 @@ async function run(window) {
 	// ⚠️ 这一段放在最后：它要**换目的地**（点导航），放中间会污染后面
 	// 依赖"当前视图"的断言（这个仓库已经踩过一次"测试之间相互污染"）。
 	console.log('\n[ui] 10) 主页（热力图 + 快捷入口 + 最近更新）')
-	await click(window, '[data-testid="nav-home"]')
+	// ⚠️ 入口从「左栏导航项」改成「用户卡本体」（卡片化阶段 1）
+	await click(window, '[data-testid="sidebar-brand"]')
 	await sleep(2500)
 
 	const home = JSON.parse(
@@ -3505,7 +3714,7 @@ async function run(window) {
 	)
 
 	// 快捷入口：收藏夹那张卡要真的切到音乐库 › 收藏夹
-	await click(window, '[data-testid="nav-home"]')
+	await click(window, '[data-testid="sidebar-brand"]')
 	await sleep(1500)
 	await click(window, '[data-testid="quick-favorites"]')
 	await sleep(1500)
@@ -3790,7 +3999,8 @@ async function run(window) {
 	// 这里复用上面那个 `login:status` 桩（已登录、mid 9001、昵称「探针用户」），
 	// 直接验证"数据被读出来了"。
 	console.log('\n[ui] 12) 设置页的登录态')
-	await click(window, '[data-testid="nav-settings"]')
+	// ⚠️ 入口从「左栏导航项」改成「歌单卡页脚的『设置』」（卡片化阶段 1）
+	await click(window, '[data-testid="sidebar-settings"]')
 	await sleep(1200)
 	const loggedInRow = JSON.parse(
 		await evaluate(

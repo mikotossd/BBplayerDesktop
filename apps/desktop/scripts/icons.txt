@@ -38,6 +38,7 @@ skip_next          # 下一首
 repeat             # 列表循环
 repeat_one         # 单曲循环
 shuffle            # 随机
+arrow_forward      # 顺序播放（放完最后一首就停）
 volume_up          # 音量
 graphic_eq         # 响度均衡
 timer              # 定时关闭
@@ -64,6 +65,10 @@ chevron_right      # 进入子页
 arrow_back         # 返回
 expand_more        # 展开
 expand_less        # 收起
+remove             # 标题栏：最小化
+crop_square        # 标题栏：最大化 / 还原
+# close 在下面「动作」一节里已经有了，不要在这里重复 ——
+# 名字重复会让 Google Fonts 直接返回 400（整批全废，不是只丢那一个）
 
 # 外观 / 主题
 palette            # 配色

@@ -353,7 +353,30 @@ function createWindow() {
 		minWidth: 980,
 		minHeight: 620,
 		/*
-		 * ⚠️ 底色由**当前主题**决定，不能写死深色。
+		 * ⚠️ **自绘标题栏**（卡片化改造）。
+		 *
+		 * 用户要求"标题栏完全自绘"。窗口去掉原生 frame，最小化 / 最大化 /
+		 * 关闭三个按钮由渲染层画（见 index.html 的 `.titlebar` 与
+		 * ipc-handlers.cjs 的 `window:*`）。
+		 *
+		 * 为什么是 `titleBarStyle: 'hidden'` + `titleBarOverlay` 的组合，
+		 * 而不是只写 `frame: false`：
+		 *   * `frame: false` 在 Windows 上会把**整个非客户区**交出去，
+		 *     包括窗口的投影、圆角、以及系统级的窗口贴靠（Snap）行为 ——
+		 *     用户会立刻觉得"这不是一个正常的窗口"；
+		 *   * `titleBarStyle: 'hidden'` 保留这些窗口特性，只隐藏标题栏；
+		 *   * `titleBarOverlay` 在 Windows / Linux 上**仍然**画出系统按钮，
+		 *     所以要把它显式关掉（`color` 用透明 + `width: 0` 也能达到同样
+		 *     效果，但直接省略这个选项更明确）。
+		 *
+		 * macOS 上 `titleBarStyle: 'hidden'` 会保留红绿灯按钮 ——
+		 * 那是 macOS 的惯例，不该自绘掉。所以只有非 darwin 才隐藏。
+		 */
+		...(process.platform === 'darwin'
+			? { titleBarStyle: 'hiddenInset' }
+			: { titleBarStyle: 'hidden' }),
+		/*
+		 * 底色由**当前主题**决定，不能写死深色。
 		 *
 		 * 浅色主题的用户会在启动时先看到一个深色矩形再变白（用户实测
 		 * "启动先黑一下"）。`setBackgroundColor` 也没人调 —— 窗口底色

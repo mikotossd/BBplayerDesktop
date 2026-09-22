@@ -553,7 +553,7 @@ async function run(window) {
 	}
 
 	console.log('\n=== 4) 主页 ===')
-	await click(window, '[data-testid="nav-home"]')
+	await click(window, '[data-testid="sidebar-brand"]')
 	await sleep(1200)
 	await shot(
 		window,
@@ -591,7 +591,7 @@ async function run(window) {
 
 	console.log('\n=== 6) 右栏（播放队列）===')
 	// 播放一首，让队列有"正在播放"
-	await click(window, '[data-testid="nav-library"]')
+	await click(window, '[data-testid="sidebar-card"]')
 	await sleep(800)
 	// 音乐库页签是歌单卡片网格（阶段 6d），曲目表在详情里 —— 先点一张卡
 	await click(window, '[data-testid^="playlist-card-"]')
@@ -652,12 +652,12 @@ async function run(window) {
 	// 阶段 6d 之前主页在**有播放记录之前**拍过一次（07-home），那时热力图是
 	// 一片灰格子。这里在播放之后再拍一张 —— 档位配色（主题色的四档）
 	// 只有真有数据时才看得出来，而"配色对不对"正是这一步要核对的。
-	await click(window, '[data-testid="nav-home"]')
+	await click(window, '[data-testid="sidebar-brand"]')
 	await sleep(2500)
 	await shot(window, '07b-home-heatmap', '主页 › 听歌频率（有播放记录）')
 
 	console.log('\n=== 7) 设置（一级页面：分类列表 + 每个子页）===')
-	await click(window, '[data-testid="nav-settings"]')
+	await click(window, '[data-testid="sidebar-settings"]')
 	await sleep(1000)
 	await shot(window, '14-settings-categories', '设置 › 分类列表')
 
@@ -729,7 +729,7 @@ async function run(window) {
 
 	console.log('\n=== 8b) 正在播放面板（阶段 4b）===')
 	// 先让队列有内容：回到音乐库，进一个歌单详情，点「播放全部」
-	await click(window, '[data-testid="nav-library"]')
+	await click(window, '[data-testid="sidebar-card"]')
 	await sleep(800)
 	await click(window, '[data-testid^="playlist-card-"]')
 	await sleep(1300)
@@ -742,7 +742,7 @@ async function run(window) {
 	await sleep(600)
 
 	console.log('\n=== 9) 共享面板（页内动作）===')
-	await click(window, '[data-testid="nav-library"]')
+	await click(window, '[data-testid="sidebar-card"]')
 	await sleep(600)
 	await click(window, '[data-testid="library-share"]')
 	await sleep(1500)
@@ -838,7 +838,7 @@ async function run(window) {
 	console.log('\n=== 11) 窄窗口（看会不会挤坏）===')
 	window.setSize(1040, 800)
 	await sleep(700)
-	await click(window, '[data-testid="nav-library"]')
+	await click(window, '[data-testid="sidebar-card"]')
 	await sleep(1200)
 	await shot(window, '34-narrow-library', '窄窗口（1040x800）')
 

@@ -954,6 +954,49 @@ function registerIpcHandlers() {
 	})
 
 	/**
+	 * **自绘标题栏的窗口控制**（卡片化改造）。
+	 *
+	 * ## 为什么由主进程提供
+	 *
+	 * 窗口的最小化 / 最大化 / 关闭**只有主进程能做**（`BrowserWindow` 的方法），
+	 * 渲染进程碰不到。所以这里只暴露三个动作 + 一个"最大化状态变了"的广播，
+	 * 渲染层负责画按钮与发送意图。
+	 *
+	 * ## 为什么不用 Electron 的 titleBarOverlay
+	 *
+	 * `titleBarOverlay` 画出来的按钮是**系统配色**的方块，与卡片化的界面
+	 * （圆角、中性色、自绘图标）对不上 —— 用户要的是"完全自绘"。
+	 * 所以窗口用 `frame: false` + `titleBarStyle: 'hidden'`，
+	 * 三个按钮由渲染层画（见 index.html 的 `.titlebar`）。
+	 *
+	 * ⚠️ 窗口里必须留出**拖拽区**：`-webkit-app-region: drag` 由 CSS 提供，
+	 * 主进程这边不需要额外处理；但双击标题栏最大化/还原要自己实现
+	 * （原生 frame 自带，自绘之后就没有了）。
+	 */
+	ipcMain.handle('window:minimize', () => {
+		const window = BrowserWindow.getFocusedWindow()
+		window?.minimize()
+		return { ok: true, data: { minimized: Boolean(window) } }
+	})
+	ipcMain.handle('window:toggleMaximize', () => {
+		const window = BrowserWindow.getFocusedWindow()
+		if (!window) return { ok: true, data: { maximized: false } }
+		if (window.isMaximized()) window.unmaximize()
+		else window.maximize()
+		return { ok: true, data: { maximized: window.isMaximized() } }
+	})
+	ipcMain.handle('window:close', () => {
+		const window = BrowserWindow.getFocusedWindow()
+		window?.close()
+		return { ok: true, data: { closed: Boolean(window) } }
+	})
+	/** 渲染层首屏要问一次"现在是不是最大化"，按钮图标才对得上 */
+	ipcMain.handle('window:isMaximized', () => {
+		const window = BrowserWindow.getFocusedWindow()
+		return { ok: true, data: { maximized: Boolean(window?.isMaximized()) } }
+	})
+
+	/**
 	 * 用**系统默认浏览器**打开一个链接（关于页的「前往 GitHub」）。
 	 *
 	 * ⚠️ 必须带**白名单**：这个 handler 会拉起系统浏览器，

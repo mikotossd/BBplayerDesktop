@@ -31,6 +31,7 @@
  *   node scripts/build-icon-font.mjs --dry-run  # 只打印 URL 与清单
  */
 
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
@@ -54,10 +55,21 @@ const CHROME_UA =
 
 function readIconNames() {
 	const raw = fs.readFileSync(ICON_LIST, 'utf8')
-	return raw
-		.split('\n')
-		.map((line) => line.replace(/#.*$/, '').trim())
-		.filter(Boolean)
+	return (
+		raw
+			/*
+			 * ⚠️ 先把 CRLF 归一化成 LF 再去注释。
+			 *
+			 * `icons.txt` 在 Windows 上是 **CRLF** 工作区文件，而 `/#.*$/` 在
+			 * `"...注释\r"` 上**匹配不到**（`$` 落不到 `\r` 之前）—— 于是注释行
+			 * 不会被清掉，整份清单（含中文注释）被拼进 Google Fonts 的
+			 * `icon_names=` 查询，服务端返回 **HTTP 400**，构建直接失败。
+			 * 这个失败与"图标名写错"完全无关，但报错信息是同一个 400，很容易误判。
+			 */
+			.split(/\r?\n/)
+			.map((line) => line.replace(/#.*$/, '').trim())
+			.filter(Boolean)
+	)
 }
 
 function buildCssUrl(iconNames) {
@@ -117,7 +129,7 @@ async function findInvalidIconNames(iconNames, batchCss) {
 			'https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded' +
 			':opsz,wght,FILL,GRAD@24,400,0..1,0' +
 			`&icon_names=${name}&display=block`
-		const css = await fetchWithRetry(url).then((r) => r.text())
+		const css = await fetchText(url)
 		if (css.includes('/* fallback */')) invalid.push(name)
 	}
 	return invalid
@@ -128,13 +140,85 @@ async function findInvalidIconNames(iconNames, batchCss) {
  *
  * Google Fonts 偶发 `fetch failed`（实测过一次，重试即成功）。
  * 构建脚本不该因为一次网络抖动就红。
+ *
+ * ## `BB_ICON_FONT_PROXY`：给"Node 出不去网、但本机能"的环境留的后门
+ *
+ * 某些受限环境（托管沙箱、企业代理）里 **Node 的 fetch/https 连不上
+ * `fonts.gstatic.com`，而系统自带的 HTTP 客户端可以**。此时把
+ * `BB_ICON_FONT_PROXY` 设成本地转发地址（形如 `http://127.0.0.1:8787`），
+ * 脚本会把请求的 host 换成它、并带上原始 `x-bb-target` 头。
+ *
+ * 不设这个变量时行为与以前**完全一致**（直连 Google）。
  */
+const FETCH_PROXY = process.env.BB_ICON_FONT_PROXY || ''
+
+/**
+ * `BB_ICON_FONT_HTTP_DIR`：把 HTTP 抓取换成读本地目录（离线构建）。
+ *
+ * 目录里按原始 URL 的 `host + pathname` 建目录、query 做文件名摘要，
+ * 形如 `<dir>/fonts.gstatic.com/l/font/<sha1>.bin`。这是**测试与受限环境的
+ * 后门**：预先把 Google 的两段响应落盘，构建时就不需要网络。
+ * 不设这个变量时行为与以前完全一致。
+ */
+const HTTP_DIR = process.env.BB_ICON_FONT_HTTP_DIR || ''
+
+/** 把 URL 映射成落盘路径（供 HTTP_DIR 模式使用，也可用于预先缓存） */
+function cachePathFor(url) {
+	const parsed = new URL(url)
+	const digest = createHash('sha1').update(url).digest('hex')
+	const dir = path.join(
+		HTTP_DIR,
+		parsed.host,
+		parsed.pathname.replace(/^\//, ''),
+	)
+	return path.join(dir, `${digest}.bin`)
+}
+
+/** 把原始 URL 按代理开关改写；返回 [最终 URL, 额外请求头] */
+function resolveFetchTarget(url) {
+	if (!FETCH_PROXY) return [url, {}]
+	const original = new URL(url)
+	const proxy = new URL(FETCH_PROXY)
+	proxy.pathname = original.pathname
+	proxy.search = original.search
+	return [proxy.toString(), { 'x-bb-target': original.origin }]
+}
+
+/**
+ * 取一个 URL 的文本内容：优先本地缓存目录，其次网络。
+ */
+async function fetchText(url) {
+	if (HTTP_DIR) {
+		const file = cachePathFor(url)
+		if (!fs.existsSync(file)) {
+			throw new Error(`本地缓存缺文件：${path.relative(HTTP_DIR, file)}`)
+		}
+		return fs.readFileSync(file, 'utf8')
+	}
+	return await fetchWithRetry(url).then((r) => r.text())
+}
+
+/**
+ * 取一个 URL 的二进制内容：优先本地缓存目录，其次网络。
+ */
+async function fetchBuffer(url) {
+	if (HTTP_DIR) {
+		const file = cachePathFor(url)
+		if (!fs.existsSync(file)) {
+			throw new Error(`本地缓存缺文件：${path.relative(HTTP_DIR, file)}`)
+		}
+		return fs.readFileSync(file)
+	}
+	return Buffer.from(await fetchWithRetry(url).then((r) => r.arrayBuffer()))
+}
+
 async function fetchWithRetry(url, { attempts = 3 } = {}) {
 	let lastError = null
 	for (let attempt = 1; attempt <= attempts; attempt++) {
 		try {
-			const response = await fetch(url, {
-				headers: { 'User-Agent': CHROME_UA },
+			const [target, extraHeaders] = resolveFetchTarget(url)
+			const response = await fetch(target, {
+				headers: { 'User-Agent': CHROME_UA, ...extraHeaders },
 			})
 			if (!response.ok) throw new Error(`HTTP ${response.status}`)
 			return response
@@ -164,7 +248,7 @@ async function main() {
 		return
 	}
 
-	const css = await fetchWithRetry(cssUrl).then((r) => r.text())
+	const css = await fetchText(cssUrl)
 
 	// ⚠️ **逐个校验图标名**（见 findInvalidIconNames 的注释）。
 	// 这一步在失败路径上会多发几十个请求，但只有名字写错时才会走到。
@@ -198,9 +282,7 @@ async function main() {
 	console.log(`返回 ${fontUrls.length} 个 woff2 分片，逐个下载：`)
 	const buffers = []
 	for (const url of fontUrls) {
-		const buffer = Buffer.from(
-			await fetchWithRetry(url).then((r) => r.arrayBuffer()),
-		)
+		const buffer = await fetchBuffer(url)
 		buffers.push(buffer)
 		console.log(
 			`  ✓ ${(buffer.length / 1024).toFixed(1)} KB  ${url.split('/').pop()}`,
