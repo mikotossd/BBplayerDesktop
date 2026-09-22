@@ -1,4 +1,3 @@
-
 /* ══════════════════════════════════════════════════════════
    组件词汇表（阶段 1c）
    ────────────────────────────────────────────────────────── */
@@ -339,7 +338,11 @@
 	height: 28px;
 	padding: 0;
 	border-radius: var(--r-full);
-	background: color-mix(in srgb, var(--surface-container-highest) 84%, transparent);
+	background: color-mix(
+		in srgb,
+		var(--surface-container-highest) 84%,
+		transparent
+	);
 	backdrop-filter: blur(4px);
 }
 
@@ -550,6 +553,20 @@
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
 	gap: var(--sp-sm);
+}
+
+/*
+ * ⚠️ `--fixed`：**固定三列**（卡片化阶段 2 的主页下沿用它）。
+ *
+ * 默认的 `auto-fill minmax(148px, 1fr)` 是"能塞几列塞几列"—— 在下沿那块
+ * （宽度只有半屏）它会把三张卡**折成两行**，而那一块的高度是钉住的，
+ * 第二行就被裁掉（截图里"我的收藏夹"整张看不见）。
+ *
+ * 下沿那一块的内容高度必须是**确定的**（否则它会去挤内容卡），
+ * 所以这里显式三列：窄了就压窄每一列，不换行。
+ */
+.home-quick--fixed {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .home-quick__card {

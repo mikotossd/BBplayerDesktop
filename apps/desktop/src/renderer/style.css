@@ -257,6 +257,128 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════
+   主页下沿的两块：⑤ 最近播放 + title ① 快捷入口（阶段 2）
+   ────────────────────────────────────────────────────────── */
+/*
+ * ⚠️ 它是 `.main` 的**第三个**网格行（`.main` 的网格是
+ * `minmax(0,1fr) auto`，这一块被自动放进第三个隐式行 —— 也正是
+ * 为什么 `.main` 的网格必须显式写两行：不写的话内容卡会与它抢同一行）。
+ *
+ * ⚠️ 左右 margin 与 `.content` / `.playbar` 取**同一个** `--sp-md`：
+ * 卡片化之后同一屏里并排的元素必须左边缘对齐，
+ * 而探针里那条"播放条与内容卡左右对齐"就是这么量的。
+ */
+.home-strip {
+	flex: none;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+	gap: var(--sp-md);
+	margin: 0 var(--sp-md);
+	/*
+	 * ⚠️ 高度要**足够放下标题 + 内容**，但不能靠"卡片自己滚"。
+	 *
+	 * 两次踩坑都记在这里：
+	 *   1. 第一版钉成 96px + 卡片内 `overflow-y: auto` → 标题占掉一行、
+	 *      内容被挤进 30px 高的滚动框，屏幕上只看得到标题。
+	 *   2. 第二版 132px 仍然不够：`.home-quick` 那个网格是
+	 *      `auto-fill minmax(148px, 1fr)`，可用宽度减半之后**三张卡折成两行**，
+	 *      第二行被裁掉（截图里"我的收藏夹"整张看不见）。
+	 *
+	 * 150px 的取法：标题 20 + 卡片内边距 24 + 快捷入口**两行**卡（36×2+8）+ 间隔。
+	 * 宽度再窄时它会继续折行 —— 那时靠 `overflow: hidden` 裁掉，不影响布局。
+	 */
+	height: 136px;
+	align-items: stretch;
+}
+/* 下沿里的快捷入口是**固定三列**（见 components.css 的 .home-quick--fixed），
+   所以这一块的内容高度是确定的：标题 20 + 内边距 24 + 卡片 84 + 间隔 8。 */
+.home-strip .home-section {
+	margin-bottom: 0;
+}
+.home-strip[hidden] {
+	display: none;
+}
+.home-strip__card {
+	min-width: 0;
+	min-height: 0;
+	background: var(--surface-container);
+	border-radius: var(--r-lg);
+	padding: var(--sp-sm) var(--sp-md);
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+	overflow: hidden;
+}
+/* 两块之间**唯一**的一条竖分隔线（草图明确要求） */
+.home-strip__divider {
+	background: var(--outline-variant);
+}
+.home-strip__title {
+	margin: 0;
+	font-size: var(--fs-title-small);
+	font-weight: 600;
+	color: var(--on-surface);
+}
+/* ⑤ 那一行：封面 + 曲名/歌手 + 继续播放 */
+.home-recent {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	min-width: 0;
+}
+.home-recent__cover {
+	width: 44px;
+	height: 44px;
+	border-radius: var(--r-md);
+	overflow: hidden;
+	flex: none;
+	background: var(--surface-container-highest);
+	display: grid;
+	place-items: center;
+	color: var(--on-surface-variant);
+}
+.home-recent__cover img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+.home-recent__main {
+	min-width: 0;
+	flex: 1 1 auto;
+}
+.home-recent__title {
+	font-size: var(--fs-body-medium);
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.home-recent__sub {
+	font-size: var(--fs-label-medium);
+	color: var(--on-surface-variant);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.home-recent__play {
+	width: 30px;
+	height: 30px;
+	border: 0;
+	border-radius: var(--r-full);
+	background: var(--primary);
+	color: var(--on-primary);
+	display: grid;
+	place-items: center;
+	cursor: pointer;
+	flex: none;
+}
+.home-recent--empty {
+	color: var(--on-surface-variant);
+	font-size: var(--fs-body-small);
+}
+
+/* ══════════════════════════════════════════════════════════
    两栏（左栏 + 中栏）+ 中栏内的播放卡
    ────────────────────────────────────────────────────────── */
 /*

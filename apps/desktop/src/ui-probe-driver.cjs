@@ -3583,6 +3583,78 @@ async function run(window) {
 		`${home.quick.join(' / ')}，最近更新 ${home.playlistCards} 张`,
 	)
 
+	/*
+	 * 卡片化阶段 2：主页下沿那两块（⑤ 最近播放 + title ① 快捷入口）。
+	 *
+	 * ⚠️ 这一组验的是**结构**（位置 + 竖分隔线 + 只在主页可见），
+	 * 不是"有没有这个类名"：
+	 *   * 两块必须在 `#content` **之外**（内容卡会整块重建，放进去会被清掉）；
+	 *   * 它们之间必须有一条真的竖线（草图明确要求，且全页只此一条）；
+	 *   * 切到别的页面必须真的藏起来（不是留个空框）。
+	 */
+	const homeStrip = JSON.parse(
+		await evaluate(
+			window,
+			`(() => {
+				const strip = document.getElementById('home-strip')
+				const content = document.getElementById('content')
+				const divider = strip?.querySelector('.home-strip__divider')
+				const r = (el) => el?.getBoundingClientRect() ?? null
+				const dividerRect = r(divider)
+				return JSON.stringify({
+					exists: Boolean(strip),
+					visible: Boolean(strip && !strip.hidden),
+					// ⚠️ 必须在内容卡**外面**（在里面的话 refresh() 会把它清掉）
+					outsideContent: Boolean(strip && !content?.contains(strip)),
+					// 竖线：宽 <= 2px 且高 > 40px
+					divider: dividerRect
+						? {
+								w: Math.round(dividerRect.width),
+								h: Math.round(dividerRect.height),
+							}
+						: null,
+					// 两块各自有内容（不是空框）
+					hasRecent: Boolean(
+						document.querySelector('[data-testid="home-recent-body"]')
+							?.firstElementChild,
+					),
+					hasQuick: Boolean(
+						document.querySelector('[data-testid="home-quick-slot"]')
+							?.firstElementChild,
+					),
+					// 下沿两块与内容卡左右对齐（同一屏里的并排元素必须对齐）
+					stripLeft: r(strip) ? Math.round(r(strip).left) : null,
+					contentLeft: r(content) ? Math.round(r(content).left) : null,
+				})
+			})()`,
+		),
+	)
+	check(
+		'主页下沿有两块（⑤ 最近播放 + title ① 快捷入口），且在**内容卡外面**',
+		homeStrip.exists && homeStrip.visible && homeStrip.outsideContent,
+		JSON.stringify(homeStrip),
+	)
+	check(
+		'两块之间有一条**竖**分隔线（草图明确要求，全页只此一条）',
+		homeStrip.divider !== null &&
+			homeStrip.divider.w <= 2 &&
+			homeStrip.divider.h > 40,
+		homeStrip.divider
+			? `${homeStrip.divider.w}×${homeStrip.divider.h}px`
+			: '找不到分隔线',
+	)
+	check(
+		'两块都真的渲染出了内容（不是空框）',
+		homeStrip.hasRecent && homeStrip.hasQuick,
+		`最近播放=${homeStrip.hasRecent} 快捷入口=${homeStrip.hasQuick}`,
+	)
+	check(
+		'下沿两块与内容卡**左边缘对齐**',
+		homeStrip.stripLeft !== null &&
+			Math.abs(homeStrip.stripLeft - homeStrip.contentLeft) <= 1,
+		`下沿=${homeStrip.stripLeft}px 内容卡=${homeStrip.contentLeft}px`,
+	)
+
 	// ⚠️ **真正端到端**的那一条：热力图的数据必须真的从 IPC 来。
 	//
 	// 只断言"格子画出来了 / 四档颜色不同"是**不够的** —— 那些都可以由
@@ -3671,6 +3743,8 @@ async function run(window) {
 		`l4=${levels.l4} vs --primary=${levels.primary}`,
 	)
 	await shot(window, 'ui-09-home')
+	// 卡片化阶段 2：截一张"主页整套"（内容卡 + 下沿两块），用于人眼核对
+	await shot(window, 'ui-09b-home-strip')
 
 	// 最近更新的卡片点得开（"卡片在"不等于"点了能进歌单"）。
 	//
@@ -3693,17 +3767,33 @@ async function run(window) {
 					title: document.querySelector('.view-head h2')?.textContent ?? '',
 					trackTable: Boolean(document.querySelector('[data-testid="track-table"]')),
 					emptyState: Boolean(document.querySelector('[data-testid="content-empty"]')),
-					leftHome: document.querySelectorAll('.home-section__title').length === 0,
+					/*
+					 * ⚠️ "离开主页"要在**内容卡内部**看，不能全文档数。
+					 * 卡片化阶段 2 之后下沿那两块（⑤ 最近播放 / 快捷入口）
+					 * 是**常驻 DOM**，只是被 hidden 藏起来 ——
+					 * 全文档数 .home-section__title 会一直数到它们，
+					 * 于是"已经离开主页"永远为 false。
+					 *
+					 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
+					 */
+					leftHome:
+						document.querySelectorAll('#content .home-section__title')
+							.length === 0,
+					// 下沿两块在别的页面必须真的藏起来（不是只留个空框）
+					homeStripHidden: Boolean(
+						document.getElementById('home-strip')?.hidden,
+					),
 					back: Boolean(document.querySelector('[data-testid="playlist-back"]')),
 				})
 			})()`,
 		),
 	)
 	check(
-		'点主页的歌单卡进入**那张卡对应的**歌单详情',
+		'点主页的歌单卡进入**那张卡对应的**歌单详情（且主页下沿两块已藏起来）',
 		cardOpened.clicked &&
 			cardOpened.title === cardOpened.want &&
 			cardOpened.leftHome &&
+			cardOpened.homeStripHidden &&
 			(cardOpened.trackTable || cardOpened.emptyState),
 		JSON.stringify(cardOpened),
 	)

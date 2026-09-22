@@ -22,6 +22,23 @@
 		els.status.className = `status status--${kind || 'idle'}`
 	}
 
+	/**
+	 * 主页下沿那两块（⑤ 最近播放 + title ① 快捷入口）的显隐（卡片化阶段 2）。
+	 *
+	 * ⚠️ 它的可见性**不能只由外壳（`setActiveNav`）决定**：
+	 * 从主页点进一张歌单卡时，目的地仍然是 `library`，但内容已经变成
+	 * "某个歌单的曲目列表" —— 那时下沿那两块留在屏幕上就是**信息错位**
+	 * （"最近播放"挂在别人的歌单详情下面）。
+	 *
+	 * 所以真正的判据是"内容卡里现在显示的是不是**音乐库的歌单列表**"。
+	 * 渲染曲目列表 / 搜索结果的入口调 `setHomeStrip(false)`，
+	 * 外壳在切到主页时调 `setHomeStrip(true)`。
+	 */
+	function setHomeStrip(visible) {
+		const strip = document.getElementById('home-strip')
+		if (strip) strip.hidden = !visible
+	}
+
 	const clear = (node) => {
 		if (node) node.textContent = ''
 	}
@@ -604,6 +621,8 @@
 		clearSelection()
 		selectionUi = null
 		window.bbUI?.showContent?.()
+		// 曲目列表（歌单详情 / 搜索结果）不属于主页下沿的场景 → 收起那两块
+		setHomeStrip(false)
 
 		const removal = removalContext(tracks.length)
 
@@ -1857,6 +1876,8 @@
 	function renderWelcome() {
 		clear(els.content)
 		window.bbUI?.showContent?.()
+		// 空库的欢迎视图同样不是"主页下沿"的场景 → 收起那两块
+		setHomeStrip(false)
 
 		// 它本质就是一个**空状态**，所以用组件层的 `.empty`
 		// （淡图标 + 标题 + 一句说明 + 动作），而不是自己拼
@@ -2457,6 +2478,12 @@
 	}
 
 	window.bbLibrary = {
+		/**
+		 * 主页下沿两块（⑤ 最近播放 + title ① 快捷入口）的显隐
+		 * （卡片化阶段 2）。外壳在切目的地时调它，本模块在渲染曲目列表
+		 * / 空库欢迎视图时把它收起来 —— 两处都写同一个元素，最后生效。
+		 */
+		setHomeStrip,
 		init,
 		refreshPlaylists,
 		/**

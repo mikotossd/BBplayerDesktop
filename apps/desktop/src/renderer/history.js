@@ -37,6 +37,16 @@
 	const els = {
 		content: document.getElementById('content'),
 		status: document.getElementById('status'),
+		/*
+		 * 主页下沿的两块（卡片化阶段 2）。
+		 *
+		 * ⚠️ 它们是**常驻 DOM**（不在 `#content` 内）：`refresh()` 会
+		 * `content.textContent = ''` 整块重建内容卡，而这两块要活下来。
+		 * 由 `renderer.js` 的 `setActiveNav` 按视图切 `#home-strip` 的 `hidden`。
+		 */
+		strip: document.getElementById('home-strip'),
+		recent: document.getElementById('home-recent-body'),
+		quick: document.getElementById('home-quick'),
 	}
 
 	const setStatus = (text, kind) => {
@@ -337,11 +347,21 @@
 		return section
 	}
 
-	/** 区块 2：快捷入口（安卓端三张卡：那月今日 / 最近常听 / 稍后再看） */
+	/**
+	 * 区块 2：快捷入口（title ① 与 area ①）。
+	 *
+	 * ⚠️ 卡片化阶段 2：它不再挂进 `#content`，而是**渲染进常驻的
+	 * `#home-quick`**（内容卡下面那一块的右半）。这样做的前提是
+	 * `#home-quick` 每次都要先清空 —— 否则每刷一次主页就叠一层。
+	 */
 	function renderQuickAccess() {
-		const section = homeSection('快捷入口', { testid: 'home-quick' })
+		const host = els.quick
+		if (!host) return null
+		host.textContent = ''
+		const section = homeSection('快捷入口')
 		const grid = document.createElement('div')
-		grid.className = 'home-quick'
+		// ⚠️ 主页下沿那块宽度只有半屏，用 `--fixed` 钉三列（见 components.css）
+		grid.className = 'home-quick home-quick--fixed'
 		section.appendChild(grid)
 
 		/*
@@ -383,7 +403,86 @@
 			button.addEventListener('click', () => card.run())
 			grid.appendChild(button)
 		}
+		host.appendChild(section)
 		return section
+	}
+
+	/**
+	 * 区块 ⑤：最近播放（最近**一次**播放的曲目）。
+	 *
+	 * 数据来自 `history.resume(1)` —— 与「继续收听」页签同一个 IPC，
+	 * 取第一条即可。取不到（空库）时给一句空态，而不是留一个空框。
+	 */
+	async function renderRecentStrip() {
+		const host = els.recent
+		if (!host) return
+		host.textContent = ''
+		let track = null
+		try {
+			const rows = unwrap(
+				await window.bbplayer.history.resume(1),
+				'读取最近播放',
+			)
+			track = Array.isArray(rows) ? (rows[0] ?? null) : null
+		} catch {
+			// 读不到就当没有 —— 这一块是锦上添花，不该让整个主页报错
+			track = null
+		}
+
+		if (!track) {
+			const empty = document.createElement('div')
+			empty.className = 'home-recent home-recent--empty'
+			empty.textContent = '还没有播放记录'
+			host.appendChild(empty)
+			return
+		}
+
+		const row = document.createElement('div')
+		row.className = 'home-recent'
+		row.dataset.testid = 'home-recent-row'
+
+		const cover = document.createElement('div')
+		cover.className = 'home-recent__cover'
+		const coverUrl = track.cover ?? track.coverUrl ?? track.cover_url ?? null
+		if (coverUrl) {
+			const img = document.createElement('img')
+			img.alt = ''
+			img.src = window.bbComponents.coverSrc(coverUrl)
+			cover.appendChild(img)
+		} else {
+			cover.appendChild(window.bbComponents.icon('music_note', 'icon--md'))
+		}
+		row.appendChild(cover)
+
+		const main = document.createElement('div')
+		main.className = 'home-recent__main'
+		const title = document.createElement('div')
+		title.className = 'home-recent__title'
+		title.textContent = track.title ?? '未知曲目'
+		const sub = document.createElement('div')
+		sub.className = 'home-recent__sub'
+		sub.textContent =
+			track.artist ||
+			track.artist_name ||
+			track.upperName ||
+			track.author ||
+			'—'
+		main.append(title, sub)
+		row.appendChild(main)
+
+		const play = document.createElement('button')
+		play.className = 'home-recent__play'
+		play.dataset.testid = 'home-recent-play'
+		play.title = '继续播放'
+		play.setAttribute('aria-label', '继续播放')
+		play.appendChild(window.bbComponents.icon('play_arrow', 'icon--sm'))
+		play.addEventListener('click', () => {
+			window.bbPlayer?.setQueue?.([track], 0)
+			void window.bbPlayer?.play?.()
+		})
+		row.appendChild(play)
+
+		host.appendChild(row)
 	}
 
 	/** 切换历史子页签并把那一块滚进视野（快捷入口用） */
@@ -527,10 +626,18 @@
 					? '暂无记录'
 					: `${summary.trackCount} 首 · ${summary.sessionCount} 次播放 · 累计 ${Math.round(summary.totalSeconds / 60)} 分钟`
 			head.appendChild(meta)
-			// 主页的四个区块顺序：热力图 → 快捷入口 → 最近更新 → 播放历史
+			/*
+			 * ⚠️ 区块顺序与容器（卡片化阶段 2）：
+			 *   * 热力图 / 最近更新 / 播放历史 → 内容卡（`#content`）
+			 *   * **快捷入口** → 内容卡**下面**那一块的右半（`#home-quick`）
+			 *   * **最近播放（⑤）** → 那一块的左半（`#home-recent-body`）
+			 *
+			 * 原来四处全挤在 `#content` 一个流里，而草图上是"内容卡 + 下沿两块"。
+			 */
 			content.appendChild(renderHeatmapSection())
-			content.appendChild(renderQuickAccess())
+			renderQuickAccess()
 			await renderRecentPlaylists(content)
+			await renderRecentStrip()
 			if (stale()) return null
 			content.appendChild(head)
 
@@ -562,6 +669,11 @@
 			 * `refresh()` 开头就 `content.textContent = ''`，而这里原来只写一行
 			 * 状态胶囊 —— 胶囊 9 秒后淡出，主页就剩一张**空白卡片**，
 			 * 用户既看不到原因也没有重试入口。
+			 *
+			 * ⚠️ 卡片化阶段 2 起：错误态只替换**内容卡**，不再吃掉
+			 * 下沿的「最近播放 / 快捷入口」两块 —— 它们由
+			 * `renderQuickAccess()` / `renderRecentStrip()` 单独渲染，
+			 * 失败的是"播放历史"这一个区块，不该连坐。
 			 */
 			content.appendChild(
 				window.bbComponents.empty({

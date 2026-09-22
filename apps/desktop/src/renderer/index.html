@@ -469,6 +469,49 @@
 				</section>
 
 				<!--
+					── 主页下沿的两块（卡片化阶段 2）──────────────────────
+					⚠️ 它们**常驻在 DOM 里**（不在 `#content` 内），只有主页可见
+					（`renderer.js` 的 `setActiveNav` 切 `hidden`）。
+
+					为什么常驻而不是渲染进 `#content`：
+					  * 它们的内容由 `history.js` 负责（⑤ 最近播放 / 快捷入口），
+					    而 `history.refresh()` 会 `content.textContent = ''` 整块重建 ——
+					    放进去的话每次刷新都要重新创建这两个容器；
+					  * 草图上是"内容卡**下面**的两块"，语义上不属于内容卡。
+
+					⚠️ 两块之间有一条竖分隔线（草图明确要求）。全页只有这一处竖线。
+				-->
+				<div
+					class="home-strip"
+					id="home-strip"
+					data-testid="home-strip"
+					hidden
+				>
+					<!-- ⑤ 最近播放：最近一次播放的曲目（封面 + 名称） -->
+					<section
+						class="home-strip__card"
+						id="home-recent"
+						data-testid="home-recent"
+						aria-label="最近播放"
+					>
+						<h2 class="home-strip__title">最近播放</h2>
+						<div
+							id="home-recent-body"
+							data-testid="home-recent-body"
+						></div>
+					</section>
+
+					<div class="home-strip__divider"></div>
+
+					<!-- title ① 快捷入口 + area ①（由 history.js 渲染） -->
+					<div
+						class="home-strip__card"
+						id="home-quick"
+						data-testid="home-quick-slot"
+					></div>
+				</div>
+
+				<!--
 					共享歌单视图（Phase 3.4）。
 					⚠️ 与其它视图不同，它**常驻在 DOM 里**（而不是渲染进 #content）：
 					这样 `#view-share` 在任何时刻都能被找到，探针不必先点导航。

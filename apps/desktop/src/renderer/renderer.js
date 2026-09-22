@@ -253,6 +253,22 @@
 		// 音乐库的页签条只在音乐库目的地显示
 		const tabs = document.getElementById('library-tabs')
 		if (tabs) tabs.hidden = view !== 'library'
+		/*
+		 * 主页下沿的两块（⑤ 最近播放 + title ① 快捷入口）只在主页显示
+		 * （卡片化阶段 2）。它们**常驻 DOM**（由 `history.js` 渲染），
+		 * 所以这里只切 `hidden`，不创建也不销毁。
+		 *
+		 * ⚠️ 但**切到主页并不等于"内容卡里是主页"**：从主页点进一张歌单卡时
+		 * 目的地仍然是 `library`。所以"内容卡是不是歌单列表"这件事由
+		 * `library.js` 的 `showPlaylistsTab` / `renderTrackCards` 再纠正一次
+		 * —— 两处都改同一个元素，最后写的那次生效。
+		 */
+		if (typeof window.bbLibrary?.setHomeStrip === 'function') {
+			window.bbLibrary.setHomeStrip(view === 'home')
+		} else {
+			const homeStrip = document.getElementById('home-strip')
+			if (homeStrip) homeStrip.hidden = view !== 'home'
+		}
 		// ⚠️ 设置子页的返回按钮只属于设置。不显式关掉的话，
 		// 从「设置 › 某个分类」切到别的页面它会一直挂着 ——
 		// 正在播放面板里就出现了**两个返回按钮**（外壳的 + 面板自己的）。
