@@ -423,7 +423,10 @@
 	global.createLyricsPanel = createLyricsPanel
 	global.__lyricsPanelUtils = { findActiveIndex, formatTime }
 
-	// 若页面提供了挂载点，自动创建一份，方便自动化脚本直接驱动
+	// ⚠️ 页面上已经有挂载点时**自动建一份**（`__lyricsPanel`），方便自动化脚本
+	// 直接驱动。**这是唯一一份** —— `renderer.js` 的 `initLyricsPanel()`
+	// 会复用它，不再自己 `createLyricsPanel()`。两处各建一份的后果见那边的注释
+	// （屏幕上的面板被清空，而所有歌词都渲染进了被摘掉的那棵树）。
 	if (typeof document !== 'undefined') {
 		const boot = () => {
 			const existing = document.getElementById('lyrics-panel')

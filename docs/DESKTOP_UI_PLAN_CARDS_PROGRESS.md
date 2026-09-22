@@ -380,42 +380,99 @@ html 写一个出来我看看效果"。原型把 12 张草图 + 用户逐条确�
 
 ## 下一步（下一件）
 
-### 阶段 4 · 播放详情页
+### P9 · 阶段 4：播放详情页（已完成）
 
-**基线**：`verify:desktop:ui` = **203 项全通过**。
+**做了什么**
+
+| 文件                  | 改动                                                                                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `index.html`          | 删掉第三栏 `#nowplaying-queue-column`（含 `#nowplaying-count` / `#nowplaying-queue-slot`）；`.nowplaying__columns` 去掉 `is-queue-hidden`；引入 `cover-accent.js`                                               |
+| `cover-accent.js`     | **新增**：Canvas 降采样到 24×24 → 逐像素转 HSL → 按 15° 色相分桶投票 → 取最高票那一桶的平均饱和度，明度固定 0.42 → 写进 `--np-accent`。跨域封面污染 canvas 时**回退 `--primary`** 并留 `data-accent="fallback"` |
+| `components.css`      | 三栏网格 → **两栏**；`.nowplaying__bg` 从"封面铺满 + `blur(64px)`"改成**主色径向渐变**（草图：「不要模糊」）；删掉 `.nowplaying__card--queue` / `.nowplaying__queue` 两条死规则                                 |
+| `player.js`           | `refreshNowPlayingView` 不再设 `backgroundImage`，改调 `bbCoverAccent.apply()`                                                                                                                                  |
+| `renderer.js`         | `placeQueue()` 只剩"放回右栏"一个落点；新增 `isLyricsPanelVisible()`；`toggleQueueColumn` 改成切**右栏**；`initLyricsPanel()` 复用自动创建的那一份                                                              |
+| `ui-probe-driver.cjs` | 改写 5 条 + 新增 2 条                                                                                                                                                                                           |
+
+#### 修掉的两个既有 bug（都不是这一步引入的）
+
+**① 歌词面板被实例化两次 → 屏幕上的歌词永远是空的**
+
+`lyrics-panel.js` 末尾有一段"页面里已经有挂载点就自动建一份"的引导代码
+（`window.__lyricsPanel`，给自动化脚本用）。而 `renderer.js` 的
+`initLyricsPanel()` **又无条件 create 了一次** —— 而 `createLyricsPanel()`
+第一步就是 `container.textContent = ''`。后果：
+
+- 屏幕上的面板被清空并换成第二份实例（一个空壳）；
+- 第一份实例（`window.__lyricsPanel`）手里攥着**已经被摘掉的 `<ul>`**，
+  `setLyrics()` 把 62 行全渲染进了那棵游离的树。
+
+用户看到的就是「歌词不滚动」；而探针一直报"状态 62 行 / 容器里 0 个 li"
+—— 这个**自相矛盾的读数在这份代码里挂了很久**，谁都没把它当线索。
+修法是 `initLyricsPanel()` 认 `window.__lyricsPanel`，只留一份。
+
+**② `timeupdate` 里的守卫让高亮永远不前进**
+
+`if (bbState.get().rightPanel !== 'lyrics') return` —— 而右栏从阶段 D-2 起
+只剩「播放队列」一个页签，`rightPanel` 初值就是 `'queue'`。
+改判据为 `isLyricsPanelVisible()`（在文档里 + 祖先链上没有 `hidden`/`display:none`）。
+
+#### 一个"看起来是断言、其实是自欺"的例子
+
+「歌词高亮跟着播放位置前进」这条回归断言，第一版写的是：
+
+```js
+audio.currentTime = 25
+audio.dispatchEvent(new Event('timeupdate'))
+```
+
+结果量出来始终是"第四行"。原因是**音频此刻真的在放**（探针前面的用例
+在放歌），`audio.currentTime = 25` 会被媒体会话立刻覆盖掉 ——
+我量到的是真实播放位置对应的行，而不是我以为的那一行。
+
+改成"先读真实位置，再按它铺一段歌词，让期望下标是确定的"，
+并且**先把高亮按到 -1 再派发事件** —— 否则播放位置常在 0 秒附近，
+派发前后是同一行，断言会退化成"永远 changed=false"。
+
+**验证**：`verify:desktop:ui` **203 → 205 项全通过**；
+`:settings` 88/0、`:history` 31/0、`:import` 25/0；
+`verify:desktop:tour` 37 张截图 0 问题。
+
+---
+
+### 下一件：阶段 5 · 队列浮层（单一 DOM，三槽位）
+
+**基线**：`verify:desktop:ui` = **205 项全通过**。
 
 **具体改动**
 
-1. `#view-nowplaying` 从**三栏**改成**两栏**（封面卡 + 歌词卡）：
-   草图 08 手写「放弃原有的三联卡片式」。删掉 `#nowplaying-queue-column`
-   与 `#nowplaying-queue-slot`，以及 `.is-queue-hidden` 那套规则。
-2. 背景从"封面模糊图"改成**封面主色的柔和渐变**（草图：「背景模糊封面主色，
-   **不要模糊**」）。取主色用 `createImageBitmap` + `OffscreenCanvas` 降采样，
-   ⚠️ 跨域封面会污染 canvas → 必须 `crossOrigin='anonymous'`，
-   失败时**回退到 `--primary`**，绝不阻塞渲染。
-3. **必须一并修那个既有 bug**：`renderer.js` 里
-   `if (bbState.get().rightPanel !== 'lyrics') return` 挡住了
-   `lyricsPanel.setPosition()` —— 而右栏现在只剩 queue 页签，于是
-   **主界面歌词的高亮与滚动永远不会前进**。守卫要改成"歌词面板当前可见"。
-4. 无歌词时显式显示「无歌词」（草图要求）。
-5. ⚠️ 歌词滚动容器必须保留 `.lyrics-panel__scroll` 且它必须继续是
-   `offsetParent`（`lyrics-panel.css` 的 `position: relative`）——
-   中间插任何 positioned 包裹层都会让居中计算整体偏移。
-6. ⚠️ 探针里读 `.nowplaying__art` 宽高比/圆角、`#nowplaying-lyrics-slot` 宽度
-   的几条断言**要继续满足**。
+1. `index.html` 新增 `#queue-popover`（**浮层**，绝对定位在播放卡上方、右对齐），
+   里面一个 `#queue-popover-slot`。
+2. `renderer.js` 的 `placeQueue(slotId)` 增加第三个落点 `queue-popover-slot`；
+   打开浮层时把**同一份** `#queue-list` 搬进去 ——
+   绝不复制（复制会让 `data-queue-index` 翻倍，探针的计数与拖拽都会错）。
+3. `toggleQueueColumn()` 改成**弹浮层**（不再是展开右栏）：
+   - 点 `#playbar-queue` / `Ctrl+Q` / 顶部菜单那一项 → 开/关浮层；
+   - 点浮层外面 / 按 `Esc` → 关闭；
+   - 关闭时把 `#queue-list` 搬回 `#queue-slot`（右栏那份还在，只是右栏收起着）。
+4. ⚠️ 浮层与右栏**不能同时**显示队列 DOM（一份 DOM 只能在一处）——
+   打开浮层时右栏如果展开着，要么先收起它，要么浮层直接复用右栏的位置。
+   这条要写进注释，否则以后一定有人"优化"成两份。
+5. ⚠️ 浮层的层级必须高于播放卡（`z-index`），但不能盖住标题栏的拖拽区。
+6. 探针要新增：浮层打开/关闭、`#queue-list` 的父节点在三个槽位之间**正确搬家**、
+   `data-queue-index` 数量在搬家中**不变**、`Esc` 能关、点外面能关。
 
 ### 之后（按施工单顺序）
 
-阶段 5（队列浮层，单一 DOM 三槽位）→
 阶段 6（歌单详情行卡）→
 阶段 7（收藏夹卡片化 + 删掉内嵌表格渲染器）→
 阶段 8（清理死 CSS、图标尺寸两套真相收敛、reduced-motion 补齐、文档）。
 
-### 已完成（本文件 P0–P8）
+### 已完成（本文件 P0–P9）
 
 原型（`prototype/`）· 播放模式四档 · 图标构建脚本两个 bug ·
 阶段 0（播放条进中栏）· 阶段 1（左栏两张卡）· 自绘标题栏 + 默认中性浅色 ·
-阶段 2（主页卡片化 + 下沿两块）· 阶段 3（播放卡：去音量、标题滚动、过渡）。
+阶段 2（主页卡片化 + 下沿两块）· 阶段 3（播放卡：去音量、标题滚动、过渡）·
+阶段 4（播放详情两栏 + 封面主色背景 + **修掉歌词的两个既有 bug**）。
 
 ### 每一步都要守的纪律
 

@@ -2758,13 +2758,52 @@ async function run(window) {
 							Math.abs(artRect.width - artRect.height) < 2 &&
 							Number.parseFloat(artStyle.borderRadius) < artRect.width / 2,
 					),
+					/*
+					 * 背景（卡片化阶段 4）：草图要求「封面主色，**不要模糊**」。
+					 * 所以这里同时量两件事：
+					 *   * filter 里**不该**再有 blur；
+					 *   * 背景该是**渐变**（径向），且带 --np-accent
+					 *     或已标了降级。
+					 *
+					 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
+					 */
+					/*
+					 * 正则里的转义看着别扭，是因为这段脚本本身写在
+					 * **模板字符串**里：对外层 JS 来说每个反斜杠都要写两个，
+					 * 注入到渲染进程之后才是一个。
+					 *
+					 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
+					 */
 					bgHasBlur: /blur\\(/.test(String(bg ? getComputedStyle(bg).filter : '')),
-					bgHasArtAttr: bg?.dataset.hasArt ?? null,
+					bgIsGradient: /gradient/.test(
+						String(bg ? getComputedStyle(bg).backgroundImage : ''),
+					),
+					bgAccentAttr: bg?.dataset.accent ?? null,
+					bgAccentVar: bg?.style.getPropertyValue('--np-accent') ?? '',
 					coverPresent: Boolean(cover),
 					queueParent:
 						document.getElementById('queue-list')?.parentElement?.id ?? null,
 					queueRows: document.querySelectorAll('[data-queue-index]').length,
-					queueCount: document.getElementById('nowplaying-count')?.textContent,
+					/*
+					 * 卡片化阶段 4：详情页只有**两栏**（封面 + 歌词）。
+					 * 草图手写「放弃原有的三联卡片式」。
+					 *
+					 * ⚠️ 宽视口下量到的是**像素值**（两段，如 658px 889px），
+					 * 窄视口（媒体查询把两栏堆成一列）量到的是 1 段。
+					 * 所以这里要看的是"**还有没有那一栏**"，
+					 * 而不是"数出来是不是 2"—— 探针窗口本来就可能落在
+					 * 媒体查询的断点下面（实测就是）。
+					 *
+					 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
+					 */
+					gridColumns: document.getElementById('nowplaying-columns')
+						? getComputedStyle(
+								document.getElementById('nowplaying-columns'),
+							).gridTemplateColumns
+						: null,
+					hasQueueColumn: Boolean(
+						document.getElementById('nowplaying-queue-column'),
+					),
 				})
 			})()`,
 		),
@@ -2788,20 +2827,28 @@ async function run(window) {
 		`${nowPlaying.artWidth}px 宽，圆角 ${nowPlaying.artRadius}px`,
 	)
 	check(
-		'背景是从封面派生的模糊层',
-		nowPlaying.bgHasBlur === true,
-		`data-has-art=${nowPlaying.bgHasArtAttr}`,
+		'详情页背景是**封面主色的渐变**，且不再有模糊（草图：「不要模糊」）',
+		nowPlaying.bgHasBlur === false &&
+			nowPlaying.bgIsGradient === true &&
+			// 要么算出了主色（cover），要么明确降级（fallback / none）
+			['cover', 'fallback', 'none'].includes(nowPlaying.bgAccentAttr),
+		`blur=${nowPlaying.bgHasBlur} gradient=${nowPlaying.bgIsGradient} ` +
+			`accent=${nowPlaying.bgAccentAttr || '(未标记)'} ` +
+			`var=${nowPlaying.bgAccentVar || '(空，退回 --primary)'}`,
 	)
 	check(
-		'队列被**搬进**面板而不是复制一份（data-queue-index 不能翻倍）',
-		nowPlaying.queueParent === 'nowplaying-queue-slot' &&
+		'详情页**没有**队列栏（草图：「放弃原有的三联卡片式」）',
+		nowPlaying.hasQueueColumn === false &&
+			/^\d+(\.\d+)?px( \d+(\.\d+)?px)?$/.test(
+				String(nowPlaying.gridColumns ?? ''),
+			),
+		`grid-template-columns=${nowPlaying.gridColumns} 队列栏存在=${nowPlaying.hasQueueColumn}`,
+	)
+	check(
+		'队列**没被搬进**详情页（它在右栏，且 data-queue-index 不翻倍）',
+		nowPlaying.queueParent === 'queue-slot' &&
 			nowPlaying.queueRows === queueBefore.rows,
 		`行数 ${queueBefore.rows} → ${nowPlaying.queueRows}，父节点 ${nowPlaying.queueParent}`,
-	)
-	check(
-		'面板上的队列计数与行数一致',
-		String(nowPlaying.queueCount) === String(nowPlaying.queueRows),
-		`计数=${nowPlaying.queueCount} 行数=${nowPlaying.queueRows}`,
 	)
 
 	// 歌词面板也必须**搬进中栏**（阶段 D 的三栏布局），而不是还留在右栏
@@ -3124,32 +3171,35 @@ async function run(window) {
 	 *   2. 改用它「前往 › 搜索」→ 桥的断言过了，但**后面 4 条键盘断言全挂**
 	 *      （Space 暂停 / ← 快退 / Ctrl+Q ×2）。原因是切到搜索页后
 	 *      **焦点落在搜索框上**，Space 和 ← 都被输入框吃掉了。
-	 *
-	 * 现在用「呼出 / 收起播放列表」（Ctrl+Q，阶段 D 起）：它切换的是
-	 * 「正在播放」页里那一栏播放列表的显隐 —— 不换视图、不动焦点，
-	 * 而且效果与播放状态无关，任何时候都可观测。
+	 *   3. 阶段 D 起用「呼出 / 收起播放列表」（Ctrl+Q），量的是
+	 *      `#nowplaying-columns` 的 `is-queue-hidden`。卡片化**阶段 4** 把
+	 *      详情页的队列栏整个删了（草图「放弃原有的三联卡片式」），
+	 *      那个类不再存在 —— 所以换成量**右栏的收起态**
+	 *      （`is-rightbar-collapsed`）。同样是"不切视图、不动焦点、
+	 *      与播放状态无关"，而且它在整个改造期内不会消失。
 	 */
-	const readQueueColumn = async () =>
+	const readQueuePanel = async () =>
 		await evaluate(
 			window,
 			`(() => {
-				const columns = document.getElementById('nowplaying-columns')
-				return columns ? columns.classList.contains('is-queue-hidden') : null
+				const app = document.querySelector('.app')
+				if (!app) return null
+				return !app.classList.contains('is-rightbar-collapsed')
 			})()`,
 		)
-	const bridgeBefore = await readQueueColumn()
+	const bridgeBefore = await readQueuePanel()
 	const menuPanelItem = appMenu?.items
 		.find((item) => item.label === '播放')
 		?.submenu.items.find((i) => i.label.includes('播放列表'))
 	menuPanelItem?.click?.()
 	await sleep(800)
-	const bridgeAfter = await readQueueColumn()
+	const bridgeAfter = await readQueuePanel()
 	check(
 		'点菜单项**真的**作用到了界面（主进程→渲染进程的桥通了）',
 		Boolean(menuPanelItem) &&
 			bridgeBefore !== null &&
 			bridgeBefore !== bridgeAfter,
-		`播放列表栏 is-queue-hidden：${bridgeBefore} → ${bridgeAfter}`,
+		`播放队列面板展开态：${bridgeBefore} → ${bridgeAfter}`,
 	)
 	// 再点一次还原
 	menuPanelItem?.click?.()
@@ -3337,26 +3387,30 @@ async function run(window) {
 	)
 
 	// ---------------------------------------------------------------
-	// 6. 快捷键：Ctrl+Q 呼出 / 收起播放列表（阶段 D）
+	// 6. 快捷键：Ctrl+Q 呼出 / 收起播放列表
 	// ---------------------------------------------------------------
 	//
-	// ⚠️ 语义变了：原来它是"切换右栏的队列/歌词两个页签"，而歌词页签已经去掉
-	// （歌词搬进了「正在播放」页的中栏）。现在它与播放条上那个按钮、顶部菜单
-	// 那一项**共用同一份实现**：不在播放页就先进去并把播放列表栏显示出来，
-	// 已经在播放页就切换那一栏的显隐。
+	// ⚠️ 这个动作的实现改过三次（见 renderer.js 的 toggleQueueColumn 注释）：
+	// 切队列/歌词页签 → 切「正在播放」页第三栏 → **卡片化阶段 4** 之后
+	// 那第三栏被草图删掉了，于是改成切**右栏（播放队列真正的家）**。
+	// 这一节的断言同步跟着改，判据本身没变：
+	// "按一次队列出现、再按一次队列收起、DOM 始终只有一份"。
 	console.log('\n[ui] 6) 快捷键：Ctrl+Q 呼出/收起播放列表')
 	const readColumns = async () =>
 		JSON.parse(
 			await evaluate(
 				window,
 				`(() => {
-					const columns = document.getElementById('nowplaying-columns')
+					const app = document.querySelector('.app')
 					return JSON.stringify({
 						// ⚠️ 面板是否在前台要看**中栏那个 section 的 hidden**，
 						// 不是 bbState.view（那是"列表视图"：playlist/search，
 						// 与"中栏是谁在前台"是两回事）—— 第一版就读错了字段。
 						viewHidden: document.getElementById('view-nowplaying')?.hidden ?? null,
-						hidden: columns?.classList.contains('is-queue-hidden') ?? null,
+						// 队列栏的显隐 = 右栏有没有展开 + 右栏页签在不在队列
+						rightbarOpen: app
+							? !app.classList.contains('is-rightbar-collapsed')
+							: null,
 						rows: document.querySelectorAll('[data-queue-index]').length,
 					})
 				})()`,
@@ -3369,20 +3423,20 @@ async function run(window) {
 	check(
 		'Ctrl+Q 呼出播放列表（并进入「正在播放」页）',
 		columnsAfter.viewHidden === false &&
-			columnsAfter.hidden === false &&
+			columnsAfter.rightbarOpen === true &&
 			columnsAfter.rows > 0,
-		`面板隐藏=${columnsBefore.viewHidden} → ${columnsAfter.viewHidden}；列表栏隐藏=${columnsBefore.hidden} → ${columnsAfter.hidden}；队列 ${columnsAfter.rows} 项`,
+		`面板隐藏=${columnsBefore.viewHidden} → ${columnsAfter.viewHidden}；右栏展开=${columnsBefore.rightbarOpen} → ${columnsAfter.rightbarOpen}；队列 ${columnsAfter.rows} 项`,
 	)
 	await shot(window, 'ui-05-nowplaying-queue')
 	await press(window, 'ctrl+q')
 	await sleep(600)
 	const columnsBack = await readColumns()
 	check(
-		'再按一次收起播放列表栏（队列 DOM 仍在，只是那一栏藏起来）',
+		'再按一次收起播放列表栏（队列 DOM 仍在，只是右栏收起来了）',
 		columnsBack.viewHidden === false &&
-			columnsBack.hidden === true &&
+			columnsBack.rightbarOpen === false &&
 			columnsBack.rows === columnsAfter.rows,
-		`列表栏隐藏=${columnsBack.hidden} 队列 ${columnsBack.rows} 项`,
+		`右栏展开=${columnsBack.rightbarOpen} 队列 ${columnsBack.rows} 项`,
 	)
 	await press(window, 'ctrl+q')
 	await sleep(600)
@@ -3606,6 +3660,105 @@ async function run(window) {
 		JSON.stringify(lyricsVisible),
 	)
 	await shot(window, 'ui-08-lyrics')
+
+	/*
+	 * ⚠️ **回归断言**：歌词高亮必须跟着播放位置前进。
+	 *
+	 * 这是卡片化阶段 4 修掉的一个**既有 bug**（不是这一步引入的）：
+	 * `renderer.js` 的 `timeupdate` 里原来写着
+	 * `if (bbState.get().rightPanel !== 'lyrics') return` ——
+	 * 而右栏从阶段 D-2 起**只剩「播放队列」一个页签**，`rightPanel` 的初值
+	 * 就是 `'queue'`。于是主界面（播放详情页中栏）的歌词**高亮与滚动
+	 * 永远不会前进**：面板明明在屏幕上，位置更新却被守卫拦掉了。
+	 *
+	 * 为什么既有断言没抓到：它们验的是"`setPosition()` 跑完之后 DOM 有没有变"，
+	 * 而那一步是探针**直接调 `setPosition`** 触发的，正好绕过了守卫。
+	 * 所以这一条必须走**真实路径**：改 `audio.currentTime` 再派发
+	 * `timeupdate`，看界面自己有没有动。
+	 */
+	const lyricsFollow = JSON.parse(
+		await evaluate(
+			window,
+			`(async () => {
+				const audio = window.bbPlayer.getAudio()
+				const panel = window.bbUI.lyricsPanel()
+				if (!panel?.getState) return JSON.stringify({ ready: false, why: 'no panel' })
+
+				/*
+				 * ⚠️ **不要动 audio.currentTime**。
+				 *
+				 * 第一版想去"跳到第 25 秒"，于是写 audio.currentTime = 25 ——
+				 * 但音频此刻在被**真实的播放流**驱动（探针前面的用例真的在放歌），
+				 * 那一行会被媒体会话立刻覆盖掉，量出来的高亮行是"第四行"
+				 * （真实播放位置对应的行），而不是我们以为的那一行。
+				 *
+				 * 换一个**不依赖真实位置**的做法：先读一次真实当前位置，
+				 * 再按它铺一段歌词，让"应该命中哪一行"是确定的，
+				 * 然后看界面自己有没有算对这个下标。
+				 * 这样既走了真实 timeupdate 路径，又与播放进度无关。
+				 *
+				 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
+				 */
+				const now = audio.currentTime
+				/*
+				 * 铺 100 行、每行 1 秒、从 now - 1 开始 ——
+				 * 期望命中的是下标 1（startTime === now 那一行）。
+				 */
+				const start = Math.max(0, now - 1)
+				const synthetic = []
+				for (let i = 0; i < 100; i += 1) {
+					synthetic.push({
+						index: i,
+						startTime: start + i,
+						content: '第 ' + (i + 1) + ' 行',
+					})
+				}
+				panel.setLyrics(synthetic)
+				/*
+				 * ⚠️ 先把高亮**明确按到别处**（-1 = 没有当前行），再派发
+				 * timeupdate：这样"它前进了没有"才是可观测的。
+				 * 直接读一次再派发是不行的 —— 播放位置常常就在 0 秒附近，
+				 * 派发前后都是同一行，断言会变成"永远 changed=false"
+				 * （第一次就是这么红的）。
+				 */
+				panel.setPosition(-1)
+				const beforeIndex = panel.getState().activeIndex
+
+				// 走真实监听路径
+				audio.dispatchEvent(new Event('timeupdate'))
+				await new Promise((r) => setTimeout(r, 300))
+				const after = panel.getState()
+
+				const list = document.querySelector('[data-testid="lyrics-list"]')
+				return JSON.stringify({
+					ready: true,
+					now: Math.round(now),
+					beforeIndex,
+					afterIndex: after.activeIndex,
+					expectIndex: Math.round(now - start),
+					afterText: after.activeText,
+					changed: beforeIndex !== after.activeIndex,
+					// 高亮同时要落到**文档里那棵树**（不是游离的树）
+					activeInDoc: Boolean(
+						list?.querySelector('.lyrics-panel__line.is-active'),
+					),
+					liCount: list ? list.querySelectorAll('li').length : -1,
+				})
+			})()`,
+		),
+	)
+	check(
+		'歌词高亮跟着播放位置前进（走真实 timeupdate，不是直接调 setPosition）',
+		lyricsFollow.ready === true &&
+			lyricsFollow.changed === true &&
+			lyricsFollow.afterIndex === lyricsFollow.expectIndex &&
+			lyricsFollow.activeInDoc === true,
+		lyricsFollow.ready
+			? `高亮行 ${lyricsFollow.beforeIndex} → ${lyricsFollow.afterIndex}` +
+					`（播放位置 ${lyricsFollow.now}s，期望 ${lyricsFollow.expectIndex}，文本「${lyricsFollow.afterText}」）` +
+					`，文档里的高亮行=${lyricsFollow.activeInDoc}，li=${lyricsFollow.liCount}`
+			: `歌词面板不可用：${JSON.stringify(lyricsFollow)}`,
+	)
 
 	// 快捷键注册表快照（便于人工核对冲突）
 	const keyList = JSON.parse(

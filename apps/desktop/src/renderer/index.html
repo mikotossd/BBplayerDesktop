@@ -1458,15 +1458,17 @@
 						</header>
 
 						<!--
-						三栏卡片（对齐网易云布局，但视觉卡片化对齐设置/音乐库页）：
-						  左卡 = 封面 + 曲名/歌手/进度/主控
-						  中卡 = 歌词
-						  右卡 = 播放队列（可收起）
-						⚠️ 歌词与队列都是**同一份 DOM 搬进来**的，不复制：
-						   队列见 renderer.js 的 placeQueue，歌词见 placeLyrics。
-					-->
+							两栏卡片（卡片化阶段 4）：
+							  左卡 = 封面 + 曲名/歌手/进度/主控
+							  右卡 = 歌词
+							⚠️ 原来还有第三栏"播放队列"。草图（播放详情页那一张）
+							手写「**放弃原有的三联卡片式**」，所以队列栏删掉了 ——
+							队列仍然只有一份，住在右栏的 `#queue-slot`
+							（见 renderer.js 的 placeQueue）。
+							⚠️ 歌词是**同一份 DOM 搬进来**的，不复制：见 placeLyrics。
+						-->
 						<div
-							class="nowplaying__columns is-queue-hidden"
+							class="nowplaying__columns"
 							id="nowplaying-columns"
 							data-testid="nowplaying-columns"
 						>
@@ -1590,34 +1592,12 @@
 								</div>
 							</article>
 
-							<!-- 中卡：歌词 -->
+							<!-- 右卡：歌词 -->
 							<article
 								class="nowplaying__card nowplaying__card--lyrics"
 								id="nowplaying-lyrics-slot"
 								data-testid="nowplaying-lyrics-slot"
 							></article>
-
-							<!-- 右卡：播放队列（可收起） -->
-							<article
-								class="nowplaying__card nowplaying__card--queue"
-								id="nowplaying-queue-column"
-								data-testid="nowplaying-queue-column"
-							>
-								<header class="nowplaying__card-head">
-									<h3 class="nowplaying__card-title">播放队列</h3>
-									<span
-										class="muted mono"
-										id="nowplaying-count"
-										data-testid="nowplaying-count"
-										>0</span
-									>
-								</header>
-								<div
-									class="nowplaying__queue"
-									id="nowplaying-queue-slot"
-									data-testid="nowplaying-queue-slot"
-								></div>
-							</article>
 						</div>
 					</div>
 				</section>
@@ -2152,6 +2132,12 @@
 		-->
 		<script src="theme.js"></script>
 		<script src="components.js"></script>
+		<!--
+			从封面取主色（卡片化阶段 4）：播放详情页的背景用它。
+			⚠️ 必须排在 `player.js` **之前** —— player 在换曲时会调
+			`window.bbCoverAccent.apply()`。
+		-->
+		<script src="cover-accent.js"></script>
 		<script src="status.js"></script>
 		<script src="state.js"></script>
 		<script src="player.js"></script>

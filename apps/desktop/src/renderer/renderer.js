@@ -302,28 +302,33 @@
 		const pageHead = document.querySelector('.page-head')
 		if (pageHead) pageHead.hidden = showNow
 		if (showSettings) window.bbSettings?.open?.()
-		// 队列只有一份：它跟着"哪一个面板在前台"搬家（见 placeQueue）
-		placeQueue(showNow)
-		// 歌词同理（见 placeLyrics）：进「正在播放」时搬进中栏，出来时搬回右栏
+		/*
+		 * ⚠️ 队列**不再搬进播放详情页**（卡片化阶段 4）。
+		 *
+		 * 草图（播放详情页）手写「放弃原有的三联卡片式」—— 第三栏就是队列。
+		 * 从那以后队列只有**一个**家：右栏的 `#queue-slot`。
+		 * `placeQueue` 保留成一个"把队列放回右栏"的幂等操作，因为
+		 * 视图切换仍然需要保证它没被别处搬走（阶段 5 会再加一个浮层槽位）。
+		 */
+		placeQueue()
+		// 歌词仍然搬进中栏（见 placeLyrics），出来时搬回右栏
 		placeLyrics(showNow)
 	}
 
 	/**
-	 * 把**唯一那份**队列列表放到正确的位置（阶段 4b）。
+	 * 把**唯一那份**队列列表放回右栏。
 	 *
-	 * ⚠️ 队列在"右栏"和"正在播放面板"里都要出现，但**不能渲染两份**：
-	 * 两棵树会让 `data-queue-index` 重复 —— 探针的计数翻倍、
-	 * 拖拽与点击落到错误的那一棵上。
+	 * ⚠️ 队列 DOM 只有一份：多渲染一份会让 `data-queue-index` 重复 ——
+	 * 探针的计数翻倍、拖拽与点击落到错误的那一棵上。
 	 *
-	 * 所以队列是一个 DOM 节点，在需要时被搬到对应的槽位里。
-	 * 这个函数是它**唯一**的搬运点。
+	 * ⚠️ 阶段 4 之前它还会被搬进「正在播放」页的第三栏；那一栏已经按草图
+	 * 删掉（"放弃原有的三联卡片式"），所以现在这里**只有一个落点**。
+	 * 阶段 5 会再加一个浮层槽位 —— 那时仍然只有这一个搬运点。
 	 */
-	function placeQueue(intoNowPlaying) {
+	function placeQueue(slotId = 'queue-slot') {
 		const list = document.getElementById('queue-list')
 		if (!list) return
-		const slot = document.getElementById(
-			intoNowPlaying ? 'nowplaying-queue-slot' : 'queue-slot',
-		)
+		const slot = document.getElementById(slotId)
 		if (slot && list.parentElement !== slot) slot.appendChild(list)
 	}
 
@@ -358,6 +363,56 @@
 		return Boolean(
 			panel && panel.parentElement?.id === 'nowplaying-lyrics-slot',
 		)
+	}
+	/**
+	 * 歌词面板现在**真的**能被用户看到吗。
+	 *
+	 * 判据是"在文档里 + 祖先链上没有 `hidden`/`display:none`"，
+	 * 而不是"右栏的哪个页签是激活的" —— 后者只在歌词住在右栏时才成立，
+	 * 而它现在的主场是播放详情页的中栏（见 `timeupdate` 里的注释：
+	 * 用页签做判据会让歌词高亮**永远不前进**）。
+	 *
+	 * ⚠️ `getBoundingClientRect().width > 0` 不能当判据：面板在
+	 * `display: none` 的祖先下时宽高确实是 0，但在**过渡动画中**
+	 * 也可能是 0 —— 那会变成偶发不更新。
+	 */
+	function isLyricsPanelVisible() {
+		const panel = lyricsPanelEl()
+		if (!panel || !panel.isConnected) return false
+		for (
+			let node = panel;
+			node && node !== document.body;
+			node = node.parentElement
+		) {
+			if (node.hidden) return false
+			if (getComputedStyle(node).display === 'none') return false
+		}
+		return true
+	}
+	/**
+	 * 歌词面板现在**真的**能被用户看到吗。
+	 *
+	 * 判据是"在文档里 + 祖先链上没有 `hidden`/`display:none`"，
+	 * 而不是"右栏的哪个页签是激活的" —— 后者只在歌词住在右栏时才成立，
+	 * 而它现在的主场是播放详情页的中栏（见 `timeupdate` 里的注释：
+	 * 用页签做判据会让歌词高亮**永远不前进**）。
+	 *
+	 * ⚠️ `getBoundingClientRect().width > 0` 不能当判据：面板在
+	 * `display: none` 的祖先下时宽高确实是 0，但在**过渡动画中**
+	 * 也可能是 0 —— 那会变成偶发不更新。
+	 */
+	function isLyricsPanelVisible() {
+		const panel = lyricsPanelEl()
+		if (!panel || !panel.isConnected) return false
+		for (
+			let node = panel;
+			node && node !== document.body;
+			node = node.parentElement
+		) {
+			if (node.hidden) return false
+			if (getComputedStyle(node).display === 'none') return false
+		}
+		return true
 	}
 	function placeLyrics(intoNowPlaying) {
 		const panel = lyricsPanelEl()
@@ -658,34 +713,36 @@
 		},
 	)
 	/**
-	 * 「呼出 / 收起播放列表」（阶段 D）。
+	 * 「呼出 / 收起播放列表」。
 	 *
-	 * 参考图里用户圈的就是这个动作：传输条上一个按钮，点了右侧的播放列表栏
-	 * 出现/消失。语义（**播放条按钮、`Ctrl+Q`、顶部菜单那一项三者共用这一份实现**）：
-	 *   * 不在「正在播放」页 → 先进那一页，并把播放列表栏**显示出来**
-	 *     （用户按它就是想看队列）；
-	 *   * 已经在那一页 → 切换播放列表栏的显隐。
+	 * 参考图里用户圈的就是这个动作：传输条上一个按钮，点了播放列表出现/消失。
+	 * 语义（**播放条按钮、`Ctrl+Q`、顶部菜单那一项三者共用这一份实现**）：
+	 *   * 不在「正在播放」页 → 先进那一页，并把播放列表**显示出来**；
+	 *   * 已经在那一页 → 切换播放列表的显隐。
 	 *
-	 * ⚠️ 原来 `Ctrl+Q` 是"切换右栏的队列/歌词两个页签"。歌词页签已经去掉
-	 * （歌词搬进了播放页中栏），那个语义不再存在。
+	 * ⚠️ 实现变过两次，记下来避免再绕回去：
+	 *   1. 最初切的是**右栏的队列/歌词两个页签**——歌词页签去掉后语义消失；
+	 *   2. 阶段 D 改成切「正在播放」页第三栏的显隐（`is-queue-hidden`）——
+	 *      卡片化**阶段 4** 把那第三栏整个删了（草图「放弃原有的三联卡片式」），
+	 *      于是这个函数变成了对着一个不存在的类名做 `classList` 操作：
+	 *      按钮点了**毫无反应**，而所有既有断言都读那个类，于是全都"通过"
+	 *      （一条假绿，靠的是探针直接读 classList，而不是看界面上有没有东西出现）。
+	 *   3. 现在切的是**右栏（播放队列真正的家）**的展开/收起。
+	 *      阶段 5 会把它换成队列浮层 —— 那时仍然只有这一个函数是入口。
 	 */
 	function toggleQueueColumn() {
-		const columns = document.getElementById('nowplaying-columns')
-		if (!columns) return
 		if (currentView !== 'nowplaying') {
 			setNowPlaying(true)
-			columns.classList.remove('is-queue-hidden')
+			setRightbar(true)
 		} else {
-			columns.classList.toggle('is-queue-hidden')
+			setRightbar(!isRightbarOpen())
 		}
-		const hidden = columns.classList.contains('is-queue-hidden')
+		const open = isRightbarOpen()
 		// 两个触发点同步（播放条按钮 + 正在播放卡片顶栏按钮）
 		const playbarButton = document.getElementById('playbar-queue')
-		if (playbarButton)
-			playbarButton.setAttribute('aria-pressed', String(!hidden))
+		if (playbarButton) playbarButton.setAttribute('aria-pressed', String(open))
 		const topbarButton = document.getElementById('nowplaying-toggle-queue')
-		if (topbarButton)
-			topbarButton.setAttribute('aria-expanded', String(!hidden))
+		if (topbarButton) topbarButton.setAttribute('aria-expanded', String(open))
 	}
 
 	keys.register('ctrl+q', { description: '呼出/收起播放列表' }, () => {
@@ -802,7 +859,28 @@
 			log('歌词面板模块不可用，跳过初始化')
 			return null
 		}
-		lyricsPanel = window.createLyricsPanel(container)
+		/*
+		 * ⚠️⚠️ **必须复用已经自动建好的那一份**，不能再 create 一次。
+		 *
+		 * `lyrics-panel.js` 末尾有一段"页面里已经有挂载点就自动建一份"的
+		 * 引导代码（`__lyricsPanel`，给自动化脚本用）。而这里原来无条件
+		 * 又 `createLyricsPanel(container)` —— `createLyricsPanel` 第一步就是
+		 * `container.textContent = ''`，于是：
+		 *   * 屏幕上的面板被**清空并换成了第二份实例**；
+		 *   * 第一份实例（`window.__lyricsPanel`）手里还攥着**已经被摘掉的**
+		 *     `<ul>`，`setLyrics()` 把 62 行全渲染进了那棵游离的树。
+		 *
+		 * 症状就是用户看到的「歌词不滚动」：面板在屏幕上（第二份实例画的空壳），
+		 * 而所有 `setLyrics` / `setPosition` 都落在屏幕外那一份上。
+		 * 探针也一直在读 `window.bbUI.lyricsPanel()`，所以它数出"状态 62 行、
+		 * 容器里 0 个 li"—— 这个矛盾读数在这份代码里挂了很久。
+		 *
+		 * 现在只认一份：有自动建的就用它，没有才自己建。
+		 */
+		lyricsPanel = window.__lyricsPanel ?? window.createLyricsPanel(container)
+		// 让 `lyrics-panel.js` 的引导代码知道"已经有人管了"，避免它再建
+		window.__lyricsPanel = lyricsPanel
+		log('歌词面板已就绪（复用自动创建的那一份）')
 		return lyricsPanel
 	}
 
@@ -923,9 +1001,33 @@
 			)
 		}
 
-		if (!lyricsPanel) return
-		if (window.bbState.get().rightPanel !== 'lyrics') return
-		lyricsPanel.setPosition(audio.currentTime)
+		/*
+		 * ⚠️ 这里**不能只认模块里的 `lyricsPanel` 变量**。
+		 *
+		 * 歌词面板其实由 `lyrics-panel.js` 末尾的引导代码自动建好
+		 * （`window.__lyricsPanel`），而 `initLyricsPanel()` 是 `boot()` 里
+		 * 较后才调的 —— 这个 `timeupdate` 处理器在更早的同步初始化阶段就绑上了，
+		 * 闭包捕获的是**当时还是 null** 的那个变量。
+		 * 加一个 `window.__lyricsPanel` 兜底之后，"谁先建好"就不再影响高亮。
+		 */
+		const panel = lyricsPanel ?? window.__lyricsPanel ?? null
+		if (!panel) return
+		/*
+		 * ⚠️ 守卫**必须看"歌词面板现在可不可见"**，不能看右栏的页签。
+		 *
+		 * 原来是 `if (bbState.get().rightPanel !== 'lyrics') return` ——
+		 * 而右栏从阶段 D-2 起**只剩「播放队列」一个页签**，`rightPanel`
+		 * 的初值就是 `'queue'`。于是主界面（播放详情页中栏）的歌词
+		 * **高亮与滚动永远不会前进**：面板明明在屏幕上，位置更新却被拦掉了。
+		 *
+		 * 这个 bug 在卡片化改造**之前就存在**，只是没人量它
+		 * （既有断言查的是"`setPosition` 被调用后 DOM 有没有变"，
+		 * 而那一步是探针直接调 `setPosition` 触发的，绕过了守卫）。
+		 *
+		 * 现在的判据：面板在文档里、且它的祖先链上没有 `hidden`/`display:none`。
+		 */
+		if (!isLyricsPanelVisible()) return
+		panel.setPosition(audio.currentTime)
 	})
 
 	// ---------------------------------------------------------------

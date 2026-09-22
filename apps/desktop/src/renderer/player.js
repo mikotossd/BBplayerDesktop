@@ -623,23 +623,20 @@
 		if (placeholder) placeholder.hidden = Boolean(coverUrl)
 
 		/*
-		 * 背景：把**同一张封面**铺满再重度模糊 + 压暗。
+		 * 背景：**从封面取主色**（卡片化阶段 4）。
 		 *
-		 * ⚠️ 不走"提取主色"那条路：`packages/image-theme-colors` 在移动端是
-		 * 原生模块，桌面端没有对应实现。直接模糊封面，效果接近且零依赖 ——
-		 * 封面本身的色彩分布就是最好的背景。
+		 * ⚠️ 原来是"同一张封面铺满 + `blur(64px)`"。草图明确写着
+		 * 「背景模糊封面主色，**不要模糊**」—— 两张图叠在一起再糊掉，
+		 * 观感是一团脏色；而从封面算出来的**一个颜色**才是要的东西。
 		 *
-		 * 没有封面时退回主色渐变（见 CSS 的 `[data-has-art='false']`），
-		 * 不留一片死白。
+		 * 取色在 `cover-accent.js`（Canvas 降采样 + 按色相投票）。
+		 * ⚠️ 它**是异步的、并且可能失败**（跨域封面拿不到像素）——
+		 * 失败时清掉 `--np-accent`，CSS 退回 `--primary` 的柔和渐变，
+		 * 同时留 `data-accent="fallback"` 给探针。
+		 * **绝不 await 阻塞这里**：换曲要立刻出画面。
 		 */
 		if (background) {
-			if (coverUrl) {
-				background.style.backgroundImage = 'url("' + coverUrl + '")'
-				background.dataset.hasArt = 'true'
-			} else {
-				background.style.backgroundImage = ''
-				background.dataset.hasArt = 'false'
-			}
+			void window.bbCoverAccent?.apply?.(coverUrl, background)
 		}
 	}
 
