@@ -1703,6 +1703,20 @@ body {
 /* ══════════════════════════════════════════════════════════
    底部播放条
    ────────────────────────────────────────────────────────── */
+/*
+ * 播放卡的标题（卡片化阶段 3）。
+ *
+ * ⚠️ 标题过长时**横向滚动**（草图明确要求：「如果过长，滚动显示」）。
+ *
+ * 为什么不用 `text-overflow: ellipsis` 就完事：省略号只是"不溢出"，
+ * 它把"这首歌叫什么"这个最重要的信息截掉了。横向滚动能把它读完。
+ *
+ * 结构：`.playbar__title` 是外层（裁剪窗口），`.playbar__title-text` 是内层
+ * （真正被平移的那一段）。平移量由 JS 按 `scrollWidth - clientWidth` 算出来
+ * 写进 `--marquee-shift`，动画只负责来回跑。
+ * 只在**真的溢出**时才加 `.is-overflowing`（JS 判 `scrollWidth > clientWidth`），
+ * 否则短标题会一直在那儿微微地动，非常廉价。
+ */
 .playbar__meta {
 	min-width: 0;
 }
@@ -1712,6 +1726,70 @@ body {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+.playbar__title.is-overflowing {
+	text-overflow: clip;
+}
+.playbar__title-text {
+	display: inline-block;
+	white-space: nowrap;
+}
+.playbar__title.is-overflowing .playbar__title-text {
+	animation: bb-marquee 14s linear infinite;
+	padding-right: var(--sp-xxl);
+}
+/* 悬停暂停：用户想看清时不该被动画拖走 */
+.playbar__title.is-overflowing:hover .playbar__title-text {
+	animation-play-state: paused;
+}
+@keyframes bb-marquee {
+	0%,
+	12% {
+		transform: translateX(0);
+	}
+	88%,
+	100% {
+		transform: translateX(var(--marquee-shift, 0px));
+	}
+}
+/*
+ * ⚠️ `prefers-reduced-motion`：**退回省略号**而不是禁用动画了事 ——
+ * 禁用之后长标题会被 `overflow: hidden` 硬裁（连省略号都没有），
+ * 那比原来更差。
+ */
+@media (prefers-reduced-motion: reduce) {
+	.playbar__title.is-overflowing .playbar__title-text {
+		animation: none;
+		transform: none;
+		padding-right: 0;
+	}
+	.playbar__title.is-overflowing {
+		text-overflow: ellipsis;
+	}
+}
+
+/*
+ * 播放详情页的进入过渡（卡片化阶段 3）。
+ *
+ * 草图：「点击 card ④ 中除控件外的区域 → **向上过渡动画**，打开播放详情页」。
+ * 用 `@starting-style` + `transition` 做"从下方 12px 滑上来 + 淡入"，
+ * 不引入任何 JS 动画库。
+ */
+#view-nowplaying {
+	transition:
+		opacity var(--motion-duration-slow) ease,
+		transform var(--motion-duration-slow) ease;
+}
+@starting-style {
+	#view-nowplaying {
+		opacity: 0;
+		transform: translateY(12px);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	#view-nowplaying {
+		transition: none;
+	}
 }
 
 .playbar__artist {

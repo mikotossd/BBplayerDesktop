@@ -60,11 +60,17 @@
 		prev: document.getElementById('prev'),
 		next: document.getElementById('next'),
 		progress: document.getElementById('progress'),
-		volume: document.getElementById('volume'),
+		/*
+		 * ⚠️ `volume` 与 `npVolume` 两条滑块在卡片化改造里**去掉了**
+		 * （用户要求播放卡与详情页都没有音量）。`els` 表里不再有它们 ——
+		 * 留着死引用会让人以为界面里还有两条滑块。
+		 */
 		mode: document.getElementById('mode'),
 		timeCurrent: document.getElementById('time-current'),
 		timeTotal: document.getElementById('time-total'),
 		title: document.getElementById('now-title'),
+		/** 标题的裁剪层（两层结构的外层，卡片化阶段 3） */
+		titleWrap: document.getElementById('now-title-wrap'),
 		artist: document.getElementById('now-artist'),
 		cover: document.getElementById('now-cover'),
 		coverPlaceholder: document.getElementById('now-cover-placeholder'),
@@ -76,7 +82,8 @@
 		npPrev: document.getElementById('nowplaying-prev'),
 		npNext: document.getElementById('nowplaying-next'),
 		npMode: document.getElementById('nowplaying-mode'),
-		npVolume: document.getElementById('nowplaying-volume'),
+		/** 详情页那颗"音量（在设置里调）"图标按钮 */
+		npVolumeOpen: document.getElementById('nowplaying-volume-open'),
 		npProgress: document.getElementById('nowplaying-progress'),
 		npTimeCurrent: document.getElementById('nowplaying-time-current'),
 		npTimeTotal: document.getElementById('nowplaying-time-total'),
@@ -477,11 +484,48 @@
 		input.style.setProperty('--range-fill', `${clamped}%`)
 	}
 
+	/**
+	 * 音量（卡片化改造之后**唯一**的实现）。
+	 *
+	 * ⚠️ 原来 `setVolume` 还要同步两条滑块（播放卡的 `#volume` 与播放详情页的
+	 * `#nowplaying-volume`）。用户明确要求那两处都不放音量滑块，于是：
+	 *   * 滑块只剩「设置 › 播放」里的一条（由 `settings-panel.js` 自己 wire）；
+	 *   * 这里只负责写 `audio.volume` 并**广播** `volume-changed`，
+	 *     谁需要跟着更新（设置里的滑块、静音按钮的文案）自己订阅。
+	 *
+	 * 为什么用事件而不是让调用方直接改滑块：`Ctrl+←/→`、设置滑块、
+	 * 以后可能的媒体键都会走这一条路 —— 让"谁改的音量"与"谁显示音量"解耦，
+	 * 否则又是"两条滑块互相同步"那种会漂的结构。
+	 */
 	function setVolume(percent) {
 		const clamped = Math.max(0, Math.min(100, percent))
 		els.audio.volume = clamped / 100
-		if (els.volume) syncRangeFill(els.volume, clamped)
-		if (els.npVolume) syncRangeFill(els.npVolume, clamped)
+		emit({ type: 'volume-changed', volume: clamped })
+		return clamped
+	}
+
+	/**
+	 * 播放卡标题的横向滚动（卡片化阶段 3）。
+	 *
+	 * 草图：「标题如果过长，滚动显示」。做法是**两层的 CSS 动画**：
+	 * 外层 `.playbar__title` 裁剪，内层 `.playbar__title-text` 按
+	 * `--marquee-shift` 平移（见 style.css 的 `@keyframes bb-marquee`）。
+	 *
+	 * ⚠️ 只有**真的溢出**才加 `.is-overflowing`。不加判断的话：
+	 *   * 短标题也会一直微微地动（`translateX(0px)` 的动画看起来像抖动）；
+	 *   * 每一个字都要跟着合成器跑，纯浪费。
+	 *
+	 * `scrollWidth - clientWidth` 就是"需要平移多少才看得完"。
+	 */
+	function syncTitleMarquee() {
+		if (!els.titleWrap || !els.title) return
+		els.titleWrap.classList.remove('is-overflowing')
+		els.titleWrap.style.removeProperty('--marquee-shift')
+		// 先摘类再量 —— 带着动画类量出来的 scrollWidth 不可靠
+		const shift = els.title.scrollWidth - els.titleWrap.clientWidth
+		if (shift <= 4) return
+		els.titleWrap.style.setProperty('--marquee-shift', `-${shift}px`)
+		els.titleWrap.classList.add('is-overflowing')
 	}
 
 	function syncModeButtons() {
@@ -602,6 +646,7 @@
 	function updateNowPlaying() {
 		const track = state.queue[state.index]
 		if (els.title) els.title.textContent = track ? track.title : '未在播放'
+		syncTitleMarquee()
 		if (els.artist)
 			els.artist.textContent = track
 				? track.artist || track.artist_name || '—'
@@ -847,18 +892,11 @@
 	if (els.next) els.next.addEventListener('click', () => void playNext(false))
 	if (els.prev) els.prev.addEventListener('click', () => void playPrev())
 	if (els.mode) els.mode.addEventListener('click', cycleMode)
-	if (els.volume) {
-		els.volume.addEventListener('input', () => {
-			setVolume(Number(els.volume.value))
-			// 同步正在播放卡片的音量条
-			if (els.npVolume) {
-				els.npVolume.value = els.volume.value
-				syncRangeFill(els.npVolume, Number(els.npVolume.value))
-			}
-		})
-		// 初始音量也要把已填充段画出来（默认 100%）
-		syncRangeFill(els.volume, Number(els.volume.value))
-	}
+	/*
+	 * ⚠️ 这里原来 wire 的是播放卡上的音量滑块。卡片化改造把两条滑块都去掉了
+	 * （用户要求播放卡与详情页都没有音量），音量只剩「设置 › 播放」里那一条
+	 * —— 它由 `settings-panel.js` 通过 `bbPlayer.setVolume()` 写入。
+	 */
 
 	// ── 正在播放卡片（同一组状态的第二触发点）──────────────────────
 	// 按钮全部转调到底部播放条已经 wire 好的动作 —— 不在这里复制逻辑。
@@ -867,16 +905,11 @@
 		els.npNext.addEventListener('click', () => void playNext(false))
 	if (els.npPrev) els.npPrev.addEventListener('click', () => void playPrev())
 	if (els.npMode) els.npMode.addEventListener('click', cycleMode)
-	if (els.npVolume) {
-		els.npVolume.addEventListener('input', () => {
-			setVolume(Number(els.npVolume.value))
-			// 同步底部播放条的音量条 —— 不然两处显示会脱节
-			if (els.volume) {
-				els.volume.value = els.npVolume.value
-				syncRangeFill(els.volume, Number(els.volume.value))
-			}
+	if (els.npVolumeOpen) {
+		// 详情页那颗音量图标按钮 → 去「设置 › 播放」那一行
+		els.npVolumeOpen.addEventListener('click', () => {
+			window.bbSettings?.switchCategory?.('playback')
 		})
-		syncRangeFill(els.npVolume, Number(els.npVolume.value))
 	}
 	if (els.npProgress) {
 		els.npProgress.addEventListener('input', () => {
@@ -914,6 +947,12 @@
 		playPrev,
 		seekTo,
 		seekBy,
+		/**
+		 * 音量（0–100）。卡片化改造之后**这是唯一的实现**：
+		 * 滑块只剩「设置 › 播放」一条，`Ctrl+←/→` 与它共用这里。
+		 */
+		setVolume,
+		getVolume: () => Math.round(els.audio.volume * 100),
 		cycleMode,
 		/** 直接设定模式（确定性测试用；顺序循环用 cycleMode） */
 		setMode,

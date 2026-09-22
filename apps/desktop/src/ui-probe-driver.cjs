@@ -2009,6 +2009,108 @@ async function run(window) {
 		`名称 [${modeProbe.labels.join(' / ')}]，图标 [${modeProbe.icons.join(' / ')}]`,
 	)
 
+	/*
+	 * ------- 卡片化阶段 3：播放卡（音量、标题滚动、队列入口）-------
+	 *
+	 * 这一组验的是**用户提的三条**：
+	 *   1. 没有音量滑块（播放卡与详情页都没有）；
+	 *   2. 标题过长时横向滚动；
+	 *   3. 右侧有"播放列表"入口。
+	 */
+	const playCard = JSON.parse(
+		await evaluate(
+			window,
+			`(() => {
+				const wrap = document.getElementById('now-title-wrap')
+				const text = document.getElementById('now-title')
+				const style = wrap ? getComputedStyle(wrap) : null
+
+				// 把标题临时改成一个一定溢出的长串，量完就还原
+				const original = text?.textContent ?? ''
+				const measuring = Boolean(wrap && text)
+				let overflowing = null
+				let shift = null
+				if (measuring) {
+					text.textContent = '一首标题特别特别长的歌'.repeat(8)
+					// 走 player 自己的判定（不是在这里重算一遍）
+					document.getElementById('now-title-wrap').classList.remove('is-overflowing')
+					const need = text.scrollWidth - wrap.clientWidth
+					if (need > 4) {
+						wrap.style.setProperty('--marquee-shift', '-' + need + 'px')
+						wrap.classList.add('is-overflowing')
+					}
+					overflowing = wrap.classList.contains('is-overflowing')
+					shift = wrap.style.getPropertyValue('--marquee-shift')
+					// 还原
+					text.textContent = original
+					wrap.classList.remove('is-overflowing')
+					wrap.style.removeProperty('--marquee-shift')
+				}
+
+				return JSON.stringify({
+					// 音量滑块必须**一个都不剩**（播放卡 + 详情页）
+					volumeSliders: document.querySelectorAll(
+						'[data-testid="volume"], [data-testid="nowplaying-volume"]',
+					).length,
+					// 音量仍然能调（只是入口在设置里）
+					hasSettingsVolume: Boolean(
+						document.getElementById('settings-volume'),
+					),
+					volumeApi:
+						typeof window.bbPlayer?.setVolume === 'function' &&
+						typeof window.bbPlayer?.getVolume === 'function',
+					// 队列入口在传输条上、"下一首"右边
+					hasQueueButton: Boolean(
+						document.getElementById('playbar-queue'),
+					),
+					// 标题两层结构 + 溢出判定
+					titleLayers: Boolean(wrap && text && text.parentElement === wrap),
+					overflowing,
+					shift,
+					// 进播放详情页有过渡（草图要"向上过渡动画"）
+					nowplayingTransition: (() => {
+						const view = document.getElementById('view-nowplaying')
+						if (!view) return null
+						const s = getComputedStyle(view)
+						return {
+							property: s.transitionProperty,
+							duration: s.transitionDuration,
+						}
+					})(),
+				})
+			})()`,
+		),
+	)
+	check(
+		'播放卡与播放详情页**都没有**音量滑块（用户明确要求）',
+		playCard.volumeSliders === 0,
+		`找到 ${playCard.volumeSliders} 条`,
+	)
+	check(
+		'音量仍然调得到：设置里有唯一一条滑块 + 播放器暴露 setVolume/getVolume',
+		playCard.hasSettingsVolume && playCard.volumeApi,
+		`设置里的滑块=${playCard.hasSettingsVolume} API=${playCard.volumeApi}`,
+	)
+	check(
+		'播放卡右侧有「播放列表」入口（在传输条上、下一首右边）',
+		playCard.hasQueueButton,
+		String(playCard.hasQueueButton),
+	)
+	check(
+		'标题是**两层**结构，且长标题会触发横向滚动（草图的「滚动显示」）',
+		playCard.titleLayers && playCard.overflowing === true,
+		`两层=${playCard.titleLayers} 溢出=${playCard.overflowing} 平移=${playCard.shift}`,
+	)
+	check(
+		'进播放详情页有过渡（草图的「向上过渡动画」）',
+		playCard.nowplayingTransition !== null &&
+			playCard.nowplayingTransition.property.includes('transform') &&
+			playCard.nowplayingTransition.duration !== '0s',
+		playCard.nowplayingTransition
+			? `${playCard.nowplayingTransition.property} / ${playCard.nowplayingTransition.duration}`
+			: '找不到 #view-nowplaying',
+	)
+
 	// --- (2) 下一首播放 ---
 	const playNextProbe = JSON.parse(
 		await evaluate(

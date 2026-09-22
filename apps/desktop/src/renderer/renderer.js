@@ -586,16 +586,18 @@
 		void player.playNext(false)
 	})
 	keys.register('ctrl+arrowleft', { description: '音量 −5%' }, () => {
-		const volume = document.getElementById('volume')
-		if (!volume) return
-		volume.value = String(Math.max(0, Number(volume.value) - 5))
-		volume.dispatchEvent(new Event('input'))
+		/*
+		 * ⚠️ 卡片化改造之后**不再通过 DOM 滑块**调音量。
+		 *
+		 * 原来这里写 `#volume.value` 再派发 `input` 事件 —— 那条滑块已经删了
+		 * （用户要求播放卡不放音量）。改成直接调 `player.setVolume()`，
+		 * 它会写 `audio.volume` 并广播 `volume-changed`，
+		 * 设置里那条滑块自己订阅更新。
+		 */
+		player.setVolume(player.getVolume() - 5)
 	})
 	keys.register('ctrl+arrowright', { description: '音量 +5%' }, () => {
-		const volume = document.getElementById('volume')
-		if (!volume) return
-		volume.value = String(Math.min(100, Number(volume.value) + 5))
-		volume.dispatchEvent(new Event('input'))
+		player.setVolume(player.getVolume() + 5)
 	})
 	keys.register('ctrl+m', { description: '静音切换' }, () => {
 		const audio = player.getAudio()
@@ -603,13 +605,15 @@
 		/*
 		 * ⚠️ 静音必须有**看得见的反馈**：原来只改 `audio.muted`，
 		 * 图标、aria-pressed、状态行全都不动 —— 连按两次在界面上完全一样。
-		 * 状态胶囊 + `aria-pressed` 是最小的可行反馈（`volume_off` 不在
-		 * 图标子集里，重建字体要联网）。
+		 * 状态胶囊 + `aria-valuetext` 是最小的可行反馈
+		 * （`volume_off` 不在图标子集里，重建字体要联网）。
+		 *
+		 * ⚠️ `aria-valuetext` 写的是**设置里那条唯一的音量滑块**
+		 * （原来是遍历 `[data-testid="volume"]`，那条已经不存在了）。
 		 */
 		setStatus(audio.muted ? '已静音' : '已取消静音', 'idle')
-		for (const button of document.querySelectorAll('[data-testid="volume"]')) {
-			button.setAttribute('aria-valuetext', audio.muted ? '已静音' : '')
-		}
+		const slider = document.getElementById('settings-volume')
+		slider?.setAttribute('aria-valuetext', audio.muted ? '已静音' : '')
 	})
 
 	// —— 模式 ——

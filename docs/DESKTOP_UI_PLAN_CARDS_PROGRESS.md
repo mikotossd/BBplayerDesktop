@@ -338,42 +338,84 @@ html 写一个出来我看看效果"。原型把 12 张草图 + 用户逐条确�
 
 ## 下一步
 
-### 下一件：阶段 3 · 播放卡
+### P8 · 阶段 3：播放卡（已完成）
 
-**基线**：`verify:desktop:ui` = **198 项全通过**。
+**做了什么**
+
+| 文件                  | 改动                                                                                                                                                                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `index.html`          | **删掉两条音量滑块**（播放卡的 `#volume` 与详情页的 `#nowplaying-volume`）；详情页那一格换成一颗"音量（在设置里调）"图标按钮；标题拆成**两层**（`#now-title-wrap` 裁剪 + `#now-title` 平移）；「设置 › 播放」新增唯一的一条音量滑块 |
+| `player.js`           | `setVolume` 变成**唯一实现**：只写 `audio.volume` 并广播 `volume-changed`；新增 `getVolume()` / `syncTitleMarquee()`；`els` 表里删掉两条滑块、加 `npVolumeOpen` / `titleWrap`                                                       |
+| `renderer.js`         | `Ctrl+←/→` 不再绕 DOM 滑块，直接调 `player.setVolume()`；`Ctrl+M` 的 `aria-valuetext` 写到设置那条滑块上                                                                                                                            |
+| `settings-panel.js`   | 新增 `renderVolume()` + 滑块 `input` 处理 + 订阅 `volume-changed`（别的路径改了音量，这条滑块跟着走）                                                                                                                               |
+| `style.css`           | `@keyframes bb-marquee` + `.is-overflowing`；`#view-nowplaying` 的 `@starting-style` 向上过渡；两者的 `prefers-reduced-motion` 分支                                                                                                 |
+| `ui-probe-driver.cjs` | 新增 5 条断言                                                                                                                                                                                                                       |
+
+#### 三条用户要求分别怎么落的
+
+1. **没有音量滑块** → 两条都删。但**音量本身不能没有**，所以：
+   - 唯一入口是「设置 › 播放」里那一条；
+   - `Ctrl+←/→` 与 `Ctrl+M` 继续可用；
+   - 真相是 `audio.volume`（`getVolume()`），**不在设置文件里存第二份**。
+2. **标题过长滚动显示** → 两层结构 + CSS 动画。是否溢出由 JS 判
+   （`scrollWidth - clientWidth > 4` 才加 `.is-overflowing`）——
+   不加判断的话短标题会一直微微地动，非常廉价。
+3. **点播放卡非控件区 → 向上过渡打开详情页** → `@starting-style` +
+   `transform: translateY(12px)`，不引 JS 动画库。
+   两个动画都有 `prefers-reduced-motion` 分支；marquee 那条特意
+   **退回省略号**（只禁用动画的话长标题会被硬裁，比原来更差）。
+
+#### 顺手修掉一个结构隐患
+
+原来 `setVolume` 要同步**三条**滑块（播放卡 / 详情页 / 设置），
+而 `desktop-features.js` 的休眠定时器**绕过 `setVolume` 直接改
+`audio.volume`** —— 滑块显示与真实音量脱节过一次。
+现在只剩一条滑块，且它订阅 `volume-changed`：
+"谁改的音量"与"谁显示音量"解耦，不再靠每处都记得同步。
+
+**验证**：`verify:desktop:ui` **198 → 203 项全通过**；
+`:settings` 88/0、`:history` 31/0、`:import` 25/0。
+
+---
+
+## 下一步（下一件）
+
+### 阶段 4 · 播放详情页
+
+**基线**：`verify:desktop:ui` = **203 项全通过**。
 
 **具体改动**
 
-1. 播放卡右侧补「播放模式」与「播放列表」两颗按钮（草图 04 的「add」：
-   _"布局上不变，在右侧额外增加控件按钮"_）。模式按钮**已经有**（`#mode`）；
-   播放列表按钮现在是"展开右栏"，要改成**弹队列浮层**（阶段 5 一起做，
-   这一步先把按钮与入口摆对）。
-2. **去掉音量滑块**（用户明确要求，播放卡与详情页都没有）。
-   `#volume` 与 `#nowplaying-volume` 不能直接删 —— 先查清有哪些断言与
-   代码在读写它们（`player.js` 的 `setVolume` 同时同步两条滑块；
-   `ctrl+←/→` 与 `ctrl+m` 也依赖 `#volume`）。
-   计划：把音量**收进设置**（一个滑杆），播放卡上的 `volume_up` 变成"打开音量"。
-3. 标题**溢出时横向滚动**（marquee）：`.playbar__title` 加一个
-   `scrollWidth > clientWidth` 的判断，才加动画类；`prefers-reduced-motion`
-   下禁用动画并退回省略号。
-4. 点播放卡**非控件区域** → 向上过渡打开播放详情页（现在已经有三个进入点：
-   封面 / 标题 / 歌手，保留那套无障碍处理，只加 `translateY` 过渡）。
-5. ⚠️ 播放卡的列数**必须等于可见子元素个数**（阶段 0 踩过：写少一列，
-   多出来的子元素落到隐式第二行，把播放条撑高一倍）。
+1. `#view-nowplaying` 从**三栏**改成**两栏**（封面卡 + 歌词卡）：
+   草图 08 手写「放弃原有的三联卡片式」。删掉 `#nowplaying-queue-column`
+   与 `#nowplaying-queue-slot`，以及 `.is-queue-hidden` 那套规则。
+2. 背景从"封面模糊图"改成**封面主色的柔和渐变**（草图：「背景模糊封面主色，
+   **不要模糊**」）。取主色用 `createImageBitmap` + `OffscreenCanvas` 降采样，
+   ⚠️ 跨域封面会污染 canvas → 必须 `crossOrigin='anonymous'`，
+   失败时**回退到 `--primary`**，绝不阻塞渲染。
+3. **必须一并修那个既有 bug**：`renderer.js` 里
+   `if (bbState.get().rightPanel !== 'lyrics') return` 挡住了
+   `lyricsPanel.setPosition()` —— 而右栏现在只剩 queue 页签，于是
+   **主界面歌词的高亮与滚动永远不会前进**。守卫要改成"歌词面板当前可见"。
+4. 无歌词时显式显示「无歌词」（草图要求）。
+5. ⚠️ 歌词滚动容器必须保留 `.lyrics-panel__scroll` 且它必须继续是
+   `offsetParent`（`lyrics-panel.css` 的 `position: relative`）——
+   中间插任何 positioned 包裹层都会让居中计算整体偏移。
+6. ⚠️ 探针里读 `.nowplaying__art` 宽高比/圆角、`#nowplaying-lyrics-slot` 宽度
+   的几条断言**要继续满足**。
 
 ### 之后（按施工单顺序）
 
-阶段 4（播放详情两栏 + 封面主色背景 + **修"歌词不滚动"的既有 bug**）→
 阶段 5（队列浮层，单一 DOM 三槽位）→
 阶段 6（歌单详情行卡）→
 阶段 7（收藏夹卡片化 + 删掉内嵌表格渲染器）→
 阶段 8（清理死 CSS、图标尺寸两套真相收敛、reduced-motion 补齐、文档）。
 
-### 已完成（本文件 P0–P7）
+### 已完成（本文件 P0–P8）
 
 原型（`prototype/`）· 播放模式四档 · 图标构建脚本两个 bug ·
 阶段 0（播放条进中栏）· 阶段 1（左栏两张卡）· 自绘标题栏 + 默认中性浅色 ·
-阶段 2（主页卡片化 + 下沿两块）。
+阶段 2（主页卡片化 + 下沿两块）· 阶段 3（播放卡：去音量、标题滚动、过渡）。
 
 ### 每一步都要守的纪律
 

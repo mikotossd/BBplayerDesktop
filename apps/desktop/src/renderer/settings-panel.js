@@ -85,6 +85,12 @@
 		loudnessTargetValue: document.getElementById(
 			'settings-loudness-target-value',
 		),
+		/*
+		 * 音量：卡片化改造之后**全应用唯一**的一条音量滑块。
+		 * 播放卡与播放详情页都没有音量（用户明确要求）。
+		 */
+		volume: document.getElementById('settings-volume'),
+		volumeValue: document.getElementById('settings-volume-value'),
 	}
 
 	const setStatus = (node, text, kind) => {
@@ -207,6 +213,8 @@
 				els.loudnessTarget.value = String(-currentSettings.loudnessTargetDb)
 				syncRangeFill(els.loudnessTarget)
 			}
+			// 音量：真相在 `audio.volume`（不是设置文件里 —— 它不落盘）
+			renderVolume()
 			if (els.downloadParallel && currentSettings.downloadMaxParallel != null) {
 				els.downloadParallel.value = String(currentSettings.downloadMaxParallel)
 			}
@@ -564,6 +572,42 @@
 				'busy',
 			)
 		})()
+	})
+
+	// ---------------------------------------------------------------
+	// 音量（卡片化改造：**这里是唯一的音量滑块**）
+	// ---------------------------------------------------------------
+	//
+	// ⚠️ 原来播放卡的 `#volume` 与播放详情页的 `#nowplaying-volume` 各有一条
+	// 滑块，三条互相同步 —— 那种结构迟早会漂（休眠定时器就绕过 `setVolume`
+	// 直接改 `audio.volume`，滑块显示与真实音量脱节过一次）。
+	//
+	// 现在只有这一条，且**真相在 `audio.volume`**（`bbPlayer.getVolume()`）：
+	// 不在这里存第二份值，打开设置时读一次、拖动时写一次。
+	function renderVolume() {
+		const percent = window.bbPlayer?.getVolume?.() ?? 100
+		if (els.volume) {
+			els.volume.value = String(percent)
+			syncRangeFill(els.volume)
+		}
+		if (els.volumeValue) els.volumeValue.textContent = `${percent}%`
+	}
+
+	els.volume?.addEventListener('input', () => {
+		const percent = Number(els.volume.value)
+		// 写进播放器（它会广播 volume-changed），界面跟着它走
+		window.bbPlayer?.setVolume?.(percent)
+		if (els.volumeValue) els.volumeValue.textContent = `${percent}%`
+		syncRangeFill(els.volume)
+	})
+
+	/*
+	 * ⚠️ 别的路径改了音量（`Ctrl+←/→`、静音）也要反映到这条滑块上。
+	 * 订阅播放器的事件而不是"每处都记得调 renderVolume" —— 后者正是
+	 * 三条滑块互相漂移的成因。
+	 */
+	window.bbPlayer?.on?.((event) => {
+		if (event?.type === 'volume-changed') renderVolume()
 	})
 
 	// ---------------------------------------------------------------

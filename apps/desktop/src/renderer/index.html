@@ -944,6 +944,32 @@
 								id="settings-loudness-status"
 								data-testid="settings-loudness-status"
 							></p>
+
+							<!--
+								⚠️ 音量滑块**只在这里**（卡片化改造）。
+								播放卡与播放详情页都没有音量 —— 用户明确要求。
+								快捷键 `Ctrl+←/→` 仍然可用，与这条滑块共用
+								`bbPlayer.setVolume()`。
+							-->
+							<h3>音量</h3>
+							<div class="settings-row">
+								<label for="settings-volume">音量</label>
+								<input
+									id="settings-volume"
+									data-testid="settings-volume"
+									type="range"
+									min="0"
+									max="100"
+									step="1"
+									value="100"
+								/>
+								<span
+									class="mono"
+									id="settings-volume-value"
+									data-testid="settings-volume-value"
+									>100%</span
+								>
+							</div>
 						</section>
 
 						<!-- 歌词 -->
@@ -1545,18 +1571,22 @@
 									>
 										<span class="icon icon--md">repeat</span>
 									</button>
-									<div class="nowplaying__volume">
-										<span class="icon icon--sm">volume_up</span>
-										<input
-											id="nowplaying-volume"
-											data-testid="nowplaying-volume"
-											type="range"
-											min="0"
-											max="100"
-											value="100"
-											aria-label="音量"
-										/>
-									</div>
+									<!--
+										⚠️ 这一格原来是一条音量滑块。卡片化改造里
+										**播放卡与播放详情页都不放音量**（用户明确要求：
+										两处都没有音量滑块）—— 音量收进
+										「设置 › 播放」，快捷键 `Ctrl+←/→` 仍然可用。
+										留一个图标按钮，点了去设置那一行。
+									-->
+									<button
+										class="icon-button icon-only"
+										id="nowplaying-volume-open"
+										data-testid="nowplaying-volume-open"
+										title="音量（在设置里调）"
+										aria-label="音量（在设置里调）"
+									>
+										<span class="icon icon--md">volume_up</span>
+									</button>
 								</div>
 							</article>
 
@@ -1642,12 +1672,25 @@
 					</div>
 
 					<div class="playbar__meta">
+						<!--
+							⚠️ 标题是**两层**（卡片化阶段 3）：外层裁剪、内层平移。
+							超长时内层按 `--marquee-shift` 横向滚动（草图上写的
+							「如果过长，滚动显示」）。是否溢出由 player.js 判
+							（只有真的溢出才加动画类，否则短标题会一直微微地动）。
+							`#now-title` 仍是**内层那个 span** —— 所有既有引用
+							（`player.js` 的 `els.title`、探针按 testid 取文本）
+							都不用改。
+						-->
 						<div
 							class="playbar__title"
-							id="now-title"
-							data-testid="now-title"
+							id="now-title-wrap"
 						>
-							未在播放
+							<span
+								class="playbar__title-text"
+								id="now-title"
+								data-testid="now-title"
+								>未在播放</span
+							>
 						</div>
 						<div
 							class="playbar__artist muted"
@@ -1725,6 +1768,16 @@
 					</div>
 
 					<div class="playbar__extra">
+						<!--
+							⚠️ 草图上播放卡右侧**只有两颗**按钮：播放模式 + 播放列表。
+							但「播放列表」那颗按用户给的参考图是在**传输控制条上、
+							「下一首」右边**（上面那颗 `#playbar-queue`）——
+							所以这里**只放模式**，不要再放一颗队列按钮（同一个动作
+							两个入口是这份施工单一直在删的东西）。
+							音量滑块原来在这里，卡片化改造里**去掉了**（用户明确要求
+							"没有音量滑块"）—— 音量收进「设置 › 播放」，
+							快捷键 `Ctrl+←/→` 与 `Ctrl+M` 仍然可用。
+						-->
 						<button
 							id="mode"
 							class="icon-only"
@@ -1733,16 +1786,6 @@
 						>
 							<span class="icon icon--md">repeat</span>
 						</button>
-						<input
-							id="volume"
-							data-testid="volume"
-							type="range"
-							min="0"
-							max="100"
-							value="100"
-							title="音量"
-							aria-label="音量"
-						/>
 					</div>
 				</footer>
 			</main>
