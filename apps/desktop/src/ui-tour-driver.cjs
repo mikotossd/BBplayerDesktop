@@ -617,32 +617,79 @@ async function run(window) {
 
 	console.log('\n=== 6b) 多选 ===')
 	// 收起右栏，免得它把中栏挤窄（多选工具条要在一屏里看全）
-	await click(window, '[data-testid="tab-queue"]')
-	await sleep(400)
+	// ⚠️ 右栏里的「歌词」页签已经去掉（歌词搬进播放详情页），
+	// 所以这里**不能再点 `tab-queue` / `tab-lyrics`** —— 那些 testid 不存在，
+	// 点了是"静默落空"（`click` 找不到元素就返回 false）。直接切右栏开关。
 	await click(window, '[data-testid="rightbar-toggle"]')
 	await sleep(600)
 	/*
-	 * ⚠️ 从「正在播放」退回来会落到**音乐库的卡片网格**（那就是"播放列表"页签的
-	 * 默认内容），而不是刚才那个歌单详情 —— 多选工具条在详情里。
-	 * 所以这里要重新进一次详情，否则下面点不到「多选」。
+	 * ⚠️ 从「正在播放」退回来会落到**音乐库的卡片网格**或**上一次的页签**，
+	 * 而多选工具条在**歌单详情**里。所以这里必须
+	 * ① 先切回「播放列表」页签（否则可能在「合集」页签上，那里点卡片
+	 *    进去的是合集详情，截图里会是卡片网格）；
+	 * ② 再点一张歌单卡进详情。
 	 */
-	await click(window, '[data-testid^="playlist-card-"]')
-	await sleep(1300)
-	await evaluate(
+	/*
+	 * ⚠️ 用**明确的调用**进详情，不要靠"点第一张卡"。
+	 *
+	 * 靠点击的话，`#content` 在切换页签期间是异步重建的 ——
+	 * 而 `[data-testid^="playlist-card-"]` 可能在**旧页签**的内容里也命中
+	 * （实测：截图里出现的是「合集详情」的卡片网格，而不是歌单详情的行列表）。
+	 * 截图脚本要的是"稳定地拍到某一个界面"，所以这里直接按 id 打开。
+	 *
+	 * 歌单 id 从左栏的歌单行里读（那一列在任何页签下都在）。
+	 */
+	const openedId = await evaluate(
+		window,
+		`(() => {
+			const row = document.querySelector('[data-playlist-id]')
+			const id = row?.dataset.playlistId
+			if (!id) return null
+			window.bbLibrary.openPlaylist?.(Number(id))
+			return id
+		})()`,
+	)
+	await sleep(1600)
+	// 拍之前先确认真的在歌单详情（行列表 + 页头），否则这张图没意义
+	const detailState = JSON.parse(
+		await evaluate(
+			window,
+			`(() => JSON.stringify({
+				view: window.bbState.get().view,
+				playlistId: window.bbState.get().selectedPlaylistId,
+				rows: document.querySelectorAll('.song-row').length,
+				cards: document.querySelectorAll('.track-card').length,
+				head: Boolean(document.querySelector('[data-testid="playlist-head"]')),
+				title:
+					document.querySelector('.pl-head__title, .view-head h2')?.textContent ?? '',
+			}))()`,
+		),
+	)
+	console.log(`  [多选截图前的状态] ${JSON.stringify(detailState)}`)
+	if (!openedId) {
+		report.problems.push('左栏没有歌单行，无法进入歌单详情拍多选')
+	} else if (detailState.rows === 0) {
+		report.problems.push(
+			`多选那张图不在歌单详情里（view=${detailState.view}，行 ${detailState.rows}，卡 ${detailState.cards}，标题「${detailState.title}」）`,
+		)
+	}
+	const multiSelect = await evaluate(
 		window,
 		`(() => {
 			// 进多选并选中前 3 首（与用户在界面上 Ctrl 点选的效果一致 ——
 			// 用真实事件而不是直接改类名，否则截图里的状态可能是"画出来的"）
 			document.querySelector('[data-testid="btn-select-mode"]')?.click()
-			const rows = [...document.querySelectorAll('.track-card')].slice(0, 3)
-			for (const row of rows) {
-				row.dispatchEvent(
+			// ⚠️ 卡片化阶段 6 之后是**紧凑行**（.song-row）
+			const rows = [...document.querySelectorAll('.song-row')].slice(0, 3)
+			for (const one of rows) {
+				one.dispatchEvent(
 					new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }),
 				)
 			}
-			return true
+			return rows.length
 		})()`,
 	)
+	console.log(`  [多选] 点了 ${multiSelect} 行`)
 	await sleep(800)
 	await shot(window, '30-multi-select', '多选（工具条 + 卡片勾选标记）')
 	await click(window, '[data-testid="selection-clear"]')

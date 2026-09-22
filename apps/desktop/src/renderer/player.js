@@ -1164,7 +1164,9 @@
 				activeView: document
 					.querySelector('.nav__item.is-active')
 					?.getAttribute('data-view'),
-				viewTitle: document.querySelector('.view-head h2')?.textContent || '',
+				viewTitle:
+					document.querySelector('.pl-head__title, .view-head h2')
+						?.textContent || '',
 			}
 		},
 	}

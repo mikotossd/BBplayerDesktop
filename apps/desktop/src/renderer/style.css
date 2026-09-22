@@ -1550,8 +1550,19 @@ body {
 	}
 }
 
+/*
+ * ⚠️ 行高**钉死**（卡片化阶段 6）。
+ *
+ * 原来只有 `cursor: pointer` + 悬停底色：行高完全由内容撑开 ——
+ * 作者名长到换行、或者封面没加载出来时行会明显变矮，一屏里的行
+ * **高低不齐**（截图审查里能看出来）。现在给一个固定行高，
+ * 并让所有单元格 `vertical-align: middle`。
+ *
+ * 56px 是"紧凑但点得准"的取法：一行 = 36px 封面 + 上下各 10px。
+ */
 .track-table tbody tr {
 	cursor: pointer;
+	height: 56px;
 }
 
 .track-table tbody tr:hover {
@@ -1561,6 +1572,23 @@ body {
 .track-table tbody tr.is-playing {
 	background: var(--secondary-container);
 	color: var(--on-secondary-container);
+}
+
+/*
+ * ⚠️ 单元格垂直居中，且**不许换行**。
+ * 换行会把行撑高、把固定行高顶破（`height` 在表格里只是"最小高度"）。
+ */
+.track-table th,
+.track-table td {
+	vertical-align: middle;
+}
+
+.track-table td.col-artist,
+.track-table td.col-duration,
+.track-table td.col-index {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /*

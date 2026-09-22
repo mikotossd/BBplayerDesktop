@@ -181,7 +181,8 @@ async function run(window) {
 		await click(window, '[data-testid="btn-seed-demo"]')
 		await waitFor(
 			window,
-			`document.querySelectorAll('.track-card').length > 0`,
+			// ⚠️ 卡片化阶段 6 之后整页曲目列表是**紧凑行**（`.song-row`）
+			`document.querySelectorAll('.song-row').length > 0`,
 			120_000,
 			'tracks',
 		)

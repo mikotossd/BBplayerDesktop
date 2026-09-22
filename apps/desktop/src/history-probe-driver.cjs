@@ -186,8 +186,11 @@ async function run(window) {
 		await click(window, '[data-testid="btn-seed-demo"]')
 		const imported = await waitFor(
 			window,
-			`document.querySelectorAll('.track-card').length > 0
-				? { ok: true, rows: document.querySelectorAll('.track-card').length }
+			// ⚠️ 卡片化阶段 6 之后整页曲目列表是**紧凑行**（`.song-row`），
+			// 不再是 `.track-card`。这类"按长相找元素"的等待条件在改版时
+			// 会**永远不满足**，表现为整套挂到超时 —— 所以两处都要跟着改。
+			`document.querySelectorAll('.song-row').length > 0
+				? { ok: true, rows: document.querySelectorAll('.song-row').length }
 				: false`,
 			180_000,
 			'import',

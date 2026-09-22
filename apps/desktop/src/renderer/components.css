@@ -548,6 +548,259 @@
 	color: var(--on-surface-variant);
 }
 
+/* ══════════════════════════════════════════════════════════
+   紧凑歌曲行（卡片化阶段 6，草图「③ 歌单页面」）
+   ────────────────────────────────────────────────────────── */
+/*
+ * 从原型 `prototype/assets/proto.css` 的 `.song-row` 移植过来。
+ *
+ * ⚠️ 用**固定列宽**而不是表格：列宽一固定，所有行就严格对齐
+ * （表格要靠 `table-layout: fixed` + `colgroup` 才能达到同样效果，
+ * 而且表格行做不了圆角 + 拖拽指示条）。
+ *
+ * ⚠️ 行是"文字流"不是卡片：hover 只给一层极淡的底、圆角比卡片小 ——
+ * 一屏几十行时，每一行都画成卡片会让人找不到焦点。
+ *
+ * ⚠️ 与卡片网格给**同一个 testid**（`track-table`），探针按它定位
+ * "曲目列表在不在"，不该因为长相变了就找不到。
+ */
+.song-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.song-row {
+	display: grid;
+	/* 播放钮 / 序号 / 封面 / 标题 / 歌手 / 时长 / ⋮ */
+	grid-template-columns: 28px 28px 40px minmax(0, 1fr) 190px 56px 28px;
+	align-items: center;
+	gap: var(--sp-xs);
+	padding: 4px var(--sp-xs);
+	height: 52px;
+	border-radius: var(--r-sm);
+	cursor: pointer;
+	transition: background var(--motion-duration-fast) ease;
+}
+
+.song-row:hover {
+	background: var(--surface-2);
+}
+
+/* 正在播放：与全工程同一套选中令牌（左栏胶囊 / 右栏页签都是它） */
+.song-row.is-playing {
+	background: var(--secondary-container);
+	color: var(--on-secondary-container);
+}
+
+/*
+ * 多选态的两层：`is-checked`（**这一首被选中**，由 `syncSelectionUi` 维护，
+ * 卡片/表格/行三种形态共用同一个类名）与 `is-selected`（单击高亮，纯视觉）。
+ */
+.song-row.is-checked,
+.song-row.is-selected {
+	background: var(--surface-3);
+}
+.song-row.is-checked .song-row__index {
+	color: var(--primary);
+	font-weight: 600;
+}
+
+/*
+ * 勾选标记（多选态）。
+ *
+ * ⚠️ 用 `::after` 画，理由与卡片网格一致：**不额外插 DOM**。
+ * 插一个勾选元素会让每行多一个节点，而"选中/取消"要来回切换 ——
+ * 每切一次就重建 DOM 会打断 Shift 连选的锚点。
+ * 卡片那边也有一条断言在查 `content` 里有没有 `check_circle`，
+ * 三种形态用同一套标记就不会再出现"这里勾了、那里没勾"。
+ */
+.song-row.is-checked::after {
+	content: 'check_circle';
+	font-family: 'Material Symbols Rounded';
+	font-size: 16px;
+	line-height: 1;
+	color: var(--primary);
+	position: absolute;
+	/* 序号与封面之间那一列空着，正好放勾 */
+	left: 30px;
+	pointer-events: none;
+}
+
+/* `::after` 用了绝对定位，行本身要成为定位上下文 */
+.song-row {
+	position: relative;
+}
+
+.song-row.is-drop-before {
+	box-shadow: inset 0 2px 0 0 var(--primary);
+}
+
+.song-row.is-drop-after {
+	box-shadow: inset 0 -2px 0 0 var(--primary);
+}
+
+/* ⚠️ 悬停/选中才露出「播放」与「⋮」：默认就画出来会让一屏几十个图标抢戏 */
+.song-row__play,
+.song-row .track-action {
+	width: 26px;
+	height: 26px;
+	border: 0;
+	background: transparent;
+	color: var(--on-surface-variant);
+	border-radius: var(--r-full);
+	display: grid;
+	place-items: center;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity var(--motion-duration-fast) ease;
+}
+
+.song-row:hover .song-row__play,
+.song-row.is-playing .song-row__play,
+.song-row:hover .track-action,
+.song-row.is-selected .track-action {
+	opacity: 1;
+}
+
+.song-row__play:hover,
+.song-row .track-action:hover {
+	background: var(--surface-container-highest);
+	color: var(--on-surface);
+}
+
+.song-row__index {
+	text-align: right;
+	font-size: var(--fs-label-medium);
+	color: var(--on-surface-variant);
+	font-variant-numeric: tabular-nums;
+}
+
+.song-row.is-playing .song-row__index {
+	color: var(--on-secondary-container);
+}
+
+.song-row__cover {
+	width: 40px;
+	height: 40px;
+	border-radius: var(--r-sm);
+	overflow: hidden;
+	/* 覆盖 `.list-row__art` 的默认尺寸 */
+	font-size: var(--fs-label-medium);
+}
+
+.song-row__title {
+	font-size: var(--fs-body-medium);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.song-row__artist {
+	font-size: var(--fs-body-small);
+	color: var(--on-surface-variant);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.song-row.is-playing .song-row__artist {
+	color: var(--on-secondary-container);
+}
+
+.song-row__time {
+	font-size: var(--fs-body-small);
+	color: var(--on-surface-variant);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+/*
+ * ⚠️ 窄窗口下歌手列会挤压标题（190px 是给它留的固定宽度）。
+ * 1180px 以下直接藏掉歌手列 —— 那是次要信息，
+ * 而标题是"我要找的那首歌"，不能被挤没。
+ */
+@media (max-width: 1180px) {
+	.song-row {
+		grid-template-columns: 28px 28px 40px minmax(0, 1fr) 56px 28px;
+	}
+	.song-row__artist {
+		display: none;
+	}
+}
+
+/* ══════════════════════════════════════════════════════════
+   歌单详情页头（卡片化阶段 6，草图「③ 歌单页面」）
+   ────────────────────────────────────────────────────────── */
+/*
+ * 左边 104px 封面 + 右边标题/简介/元信息。
+ * 值抄自原型（`prototype/assets/proto.css` 的 `.pl-head`），
+ * 这样原型与实现是同一套尺寸，不用来回对照。
+ */
+.pl-head {
+	flex: none;
+	display: grid;
+	grid-template-columns: 104px minmax(0, 1fr);
+	gap: var(--sp-md);
+	padding: var(--sp-md) 0;
+	border-bottom: 1px solid var(--outline-variant);
+	margin-bottom: var(--sp-sm);
+}
+
+.pl-head__cover {
+	width: 104px;
+	height: 104px;
+	border-radius: var(--r-lg);
+	overflow: hidden;
+}
+
+.pl-head__body {
+	min-width: 0;
+}
+
+.pl-head__title {
+	margin: 0 0 var(--sp-xs);
+	font-size: var(--fs-headline-small);
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	/* 长歌单名最多两行，再多就把下面的元信息顶出视野 */
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.pl-head__desc {
+	margin: 0 0 var(--sp-xs);
+	font-size: var(--fs-body-small);
+	color: var(--on-surface-variant);
+	max-width: 60ch;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.pl-head__meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--sp-xxs) var(--sp-md);
+	font-size: var(--fs-label-medium);
+	color: var(--on-surface-variant);
+}
+
+/*
+ * 页头里的动作（「← 播放列表」+「⋮」）。
+ * 单独一行放在元信息下面 —— 挤在标题右边会和长标题抢宽度。
+ */
+.pl-head__actions {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+	margin-top: var(--sp-sm);
+}
+
 /* 快捷入口：三张卡横排（安卓端是横向滚动，桌面端放得下就不滚） */
 .home-quick {
 	display: grid;

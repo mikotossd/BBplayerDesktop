@@ -1426,18 +1426,27 @@ async function run(window) {
 				await new Promise((r) => setTimeout(r, 1500))
 				// 作者名：**数据库路径**的作者在 artists 表里（tracks 只存外键），
 				// 所以这条同时验证 join 真的做了 —— 用户抱怨过「作者永远是 —」。
-				// 曲目卡把它放在副标题里（「歌手 · 时长」）。
+				// ⚠️ 卡片化**阶段 6** 之后整页曲目列表是**紧凑行**
+				// （.song-row），作者在 .song-row__artist 里；
+				// 内嵌表格（收藏夹预览）仍是 td.col-artist。两种都认。
+				//
+				// ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
 				const artists = [
-					...document.querySelectorAll('.track-card .media-card__sub'),
+					...document.querySelectorAll(
+						'[data-testid="track-table"] .song-row__artist',
+					),
 				]
-					.map((node) => node.textContent.split('·')[0].trim())
+					.map((node) => node.textContent.trim())
 					.filter(Boolean)
 				const inDetail = {
-					trackGrid: Boolean(
-						document.querySelector('[data-testid="track-table"] .track-card'),
+					trackList: Boolean(
+						document.querySelector(
+							'[data-testid="track-table"] .song-row, [data-testid="track-table"] .track-card, [data-testid="track-table"] tr',
+						),
 					),
 					back: Boolean(document.querySelector('[data-testid="playlist-back"]')),
-					title: document.querySelector('.view-head h2')?.textContent ?? '',
+					title: document.querySelector('.pl-head__title, .view-head h2')?.textContent ?? '',
+					head: Boolean(document.querySelector('[data-testid="playlist-head"]')),
 					authorRows: artists.length,
 					authorFilled: artists.filter((t) => t && t !== '—').length,
 					authorSample: artists.find((t) => t && t !== '—') ?? null,
@@ -1450,8 +1459,8 @@ async function run(window) {
 		),
 	)
 	check(
-		'点歌单卡片进详情（曲目卡网格 + 返回按钮都在）',
-		drill.inDetail.trackGrid && drill.inDetail.back,
+		'点歌单卡片进详情（曲目行 + 页头 + 返回按钮都在）',
+		drill.inDetail.trackList && drill.inDetail.back && drill.inDetail.head,
 		`标题「${drill.inDetail.title}」 ${JSON.stringify(drill.inDetail)}`,
 	)
 	check(
@@ -1491,7 +1500,7 @@ async function run(window) {
 			window,
 			`(async () => {
 				const inDetail = {
-					title: document.querySelector('.view-head h2')?.textContent ?? '',
+					title: document.querySelector('.pl-head__title, .view-head h2')?.textContent ?? '',
 					dialogGone: !document.querySelector('[data-testid="create-playlist"]'),
 				}
 				document.querySelector('[data-testid="playlist-back"]')?.click()
@@ -1591,64 +1600,78 @@ async function run(window) {
 	// ---------------------------------------------------------------
 	// 2.6b 曲目卡网格（阶段 A → 用户复审：取消曲目表）
 	// ---------------------------------------------------------------
+	// 2.6b 曲目**紧凑行**（卡片化阶段 6）
+	// ---------------------------------------------------------------
 	//
-	// 用户的原话：「两个按钮出来的是两个完全不同的播放列表页面，只保留
-	// 播放详情页里面的播放列表（圆角卡片样式的那个）」。
+	// 历史：这里原来断言的是"曲目**卡网格**"（用户当时说"两个按钮出来的是
+	// 两个完全不同的播放列表页面，只保留播放详情页里面的播放列表"）。
+	// 卡片化阶段 6 按草图「③ 歌单页面」把整页曲目列表改成**紧凑行**：
+	// 草图画的是"页头卡 + 一列横长条"，而且一屏几十首时行的扫视效率
+	// 远高于卡片（卡片一屏只放得下 6–8 首）。
 	//
-	// 也就是说歌单详情**不再有曲目表**，而是与歌单列表同一张圆角卡片。
-	// 断言按看得见的现象写：
-	//   1. 详情里没有任何 `<table class="track-table">`；
-	//   2. 曲目卡是 `<button>`（键盘可达：有 role 语义 + tabindex）；
-	//   3. 每张卡的封面是 1:1 的圆角正方形；
-	//   4. 卡片底色与页面底色可区分（是"卡片"而不是裸文字）。
-	console.log('\n[ui] 2.6b) 曲目卡网格')
+	// 断言跟着改，但**判据本身没变**：这一页要能一眼扫、要有点得准的
+	// 行内动作、封面是圆角正方形、行与页面底色可区分。
+	console.log('\n[ui] 2.6b) 曲目紧凑行')
 	const trackGrid = JSON.parse(
 		await evaluate(
 			window,
 			`(() => {
-				const grid = document.querySelector('[data-testid="track-table"]')
-				const cards = [...document.querySelectorAll('.track-card')]
-				const first = cards[0]
+				const list = document.querySelector('[data-testid="track-table"]')
+				const rows = [...document.querySelectorAll('.song-row')]
+				const first = rows[0]
 				const art = first?.querySelector('.list-row__art')
 				const artRect = art?.getBoundingClientRect()
 				const radius = art ? Number.parseFloat(getComputedStyle(art).borderRadius) : 0
+				const rowRect = first?.getBoundingClientRect()
 				return JSON.stringify({
-					isGrid: grid ? grid.tagName === 'DIV' && grid.classList.contains('media-grid') : false,
+					isList: Boolean(list && list.classList.contains('song-list')),
 					hasTable: Boolean(document.querySelector('table.track-table')),
-					count: cards.length,
+					count: rows.length,
 					tag: first?.tagName ?? null,
-					hasSub: Boolean(first?.querySelector('.media-card__sub')),
+					// 行是**横长条**（宽 > 高）；卡片是竖的
+					isRowShaped: rowRect ? rowRect.width > rowRect.height : false,
+					// 行内动作：悬停露出的「⋮」必须在
+					hasMore: Boolean(first?.querySelector('.track-action')),
+					// 六列信息都在
+					fields: first
+						? [
+								'.song-row__play',
+								'.song-row__index',
+								'.song-row__cover',
+								'.song-row__title',
+								'.song-row__artist',
+								'.song-row__time',
+							].filter((sel) => first.querySelector(sel)).length
+						: 0,
 					artSquare: artRect
 						? Math.abs(artRect.width - artRect.height) <= 2
 						: false,
 					artRadius: radius,
-					cardBg: first ? getComputedStyle(first).backgroundColor : null,
+					rowBg: first ? getComputedStyle(first).backgroundColor : null,
 					contentBg: getComputedStyle(document.getElementById('content')).backgroundColor,
 				})
 			})()`,
 		),
 	)
 	check(
-		'歌单详情渲染的是曲目**卡网格**，页面上不再有曲目表',
-		trackGrid.isGrid && !trackGrid.hasTable && trackGrid.count > 1,
-		`grid=${trackGrid.isGrid} table=${trackGrid.hasTable} 卡片 ${trackGrid.count} 张`,
+		'歌单详情渲染的是曲目**紧凑行**（列表），页面上不再有曲目表',
+		trackGrid.isList && !trackGrid.hasTable && trackGrid.count > 1,
+		`list=${trackGrid.isList} table=${trackGrid.hasTable} 行 ${trackGrid.count} 个`,
 	)
 	check(
-		'曲目卡是 <button>（键盘可达）且带歌手的副标题',
-		trackGrid.tag === 'BUTTON' && trackGrid.hasSub,
-		`<${trackGrid.tag}> sub=${trackGrid.hasSub}`,
+		'每行是**横长条**（宽 > 高），且六列信息齐全',
+		trackGrid.isRowShaped && trackGrid.fields >= 6,
+		`横长条=${trackGrid.isRowShaped} 列数=${trackGrid.fields}/6`,
 	)
 	check(
-		'曲目卡封面是 1:1 的圆角正方形',
-		trackGrid.artSquare && trackGrid.artRadius >= 8,
+		'每行都有行内「⋮」（悬停才露出，但必须在 DOM 里）',
+		trackGrid.hasMore,
+		String(trackGrid.hasMore),
+	)
+	check(
+		'行封面是 1:1 的圆角正方形',
+		trackGrid.artSquare && trackGrid.artRadius >= 4,
 		`1:1=${trackGrid.artSquare} radius=${trackGrid.artRadius}`,
-	)
-	check(
-		'曲目卡底色与内容区底色可区分',
-		Boolean(trackGrid.cardBg) &&
-			trackGrid.cardBg !== 'rgba(0, 0, 0, 0)' &&
-			trackGrid.cardBg !== trackGrid.contentBg,
-		`卡片 ${trackGrid.cardBg} vs 内容区 ${trackGrid.contentBg}`,
 	)
 
 	// ---------------------------------------------------------------
@@ -1668,7 +1691,7 @@ async function run(window) {
 		await evaluate(
 			window,
 			`(() => JSON.stringify({
-				rows: document.querySelectorAll('.track-card').length,
+				rows: document.querySelectorAll('.song-row').length,
 				barHidden: document.querySelector('[data-testid="selection-bar"]')?.hidden,
 				selectButton: Boolean(document.querySelector('[data-testid="btn-select-mode"]')),
 			}))()`,
@@ -1687,7 +1710,7 @@ async function run(window) {
 		await evaluate(
 			window,
 			`(async () => {
-				const rows = [...document.querySelectorAll('.track-card')]
+				const rows = [...document.querySelectorAll('.song-row')]
 				const click = (row, init) =>
 					row.dispatchEvent(
 						new MouseEvent('click', { bubbles: true, cancelable: true, ...init }),
@@ -1696,11 +1719,11 @@ async function run(window) {
 				await new Promise((r) => setTimeout(r, 200))
 				const afterOne = {
 					barHidden: document.querySelector('[data-testid="selection-bar"]').hidden,
-					checked: document.querySelectorAll('.track-card.is-checked').length,
+					checked: document.querySelectorAll('.song-row.is-checked').length,
 					label: document.querySelector('[data-testid="selection-count"]').textContent,
 					// 选中标记：曲目卡用主色勾选图标（表格那套方格复选框已随表格退场）
 					mark: (() => {
-						const card = document.querySelector('.track-card.is-checked')
+						const card = document.querySelector('.song-row.is-checked')
 						if (!card) return null
 						const s = getComputedStyle(card, '::after')
 						return { content: s.content, color: s.color }
@@ -1712,7 +1735,7 @@ async function run(window) {
 				click(rows[2], { shiftKey: true })
 				await new Promise((r) => setTimeout(r, 200))
 				const afterRange = {
-					checked: document.querySelectorAll('.track-card.is-checked').length,
+					checked: document.querySelectorAll('.song-row.is-checked').length,
 					label: document.querySelector('[data-testid="selection-count"]').textContent,
 				}
 				return JSON.stringify({ afterOne, afterRange })
@@ -1743,16 +1766,16 @@ async function run(window) {
 		await evaluate(
 			window,
 			`(async () => {
-				const rows = document.querySelectorAll('.track-card').length
+				const rows = document.querySelectorAll('.song-row').length
 				document.querySelector('[data-testid="selection-all"]').click()
 				await new Promise((r) => setTimeout(r, 200))
-				const all = document.querySelectorAll('.track-card.is-checked').length
+				const all = document.querySelectorAll('.song-row.is-checked').length
 				document.querySelector('[data-testid="selection-invert"]').click()
 				await new Promise((r) => setTimeout(r, 200))
-				const inverted = document.querySelectorAll('.track-card.is-checked').length
+				const inverted = document.querySelectorAll('.song-row.is-checked').length
 				document.querySelector('[data-testid="selection-all"]').click()
 				await new Promise((r) => setTimeout(r, 200))
-				const backToAll = document.querySelectorAll('.track-card.is-checked').length
+				const backToAll = document.querySelectorAll('.song-row.is-checked').length
 				return JSON.stringify({ rows, all, inverted, backToAll })
 			})()`,
 		),
@@ -1806,8 +1829,8 @@ async function run(window) {
 				return JSON.stringify({
 					inMode,
 					barHidden: document.querySelector('[data-testid="selection-bar"]').hidden,
-					checked: document.querySelectorAll('.track-card.is-checked').length,
-					rowsVisible: document.querySelectorAll('.track-card').length,
+					checked: document.querySelectorAll('.song-row.is-checked').length,
+					rowsVisible: document.querySelectorAll('.song-row').length,
 				})
 			})()`,
 		),
@@ -3649,17 +3672,17 @@ async function run(window) {
 	// ---------------------------------------------------------------
 	// 8. 双击曲目播放
 	// ---------------------------------------------------------------
-	console.log('\n[ui] 8) 双击曲目卡播放')
+	console.log('\n[ui] 8) 双击曲目行播放')
 	const doubleClicked = await evaluate(
 		window,
 		`(() => {
-			const card = document.querySelector('.track-card')
+			const card = document.querySelector('.song-row')
 			if (!card) return false
 			card.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
 			return true
 		})()`,
 	)
-	check('找到并双击首张曲目卡', doubleClicked)
+	check('找到并双击首行曲目', doubleClicked)
 	if (doubleClicked) {
 		const played = await waitFor(
 			window,
@@ -4190,7 +4213,7 @@ async function run(window) {
 					clicked: true,
 					testid: card.dataset.testid ?? '',
 					want,
-					title: document.querySelector('.view-head h2')?.textContent ?? '',
+					title: document.querySelector('.pl-head__title, .view-head h2')?.textContent ?? '',
 					trackTable: Boolean(document.querySelector('[data-testid="track-table"]')),
 					emptyState: Boolean(document.querySelector('[data-testid="content-empty"]')),
 					/*
@@ -4609,7 +4632,7 @@ async function run(window) {
 	const coverBackfilled = await waitFor(
 		window,
 		`(() => {
-			const imgs = [...document.querySelectorAll('[data-testid="track-table"] .track-card .list-row__art img')]
+			const imgs = [...document.querySelectorAll('[data-testid="track-table"] .song-row .list-row__art img')]
 			return imgs.length === 2 ? { ok: true, src: imgs[0].getAttribute('src') } : false
 		})()`,
 		20_000,

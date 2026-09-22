@@ -1187,10 +1187,10 @@
 	player.on((event) => {
 		if (event.type === 'track-changed') {
 			log(`开始播放：${event.track.title}`)
-			// 曲目列表现在有两种形态：整页是**曲目卡**（`.track-card`），
+			// 曲目列表现在有两种形态：整页是**紧凑行**（`.song-row`），
 			// 收藏夹预览那张内嵌表仍是 `<tr>`。都带 `data-bvid`，按属性选。
 			for (const row of document.querySelectorAll(
-				'.track-card[data-bvid], .track-table tbody tr[data-bvid]',
+				'[data-testid^="track-row-"][data-bvid], .track-table tbody tr[data-bvid]',
 			)) {
 				row.classList.toggle(
 					'is-playing',
