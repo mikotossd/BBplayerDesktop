@@ -10,7 +10,14 @@
 	const listeners = new Set()
 
 	const state = {
-		/** 当前视图：library | search | collection | playlist */
+		/**
+		 * 当前视图：`library | search | collection | playlist | favorites`
+		 *
+		 * ⚠️ `favorites` 是卡片化阶段 7 加的：收藏夹的曲目列表现在也走
+		 * **整页曲目渲染器**（与歌单详情同一条路径）。不把它区分出来的话，
+		 * `view` 会停在 `'playlist'` —— 于是页头会去建"歌单页头卡"、
+		 * 显示上一个歌单的封面与首数，而**返回按钮指向歌单列表**。
+		 */
 		view: 'library',
 		/** 左栏选中的歌单 id（null 表示未选） */
 		selectedPlaylistId: null,

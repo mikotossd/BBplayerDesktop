@@ -155,82 +155,99 @@
 			return
 		}
 
-		const list = document.createElement('ul')
-		list.className = 'favorite-list'
-		list.dataset.testid = 'favorite-list'
-
+		/*
+		 * ── 卡片网格（卡片化阶段 7）──────────────────────────
+		 *
+		 * ⚠️ 原来是"一行一个（`.list-row`）+ 展开一块**内嵌曲目表**"。
+		 * 改成卡片有两个理由，都是用户给的：
+		 *   1. **收藏夹卡只显示 N 个视频** —— 不要在卡里塞预览列表；
+		 *   2. 与「音乐库 › 播放列表」用**同一张 `mediaCard`** ——
+		 *      两处都是"一排可以点进去的集合"，长相必须一致
+		 *      （这正是这份施工单一直在收敛的东西）。
+		 *
+		 * 点卡片 = 进曲目列表（不再是"在卡里展开"）。所以那个内嵌表格
+		 * 渲染器（`renderTrackTable` 的 `into` 形态）在收藏夹这一侧
+		 * **不再被调用** —— 收藏夹与歌单详情现在是同一条路径。
+		 */
+		const grid = document.createElement('div')
+		grid.className = 'media-grid'
+		grid.dataset.testid = 'favorite-list'
 		for (const folder of folders) {
-			const item = document.createElement('li')
-			item.className = 'favorite-list__item'
-			item.dataset.testid = `favorite-${folder.mediaId}`
-			item.dataset.mediaId = String(folder.mediaId)
-
-			const main = document.createElement('div')
-			main.className = 'favorite-list__main'
-
-			const title = document.createElement('div')
-			title.className = 'favorite-list__title'
-			title.textContent = folder.title
-			main.appendChild(title)
-
-			const sub = document.createElement('div')
-			sub.className = 'favorite-list__sub muted'
 			const badges = [`${folder.mediaCount} 个视频`]
 			if (folder.isPrivate) badges.push('私密')
-			sub.textContent = badges.join(' · ')
-			main.appendChild(sub)
 
-			item.appendChild(main)
+			const card = window.bbComponents.mediaCard({
+				title: folder.title,
+				sub: badges.join(' · '),
+				// ⚠️ 封面是**视频封面**（这里指收藏夹自己的封面图）
+				coverUrl: folder.cover ?? null,
+				badges: folder.isPrivate ? ['私密'] : [],
+				testid: `favorite-${folder.mediaId}`,
+				onClick: () => void openFolder(folder),
+			})
+			card.dataset.mediaId = String(folder.mediaId)
 
+			/*
+			 * 卡片右下角两个动作。
+			 * ⚠️ testid 保留 `favorite-preview-*`（旧的"预览"按钮）——
+			 * 巡检与登录探针按它找"这张卡有没有进得去的入口"，
+			 * 换了名字就会变成"点不到"（这个仓库反复踩过）。
+			 * 文案改成「查看」：行为从"展开"变成"进列表"，说清楚更好。
+			 */
 			const actions = document.createElement('div')
-			actions.className = 'favorite-list__actions'
+			actions.className = 'media-card__actions'
 
 			const preview = document.createElement('button')
+			preview.className = 'icon-button icon-only'
 			preview.dataset.testid = `favorite-preview-${folder.mediaId}`
-			preview.textContent = '预览'
-			preview.addEventListener(
-				'click',
-				() => void togglePreview(folder, item, preview),
+			preview.title = '查看里面的视频'
+			preview.setAttribute('aria-label', '查看里面的视频')
+			preview.innerHTML = window.bbComponents.iconHtml(
+				'chevron_right',
+				'icon--md',
 			)
+			preview.addEventListener('click', (event) => {
+				// 不要让单击冒泡到卡片（那是"进列表"，与这里重复）
+				event.stopPropagation()
+				void openFolder(folder)
+			})
 			actions.appendChild(preview)
 
 			const sync = document.createElement('button')
+			sync.className = 'icon-button icon-only'
 			sync.dataset.testid = `favorite-sync-${folder.mediaId}`
-			sync.textContent = '导入为歌单'
-			sync.addEventListener('click', () => void syncFolder(folder, sync))
+			sync.title = '导入为歌单'
+			sync.setAttribute('aria-label', '导入为歌单')
+			sync.innerHTML = window.bbComponents.iconHtml('playlist_add', 'icon--md')
+			sync.addEventListener('click', (event) => {
+				event.stopPropagation()
+				void syncFolder(folder, sync)
+			})
 			actions.appendChild(sync)
 
-			item.appendChild(actions)
-
-			// 预览容器（懒加载）
-			const previewBox = document.createElement('div')
-			previewBox.className = 'favorite-list__preview'
-			previewBox.dataset.testid = `favorite-preview-box-${folder.mediaId}`
-			previewBox.hidden = true
-			item.appendChild(previewBox)
-
-			list.appendChild(item)
+			const trailing = card.querySelector('.media-card__trailing')
+			if (trailing) trailing.appendChild(actions)
+			else card.appendChild(actions)
+			grid.appendChild(card)
 		}
 
-		content.appendChild(list)
+		content.appendChild(grid)
 	}
 
-	async function togglePreview(folder, item, button) {
-		const box = item.querySelector('.favorite-list__preview')
-		if (!box) return
-
-		if (!box.hidden) {
-			box.hidden = true
-			button.textContent = '预览'
-			return
-		}
-
-		box.hidden = false
-		button.textContent = '收起'
-
+	/**
+	 * 进一个收藏夹的曲目列表（卡片化阶段 7）。
+	 *
+	 * 复用**歌单详情那一套渲染器**（`renderTrackTable` 的整页形态）——
+	 * 于是行内「⋮」、多选、双击播放、播放全部/加入队列**自动全都有**，
+	 * 与「音乐库 › 某个歌单」完全一致。
+	 *
+	 * ⚠️ 与旧实现的关键差别：不再往卡片**里面**塞一张内嵌表。
+	 * 旧做法的代价是"同一屏里两种密度的列表"，而且卡里的表宽度只有几百像素。
+	 */
+	async function openFolder(folder) {
+		setStatus(`正在读取「${folder.title}」…`, 'busy')
 		let items = resourceCache.get(folder.mediaId)
 		if (!items) {
-			box.textContent = '加载中…'
 			try {
 				items = unwrap(
 					await window.bbplayer.favoriteResources(folder.mediaId),
@@ -238,43 +255,38 @@
 				)
 				resourceCache.set(folder.mediaId, items)
 			} catch (error) {
-				box.textContent = error.message
+				setStatus(error.message, 'bad')
 				return
 			}
 		}
-
-		box.textContent = ''
-		/*
-		 * ⚠️ 这里原来**自己手搓了第二张 `track-table`**（只有 序号/标题/作者/时长
-		 * 四列，连点击处理都没有）—— 于是收藏夹的展开预览
-		 * **不能播放、没有「⋮」、不能多选批量添加到歌单**。
-		 * 用户的原话：「没有和正式歌单一样的操作按钮，同时也无法多选添加进入歌单」。
-		 *
-		 * 现在改为 `bbLibrary.renderTrackTable(..., { into })` —— 就是整页那张表
-		 * 的**同一个渲染器**（内嵌形态）。于是行内动作、多选、双击播放、
-		 * 播放全部/加入队列**自动全都有**，以后新增行能力两处一起生效。
-		 *
-		 * ⚠️ 同时**去掉了"只取前 50 条"的限制**（用户明确要求全量渲染）：
-		 * 几百条的收藏夹展开时会多渲染一会儿，但"看得全"比"展开快"重要 ——
-		 * 想看全部却只给 50 条、还得去别处导入才能看全，那才是真的难受。
-		 * 真遇到超大收藏夹卡顿的话，再考虑"加载更多"，而不是先砍条数。
-		 */
 		if (items.length === 0) {
-			box.appendChild(
-				window.bbComponents.empty({
-					testid: 'favorite-preview-empty',
-					iconName: 'video_library',
-					title: '没有可播放的条目',
-					hint: '可能全是已失效视频。',
-				}),
-			)
+			setStatus('这个收藏夹里没有可播放的条目（可能全是已失效视频）', 'idle')
 			return
 		}
-
-		window.bbLibrary.renderTrackTable(items, {
-			into: box,
-			tableTestid: `favorite-table-${folder.mediaId}`,
+		/*
+		 * ⚠️ 必须把 `view` 标成 `favorites`、并清掉 `selectedPlaylistId`。
+		 *
+		 * 曲目列表渲染器按 `view === 'playlist'` 决定"要不要建歌单页头卡"。
+		 * 从收藏夹进来时 `view` 还停在上一次打开的 `'playlist'` ——
+		 * 于是页头会去建**上一个歌单**的封面/首数，返回按钮指向歌单列表
+		 * （实测症状：`playlist-head` 在、`favorites-back` 不在）。
+		 */
+		window.bbState.set({
+			view: 'favorites',
+			selectedPlaylistId: null,
+			tracks: items,
+			title: folder.title,
 		})
+		/*
+		 * ⚠️ **全量**交给渲染器（用户明确要求过全量渲染）：
+		 * 不再有"只取前 50 条"这种截断。
+		 */
+		window.bbLibrary.renderTrackTable(items, {
+			title: folder.title,
+			// 从收藏夹进来，返回要回收藏夹而不是歌单列表
+			backTo: 'favorites',
+		})
+		setStatus(`已加载 ${items.length} 首`, 'ok')
 	}
 
 	async function syncFolder(folder, button) {

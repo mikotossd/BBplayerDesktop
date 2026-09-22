@@ -509,15 +509,60 @@ body {
  * —— 两边由同一个值决定，所以**左边缘天然对齐**（探针断言的就是这件事）。
  * 给中栏加 padding 会让两者正好差一个 padding 的宽度（实测差 16px）。
  */
+/*
+ * 中栏 = **flex 纵向**：\`.main-stack\`（页面内容，唯一会滚的一层）
+ * + 播放卡（固定在底部）。
+ *
+ * ⚠️⚠️ 这里原本是 CSS **网格**，改了四次都没摆对，最后换成 flex。
+ * 前三次的教训值得留着（都属于"看着对、量出来不对"）：
+ *   1. 模板只写 2 行（minmax(0,1fr) auto）而直接子元素有 5 个 ——
+ *      顶栏落到 1fr（吃掉整屏）。
+ *   2. 补成 4 行、逐条钉行号 —— 但**行号按"显式网格"算**，而 auto 放置的
+ *      元素会各自新增一行（实测 7 行），于是 grid-row: 3 指的是页签条、
+ *      播放卡被塞进页面标题那一行（实测 y=220，而内容区 y=418）。
+ *      换成 grid-row: -2（从末尾数）也不行：负行号同样不计隐式行。
+ *   3. 给页面元素全部写 grid-row: 1 想"同一格里按序堆叠" ——
+ *      **网格项不会那样堆**：同一格里的项会**重叠**在格子起点，
+ *      于是搜索框压在列表上、列表溢到播放卡下面（截图里一眼可见）。
+ *
+ * 换 flex 之后这些都不存在：普通流就是"该多高就多高、按顺序往下推"。
+ * 网格只留 \`.app\` 那一层（左栏 / 中栏 / 右栏）。
+ */
 .main {
 	grid-area: main;
-	display: grid;
-	grid-template-rows: minmax(0, 1fr) auto;
+	display: flex;
+	flex-direction: column;
 	min-height: 0;
 	min-width: 0;
 	padding: var(--sp-xs) 0 0;
 }
 
+/*
+ * 页面内容：**唯一**会滚的那一层（\`flex: 1 1 auto\` + \`overflow-y: auto\`）。
+ *
+ * ⚠️ 顶栏与浮层不在这一层里：
+ *   * 顶栏是常驻控件，不该被滚动带走；
+ *   * 浮层锚在 \`.main\` 底部（绝对定位），放进滚动容器会让定位基准
+ *     变成滚动内容。
+ *
+ * ⚠️ 为什么要包一层而不是让子元素直接排在 \`.main\` 里：
+ * \`#content\` / \`#view-share\` / \`#view-settings\` / \`#view-nowplaying\`
+ * 是**互斥视图**，各自定高会让隐藏的那些也占位（屏幕上一大片空白）；
+ * 用一层 flex 容器，它们按 \`hidden\` 只占可见那一个的高度。
+ */
+.main-stack {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	min-width: 0;
+	overflow-y: auto;
+}
+
+/* 播放卡：不参与压缩，永远贴在窗口底部 */
+.main > .playbar {
+	flex: none;
+}
 .rightbar {
 	/*
 	 * ⚠️ `grid-template-areas` 里已经没有右栏了，所以必须**显式钉列**。

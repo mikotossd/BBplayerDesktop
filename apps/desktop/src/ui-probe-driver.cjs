@@ -999,6 +999,27 @@ async function run(window) {
 					 */
 					playbarLeft: Math.round(playbar?.left ?? 0),
 					contentLeft: content ? Math.round(content.left) : null,
+					contentHidden: document.querySelector('.content')?.hidden ?? null,
+					contentDisplay: getComputedStyle(
+						document.querySelector('.content'),
+					).display,
+					contentRect: content
+						? [
+								Math.round(content.top),
+								Math.round(content.bottom),
+								Math.round(content.width),
+							]
+						: null,
+					playbarRect: playbar
+						? [Math.round(playbar.top), Math.round(playbar.bottom)]
+						: null,
+					mainRows: getComputedStyle(document.querySelector('.main'))
+						.gridTemplateRows,
+					playbarRowStart: getComputedStyle(
+						document.querySelector('.playbar'),
+					).gridRowStart,
+					playbarParent: document.querySelector('.playbar')?.parentElement
+						?.className,
 					// 内容底边与播放条顶边的关系：内容不该压到播放条上
 					overlapPx: content && playbar
 						? Math.round(content.bottom - playbar.top)
@@ -1042,7 +1063,10 @@ async function run(window) {
 	check(
 		'内容区不压到播放条上（缺陷 1）',
 		shell.overlapPx !== null && shell.overlapPx <= 2,
-		`内容底边 - 播放条顶边 = ${shell.overlapPx}px（≤2 视为不重叠）`,
+		`内容底边 - 播放条顶边 = ${shell.overlapPx}px（≤2 视为不重叠）；` +
+			`内容 hidden=${shell.contentHidden} rect=${shell.contentRect} ` +
+			`播放条 rect=${shell.playbarRect} row=${shell.playbarRowStart} ` +
+			`父=${shell.playbarParent} 模板=${shell.mainRows}`,
 	)
 
 	// ---------------------------------------------------------------
@@ -2535,7 +2559,19 @@ async function run(window) {
 					),
 					panelCount: panels.length,
 					outsidePanels: outside,
-					viewParent: view?.parentElement?.tagName?.toLowerCase() ?? null,
+					/*
+					 * ⚠️ 判据是"在 .main **里面**"，不是"直接父元素是 main"。
+					 * 卡片化阶段 7 给中栏加了一层 .main-stack（页面内容的
+					 * 普通流容器），于是直接父元素变成那个 div ——
+					 * 这条断言原本写的是 parentElement === main，
+					 * 加一层包裹就红了，而它想验的"没跑到 body 下"完全没问题。
+					 * 所以往上找最近的 .main 祖先。
+					 *
+					 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
+					 */
+					viewParent:
+						view?.closest('.main')?.getAttribute('data-testid') ?? null,
+					viewDirectParent: view?.parentElement?.className ?? null,
 				})
 			})()`,
 		),
@@ -2579,7 +2615,7 @@ async function run(window) {
 	check(
 		'设置页在 .main 里（跑到 body 下就会画在屏幕外）',
 		settingsNesting.viewInsideMain && settingsNesting.viewParent === 'main',
-		`父元素=${settingsNesting.viewParent}`,
+		`最近的 .main 祖先=${settingsNesting.viewParent}，直接父=${settingsNesting.viewDirectParent}`,
 	)
 	check(
 		'10 个分类面板都在 #settings-panels 里（一个都不能被解析器挪走）',
@@ -3954,7 +3990,90 @@ async function run(window) {
 			: `歌词面板不可用：${JSON.stringify(lyricsFollow)}`,
 	)
 
-	// 快捷键注册表快照（便于人工核对冲突）
+	// ---------------------------------------------------------------
+	// 13. 中栏的纵向排列
+	// ---------------------------------------------------------------
+	//
+	// ⚠️ 这一条是补的，因为踩了一整轮很安静的坑：中栏原来是 CSS **网格**，
+	// 而"直接子元素有几个"一直变（顶栏 / 搜索行 / 标题 / 页签条 / 工具条 /
+	// 内容区 / 三个互斥视图 / 播放卡）—— 网格自动布局不会报错，只会安静地
+	// 把元素摆错地方（顶栏吃掉整屏、播放卡跑到页面标题那一行、
+	// 列表溢到播放卡下面）。现在中栏是 **flex 纵向**，判据跟着改成：
+	//   * 顶栏在最上面、播放卡在最下面，两者之间是 `.main-stack`；
+	//   * `.main-stack` 是**唯一**会滚的那一层（顶栏与播放卡不该被滚走）；
+	//   * 不含互斥视图之外的"孤儿"（跑到 `.main` 外面的元素会画在屏幕外）。
+	console.log('\n[ui] 13) 中栏的纵向排列')
+	const layout = JSON.parse(
+		await evaluate(
+			window,
+			`(() => {
+				const main = document.querySelector('[data-testid="main"]')
+				const box = (sel) => {
+					const el = document.querySelector(sel)
+					if (!el) return null
+					const r = el.getBoundingClientRect()
+					return {
+						top: Math.round(r.top),
+						bottom: Math.round(r.bottom),
+						overflow: getComputedStyle(el).overflowY,
+						flex: getComputedStyle(el).flex,
+					}
+				}
+				const topbar = box('.topbar')
+				const stack = box('.main-stack')
+				const playbar = box('.playbar')
+				// 五个"页面级容器"必须在 .main 里（跑到 body 下会画到屏幕外）
+				const orphans = [
+					'#content',
+					'#view-share',
+					'#view-settings',
+					'#view-nowplaying',
+					'.home-strip',
+				]
+					.map((sel) => document.querySelector(sel))
+					.filter((el) => el && !main?.contains(el))
+					.map((el) => el.id || el.className)
+				return JSON.stringify({
+					layout: getComputedStyle(main).display,
+					topbar,
+					stack,
+					playbar,
+					orphans,
+					// 播放卡必须真的在最底下（顶边在 stack 底边之下）
+					orderOk: Boolean(
+						topbar && stack && playbar &&
+							topbar.top <= stack.top &&
+							stack.bottom <= playbar.top + 2,
+					),
+				})
+			})()`,
+		),
+	)
+	check(
+		'中栏是纵向排列：顶栏在上、内容居中、播放卡在下（不重叠）',
+		layout.layout === 'flex' && layout.orderOk,
+		JSON.stringify({
+			display: layout.layout,
+			topbar: layout.topbar?.top,
+			stack: [layout.stack?.top, layout.stack?.bottom],
+			playbar: layout.playbar?.top,
+		}),
+	)
+	check(
+		'只有 .main-stack 会滚（顶栏与播放卡不该被滚走）',
+		layout.stack?.overflow === 'auto' &&
+			layout.topbar?.overflow !== 'auto' &&
+			layout.playbar?.overflow !== 'auto',
+		`topbar=${layout.topbar?.overflow} stack=${layout.stack?.overflow} playbar=${layout.playbar?.overflow}`,
+	)
+	check(
+		'页面级容器都在 .main 里（跑到 body 下会画到屏幕外）',
+		layout.orphans.length === 0,
+		layout.orphans.length === 0
+			? '五个容器都在'
+			: `跑到外面：${layout.orphans.join('、')}`,
+	)
+
 	const keyList = JSON.parse(
 		await evaluate(window, 'JSON.stringify(window.bbUI.keys())'),
 	)
@@ -4324,7 +4443,10 @@ async function run(window) {
 			await evaluate(
 				window,
 				`(() => JSON.stringify({
-					items: document.querySelectorAll('.favorite-list__item').length,
+					// ⚠️ 卡片化阶段 7：收藏夹从"一行一个（.favorite-list__item）"
+					// 改成**卡片**（.media-card，与音乐库的歌单卡同一张）。
+					// 判据仍然是"数出几张"，只是长相换了。
+					items: document.querySelectorAll('[data-media-id]').length,
 					status: document.getElementById('favorite-status')?.textContent?.trim() ?? '',
 					meta: document.querySelector('[data-testid="favorites-meta"]')?.textContent ?? '',
 					hasRefresh: Boolean(document.querySelector('[data-testid="favorites-refresh"]')),
@@ -4466,45 +4588,78 @@ async function run(window) {
 		return { ok: true, data: fakeEntries }
 	})
 
+	/*
+	 * ── 卡片化阶段 7：收藏夹改成**卡片 + 点进去看列表** ──────────
+	 *
+	 * 用户确认过两条：
+	 *   1. **收藏夹卡只显示 N 个视频**（不要在卡里塞预览列表）；
+	 *   2. 与「音乐库 › 播放列表」的卡是同一张。
+	 *
+	 * 所以这一段从"在卡里展开一张内嵌表"改成"点进去，整页显示曲目行"。
+	 * 判据本身没变（还是那三件事）：用的是同一个渲染器（有「⋮」/ 多选 /
+	 * 播放全部）、**全量渲染**（60 条不砍到 50）、双击能播。
+	 */
 	await click(window, '[data-testid="favorite-preview-9001"]')
 	await sleep(1800)
 	const preview = JSON.parse(
 		await evaluate(
 			window,
 			`(() => {
-				const box = document.querySelector('[data-testid="favorite-preview-box-9001"]')
-				const table = box?.querySelector('[data-testid="favorite-table-9001"]')
+				const list = document.querySelector('[data-testid="track-table"]')
 				return JSON.stringify({
-					rows: table ? table.querySelectorAll('tbody tr').length : 0,
-					hasActionsCol: Boolean(table?.querySelector('th.col-actions')),
-					moreButtons: table ? table.querySelectorAll('.track-action').length : 0,
-					hasSelectMode: Boolean(box?.querySelector('[data-testid="btn-select-mode"]')),
-					hasPlayAll: Boolean(box?.querySelector('[data-testid="btn-play-all"]')),
-					hasIndex: Boolean(table?.querySelector('td.col-index')),
+					// 整页列表：紧凑行（阶段 6 之后曲目列表就是行）
+					rows: list ? list.querySelectorAll('.song-row').length : 0,
+					moreButtons: list ? list.querySelectorAll('.track-action').length : 0,
+					hasSelectMode: Boolean(document.querySelector('[data-testid="btn-select-mode"]')),
+					hasPlayAll: Boolean(document.querySelector('[data-testid="btn-play-all"]')),
+					// 从收藏夹进来要有**回收藏夹**的路
+					hasBack: Boolean(document.querySelector('[data-testid="favorites-back"]')),
+					/*
+					 * ⚠️ 顺带钉住"这一页不是歌单详情"：从收藏夹进来时
+					 * view 必须是 favorites —— 否则渲染器会去建歌单页头卡、
+					 * 显示上一个歌单的封面与首数（实测踩过）。
+					 *
+					 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
+					 */
+					view: window.bbState.get().view,
+					hasPlHead: Boolean(document.querySelector('[data-testid="playlist-head"]')),
+					// 卡里**不该**再有内嵌预览容器（用户要求卡上只显示 N 个）
+					embeddedPreview: document.querySelectorAll(
+						'[data-testid^="favorite-preview-box-"]',
+					).length,
 				})
 			})()`,
 		),
 	)
 	check(
-		'收藏夹预览复用了正式歌单的渲染器（有「⋮」列 / 多选 / 播放全部）',
-		preview.hasActionsCol &&
+		'收藏夹点进去复用正式歌单的渲染器（「⋮」/ 多选 / 播放全部 / 返回收藏夹）',
+		preview.rows > 0 &&
 			preview.moreButtons === preview.rows &&
 			preview.hasSelectMode &&
-			preview.hasPlayAll,
+			preview.hasPlayAll &&
+			preview.hasBack &&
+			// 不能是歌单详情的页头卡（那是"从歌单进来"的长相）
+			preview.view === 'favorites' &&
+			preview.hasPlHead === false,
 		JSON.stringify(preview),
 	)
 	check(
-		'收藏夹预览**全量渲染**（桩了 60 条，不再被砍到 50）',
+		'收藏夹卡上**没有**内嵌预览列表（用户要求卡只显示 N 个视频）',
+		preview.embeddedPreview === 0,
+		`内嵌预览容器 ${preview.embeddedPreview} 个`,
+	)
+	check(
+		'收藏夹列表**全量渲染**（桩了 60 条，不再被砍到 50）',
 		preview.rows === 60 && resourceCalls === 1,
 		`渲染 ${preview.rows} 行 / 请求 ${resourceCalls} 次`,
 	)
 
-	// 双击预览里的行 —— 修之前这一屏**根本不能播**
+	// 双击列表里的行 —— 修之前这一屏**根本不能播**
 	const playFromPreview = JSON.parse(
 		await evaluate(
 			window,
 			`(async () => {
-				const row = document.querySelector('[data-testid="favorite-table-9001"] tbody tr')
+				const row = document.querySelector('[data-testid="track-table"] .song-row')
 				if (!row) return JSON.stringify({ clicked: false })
 				row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
 				await new Promise((r) => setTimeout(r, 1500))
@@ -4518,11 +4673,29 @@ async function run(window) {
 		),
 	)
 	check(
-		'预览里的曲目能直接双击播放（队列与当前曲目都变了）',
+		'收藏夹列表里的曲目能直接双击播放（队列与当前曲目都变了）',
 		playFromPreview.clicked &&
 			playFromPreview.queueLength === 60 &&
 			playFromPreview.currentTitle === '探针曲目 1',
 		JSON.stringify(playFromPreview),
+	)
+
+	// 「← 收藏夹」要真的回得去（桌面端没有导航栈，这条回路经常漏）
+	await click(window, '[data-testid="favorites-back"]')
+	await sleep(900)
+	const backToFavorites = JSON.parse(
+		await evaluate(
+			window,
+			`(() => JSON.stringify({
+				cards: document.querySelectorAll('[data-media-id]').length,
+				hasRefresh: Boolean(document.querySelector('[data-testid="favorites-refresh"]')),
+			}))()`,
+		),
+	)
+	check(
+		'收藏夹的「← 收藏夹」真的回得去（卡片还在）',
+		backToFavorites.cards === 3 && backToFavorites.hasRefresh,
+		JSON.stringify(backToFavorites),
 	)
 
 	// ---------------------------------------------------------------

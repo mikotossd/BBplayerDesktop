@@ -866,7 +866,13 @@
 
 	function renderTrackCards(
 		tracks,
-		{ title, query, tableTestid = 'track-table', layout = 'rows' } = {},
+		{
+			title,
+			query,
+			tableTestid = 'track-table',
+			layout = 'rows',
+			backTo = null,
+		} = {},
 	) {
 		clear(els.content)
 		// 换了列表就把多选清掉 —— 否则在 A 歌单选中的曲子会"跟到" B 歌单
@@ -881,12 +887,27 @@
 		const useHead = isPlaylist && layout !== 'cards'
 
 		/*
+		 * 「回去」的那条路（卡片化阶段 7）。
+		 *
+		 * ⚠️ 桌面端没有导航栈，所以每条入口都要**自己**给出回路 ——
+		 * 缺了它用户进了列表就出不去（这个仓库里反复出现过的一类问题）。
+		 * `backTo` 让调用方声明"从哪来"：收藏夹进来就回收藏夹，
+		 * 歌单进来就回播放列表。
+		 */
+		const backSpec =
+			backTo === 'favorites'
+				? { label: '收藏夹', testid: 'favorites-back', to: 'favorites' }
+				: isPlaylist
+					? { label: '播放列表', testid: 'playlist-back', to: 'playlists' }
+					: null
+
+		/*
 		 * 歌单详情按草图「③ 歌单页面」用一张**页头卡**代替普通的
 		 * `.view-head`：封面在左、标题/作者/首数/总时长在右。
 		 *
 		 * ⚠️ 两者**不能同时出现** —— 那就成了两行标题（同一张歌单名
 		 * 上下各写一遍）。所以歌单详情走 `buildPlaylistHead`，
-		 * 搜索结果 / 内嵌预览仍然走 `.view-head`。
+		 * 搜索结果 / 收藏夹列表仍然走 `.view-head`。
 		 */
 		if (useHead) {
 			els.content.appendChild(buildPlaylistHead(tracks, title, removal))
@@ -896,14 +917,18 @@
 			const lead = document.createElement('div')
 			lead.className = 'view-head__lead'
 
-			// 歌单详情是从「播放列表」卡片进来的，所以要有一条**明确的回路**。
-			// 安卓端这是路由自带的返回；桌面端没有导航栈，得自己给。
-			if (isPlaylist) {
+			if (backSpec) {
 				const back = document.createElement('button')
 				back.className = 'text-button view-head__back'
-				back.dataset.testid = 'playlist-back'
-				back.innerHTML = `${window.bbComponents.iconHtml('arrow_back', 'icon--sm')} 播放列表`
-				back.addEventListener('click', () => void showPlaylistsTab())
+				back.dataset.testid = backSpec.testid
+				back.innerHTML = `${window.bbComponents.iconHtml('arrow_back', 'icon--sm')} ${backSpec.label}`
+				back.addEventListener('click', () => {
+					if (backSpec.to === 'favorites') {
+						window.bbUI?.setLibraryTab?.('favorites')
+					} else {
+						void showPlaylistsTab()
+					}
+				})
 				lead.appendChild(back)
 			}
 
@@ -1212,10 +1237,17 @@
 	 * @param {string} [options.query] 搜索关键词（决定空状态文案）
 	 * @param {HTMLElement|null} [options.into] 内嵌形态的目标容器
 	 * @param {string} [options.tableTestid] 表格的 testid（探针按它定位）
+	 * @param {'favorites'|null} [options.backTo] 从哪来（决定页头那条回路）
 	 */
 	function renderTrackTable(
 		tracks,
-		{ title, query, into = null, tableTestid = 'track-table' } = {},
+		{
+			title,
+			query,
+			into = null,
+			tableTestid = 'track-table',
+			backTo = null,
+		} = {},
 	) {
 		/*
 		 * ⚠️ **整页曲目列表 = 卡片网格**（用户明确要求）。
@@ -1229,7 +1261,7 @@
 		 * 里的一个嵌层，宽度只有几百像素，卡片会退化成小方块。
 		 */
 		if (!into) {
-			renderTrackCards(tracks, { title, query, tableTestid })
+			renderTrackCards(tracks, { title, query, tableTestid, backTo })
 			return
 		}
 

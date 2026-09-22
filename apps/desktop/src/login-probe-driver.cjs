@@ -430,13 +430,17 @@ async function run(window) {
 
 	const folders = await waitFor(
 		window,
+		// ⚠️ 卡片化阶段 7：收藏夹从"一行一个（.favorite-list__item）"
+		// 改成**卡片**（[data-media-id]，与音乐库的歌单卡同一张）。
+		// 这类"按长相找元素"的等待条件在改版时会**永远不满足**，
+		// 表现为整套挂到超时 —— 所以改版时必须一起改。
 		`(() => {
-			const items = document.querySelectorAll('.favorite-list__item')
+			const items = document.querySelectorAll('[data-media-id]')
 			if (items.length === 0) return false
 			return {
 				ok: true,
 				count: items.length,
-				first: items[0].querySelector('.favorite-list__title')?.textContent ?? '',
+				first: items[0].querySelector('.media-card__title')?.textContent ?? '',
 			}
 		})()`,
 		45_000,
@@ -451,35 +455,36 @@ async function run(window) {
 	)
 	await shot(window, 'login-07-favorites-list')
 
-	// ---------- 11. 预览 ----------
+	// ---------- 11. 进收藏夹看列表 ----------
 	if (folders.ok) {
 		const firstMediaId = await evaluate(
 			window,
-			`document.querySelector('.favorite-list__item')?.dataset.mediaId ?? null`,
+			`document.querySelector('[data-media-id]')?.dataset.mediaId ?? null`,
 		)
 		await click(window, `[data-testid="favorite-preview-${firstMediaId}"]`)
 		const preview = await waitFor(
 			window,
+			// ⚠️ 卡片化阶段 7：不再往卡里塞内嵌表，而是**整页**显示曲目行
+			// （与歌单详情同一条路径）。
 			`(() => {
-				const table = document.querySelector('[data-testid="favorite-table-${firstMediaId}"]')
-				if (!table) return false
-				return { ok: true, rows: table.querySelectorAll('tbody tr').length }
+				const list = document.querySelector('[data-testid="track-table"]')
+				if (!list) return false
+				return { ok: true, rows: list.querySelectorAll('.song-row').length }
 			})()`,
 			45_000,
 			'preview',
 		)
 		check(
-			'收藏夹预览渲染出曲目表',
+			'收藏夹点进去渲染出曲目列表',
 			preview.ok && preview.value.rows > 0,
 			preview.ok ? `${preview.value.rows} 行` : JSON.stringify(preview.value),
 		)
 		/*
-		 * 「作者」列不能整列都是「—」。
+		 * 「作者」不能整列都是「—」。
 		 *
-		 * 这一列曾经**永远是「—」**：`library.js` 的曲目表只认
-		 * `track.artist` / `track.artist_name`，而收藏夹预览喂进来的对象
-		 * 带的是接口的 **`upperName`**（`bilibili-api.cjs:405` 从
-		 * `media.upper.name` 映射）。两套渲染器认两套字段名。
+		 * 这一列曾经**永远是「—」**：渲染器只认 `track.artist` /
+		 * `track.artist_name`，而收藏夹喂进来的对象带的是接口的
+		 * **`upperName`**（`bilibili-api.cjs:405` 从 `media.upper.name` 映射）。
 		 *
 		 * 用真实接口验证过：`/x/v3/fav/resource/list` 的 media **10/10 条**
 		 * 都带 `upper`，所以不是接口的问题。
@@ -492,7 +497,9 @@ async function run(window) {
 				window,
 				`(() => {
 					const cells = [
-						...document.querySelectorAll('[data-testid^="favorite-table-"] td.col-artist'),
+						...document.querySelectorAll(
+							'[data-testid="track-table"] .song-row__artist',
+						),
 					]
 					const texts = cells.map((c) => (c.textContent ?? '').trim())
 					const named = texts.filter((t) => t && t !== '—')
@@ -506,7 +513,7 @@ async function run(window) {
 			),
 		)
 		check(
-			'收藏夹预览的「作者」列真的读到了作者（不是整列「—」）',
+			'收藏夹列表的歌手真的读到了作者（不是整列「—」）',
 			artistColumn.total > 0 && !artistColumn.allDash,
 			`${artistColumn.named}/${artistColumn.total} 行有作者` +
 				(artistColumn.sample.length > 0
@@ -514,6 +521,10 @@ async function run(window) {
 					: ''),
 		)
 		await shot(window, 'login-08-favorites-preview')
+
+		// ⚠️ 看完要回收藏夹，才能拍到/点到卡片上的「导入为歌单」
+		await click(window, '[data-testid="favorites-back"]')
+		await sleep(800)
 
 		// ---------- 12. 导入为歌单（增量幂等）----------
 		await click(window, `[data-testid="favorite-sync-${firstMediaId}"]`)
@@ -545,7 +556,8 @@ async function run(window) {
 		await click(window, '[data-testid="lib-tab-favorites"]')
 		const relisted = await waitFor(
 			window,
-			`document.querySelectorAll('.favorite-list__item').length > 0`,
+			// ⚠️ 卡片化阶段 7：收藏夹是卡片（`[data-media-id]`）
+			`document.querySelectorAll('[data-media-id]').length > 0`,
 			45_000,
 			'relist',
 		)
