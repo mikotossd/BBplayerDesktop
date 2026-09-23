@@ -329,12 +329,20 @@ async function run(window) {
 		evaluate(
 			window,
 			`(() => {
-				const topbar = document.querySelector('.topbar')
-				const s = topbar ? getComputedStyle(topbar) : null
+				/*
+				 * ⚠️ 判据从「顶栏」改成「弹窗」（卡片化收尾删掉了顶栏）：
+				 * .modal.material 现在是全应用**仅剩**的 material 表面。
+				 * 它平时是 hidden，但 getComputedStyle 对隐藏元素照样返回
+				 * 计算值，所以不必真的把登录弹窗打开。
+				 *
+				 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
+				 */
+				const surface = document.querySelector('.modal.material')
+				const s = surface ? getComputedStyle(surface) : null
 				return {
 					dataset: document.documentElement.dataset.material ?? null,
 					backdrop: s ? (s.backdropFilter || s.webkitBackdropFilter) : null,
-					topbarBg: s ? s.backgroundColor : null,
+					surfaceBg: s ? s.backgroundColor : null,
 					described: window.bbTheme?.describe?.() ?? null,
 				}
 			})()`,
@@ -348,25 +356,25 @@ async function run(window) {
 		`data-material=${materialDefault.dataset}，主进程说=${materialDefault.described?.materialLevel}`,
 	)
 	check(
-		'默认档位下顶栏真的有 backdrop-filter（不是只改了个属性）',
+		'默认档位下弹窗真的有 backdrop-filter（不是只改了个属性）',
 		/blur\(/.test(String(materialDefault.backdrop)),
 		String(materialDefault.backdrop),
 	)
 	check(
-		'默认档位下顶栏是半透明的（否则模糊没有东西可透）',
+		'默认档位下弹窗是半透明的（否则模糊没有东西可透）',
 		// ⚠️ 不能断言字符串长什么样：Chromium 对 `color-mix()` 的结果返回的是
 		// `color(srgb 0.10 0.10 0.12 / 0.78)`，而不是 `rgba(...)`。
 		// 第一版按 `rgba(` 前缀匹配，于是**行为正确却判失败**。
 		// 这里改成解析 alpha：`color(... / a)` 与 `rgba(..., a)` 都要认。
 		(() => {
-			const value = String(materialDefault.topbarBg)
+			const value = String(materialDefault.surfaceBg)
 			const slash = value.match(/\/\s*([\d.]+)\s*\)/)
 			if (slash) return Number(slash[1]) < 1
 			const rgba = value.match(/^rgba\([^)]*,\s*([\d.]+)\s*\)$/)
 			if (rgba) return Number(rgba[1]) < 1
 			return false // 纯 rgb(...) = 不透明
 		})(),
-		String(materialDefault.topbarBg),
+		String(materialDefault.surfaceBg),
 	)
 
 	await click(window, '[data-testid="material-none"]')

@@ -535,15 +535,34 @@
 	margin-bottom: 0;
 }
 
+/*
+ * 区块的**标题行**：标题在左，右侧是说明 / 汇总 / 动作。
+ *
+ * ⚠️ 卡片化收尾把「说明」从标题**下面**的一行灰字挪到了标题**右边** ——
+ * 主页按原型（`prototype/pages/home.html`）重做之后就是一行一个区块头：
+ * 标题 + 推开 + 右侧说明。说明另起一行会白占一整行，四块就是四行废话。
+ */
+.home-section__head {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-sm);
+	margin-bottom: var(--sp-sm);
+	min-height: 28px;
+}
+
 .home-section__title {
-	margin: 0 0 var(--sp-sm);
+	margin: 0;
 	font-size: var(--fs-title-medium);
 	font-weight: 600;
 	color: var(--on-surface);
 }
 
-.home-section__hint {
-	margin: calc(-1 * var(--sp-xs)) 0 var(--sp-sm);
+/* 把标题后面的东西顶到右端 */
+.home-section__spacer {
+	flex: 1 1 auto;
+}
+
+.home-section__meta {
 	font-size: var(--fs-body-small);
 	color: var(--on-surface-variant);
 }
@@ -801,64 +820,70 @@
 	margin-top: var(--sp-sm);
 }
 
-/* 快捷入口：三张卡横排（安卓端是横向滚动，桌面端放得下就不滚） */
-.home-quick {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-	gap: var(--sp-sm);
+/*
+ * 没有「⋮」的歌曲行（主页的播放历史就是这样）。
+ *
+ * ⚠️ 不写这一条的话，`.song-row` 的最后一列仍然占着 28px ——
+ * 行右侧会空出一条无意义的缝，看起来像"少画了一个按钮"。
+ */
+.song-row--no-more {
+	/* 播放钮 / 序号 / 封面 / 标题 / 歌手 / 那一格 */
+	grid-template-columns: 28px 28px 40px minmax(0, 1fr) 190px 96px;
 }
 
 /*
- * ⚠️ `--fixed`：**固定三列**（卡片化阶段 2 的主页下沿用它）。
+ * 快捷入口：一排**胶囊**（小圆图标 + 文字），放不下就折行。
  *
- * 默认的 `auto-fill minmax(148px, 1fr)` 是"能塞几列塞几列"—— 在下沿那块
- * （宽度只有半屏）它会把三张卡**折成两行**，而那一块的高度是钉住的，
- * 第二行就被裁掉（截图里"我的收藏夹"整张看不见）。
- *
- * 下沿那一块的内容高度必须是**确定的**（否则它会去挤内容卡），
- * 所以这里显式三列：窄了就压窄每一列，不换行。
+ * ⚠️ 原型（`prototype/assets/proto.css` 的 `.quick`）就是这个形状。
+ * 卡片化阶段 2 把它做成了"48px 圆图标 + 文字"的方块卡，还为了塞进
+ * 半屏高的下沿而钉死三列 —— 主页重做之后它回到原型的样子：
+ * 一行放得下就一行，放不下折行，高度由内容决定。
  */
-.home-quick--fixed {
-	grid-template-columns: repeat(3, minmax(0, 1fr));
+.home-quick {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--sp-xs);
 }
 
 .home-quick__card {
 	display: flex;
-	flex-direction: column;
 	align-items: center;
-	justify-content: center;
 	gap: var(--sp-xs);
-	padding: var(--sp-md) var(--sp-sm);
-	background: var(--surface-container-high);
-	border: none;
-	border-radius: var(--r-md);
+	height: 36px;
+	padding: 0 var(--sp-sm) 0 var(--sp-xs);
+	border: 1px solid var(--outline-variant);
+	border-radius: var(--r-full);
+	background: var(--surface-2);
 	color: var(--on-surface);
 	font: inherit;
 	cursor: pointer;
-	transition: background var(--motion-duration-fast) ease;
+	transition:
+		background var(--motion-duration-fast) ease,
+		border-color var(--motion-duration-fast) ease;
 }
 
 .home-quick__card:hover {
-	background: var(--surface-container-highest);
+	background: var(--surface-container-high);
+	border-color: var(--outline);
 }
 
-/* 圆图标位（安卓端 48 的圆里放 32 的图标） */
+/* 小圆图标位（原型里是 22px 的圆，里面放 13px 的字形） */
 .home-quick__icon {
 	display: grid;
 	place-items: center;
-	width: 48px;
-	height: 48px;
+	width: 22px;
+	height: 22px;
 	border-radius: var(--r-full);
+	background: var(--surface-container-highest);
 	color: var(--on-surface-variant);
 }
 
 .home-quick__icon .icon {
-	font-size: 32px;
+	font-size: var(--icon-sm);
 }
 
 .home-quick__label {
-	font-size: var(--fs-label-medium);
-	font-weight: 600;
+	font-size: var(--fs-body-medium);
 }
 
 /* ── 视图页签条 ────────────────────────────────────────── */
@@ -1162,15 +1187,16 @@
  *   右 = 歌词
  *
  * ⚠️ 原来还有**第三栏"播放队列"**。草图（播放详情页那一张）手写
- * 「**放弃原有的三联卡片式**」，所以队列栏删掉了 —— 队列住在右栏
- * （见 `renderer.js` 的 placeQueue），播放详情页不再有第二个入口。
+ * 「**放弃原有的三联卡片式**」，所以队列栏删掉了 —— 队列住在**播放列表浮层**
+ * 里（卡片化收尾又把右栏也删了），播放详情页不再有第二个入口。
  *
  * 视觉对齐**本项目的卡片化语言**（用户要求）：
  *   每一栏都是一张 `surface-container` 卡片，与设置/音乐库的
  *   "功能区卡片"是同一套视觉语言。
  *
  * ## 两件事刻意复用而不是新造
- *   * 歌词 DOM 是**唯一一份**（`placeLyrics` 负责搬运）；
+ *   * 歌词面板是**唯一一份**，而且**常驻**在这张右卡里（卡片化收尾删掉了
+ *     右栏，它不再需要在两个落点之间被搬运）；
  *   * 播放控制的状态来自 `player.js`（与底部播放卡共享 isPlaying / 进度）——
  *     本卡片里的按钮是**同一组动作的第二个触发点**，不是新播放器。
  */

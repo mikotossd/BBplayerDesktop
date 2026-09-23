@@ -181,47 +181,35 @@
 	}
 
 	/**
-	 * 快捷键帮助的开关。
+	 * 快捷键说明（卡片化收尾：从顶栏弹层搬进设置页）。
 	 *
-	 * 说明文字原来是**常驻**在顶栏上的（「快捷键：Space 播放/暂停 · …」）——
-	 * 那是把说明书贴在墙上：看过一遍之后每一屏都还要再看一遍，
-	 * 还占掉了顶栏最值钱的位置。现在收进一个键盘图标按钮，点开才显示。
+	 * ⚠️ 它原来是顶栏上的一颗键盘图标 + 一个绝对定位的弹层。用户圈掉整条
+	 * 顶栏之后，唯一还引用这份说明的地方是「设置 › 通用」，所以它现在
+	 * **就地**渲染在设置页里 —— 元素 id 仍然是 `hint`，语义没变
+	 * （它还是"说明文字"），只是不再需要"打开 / 关闭"这套交互。
 	 *
 	 * 文案取自 `list()`（**实际注册**的快捷键表），而不是手写一份 ——
 	 * 手写的说明会与真实键位漂移（这个仓库已经踩过一次）。
 	 */
-	function wireShortcutHelp() {
-		const openButton = document.getElementById('shortcuts-open')
-		const hint = document.getElementById('hint')
-		if (!openButton || !hint) return
-
-		const entries = list()
-		if (entries.length > 0) {
-			hint.textContent =
-				'快捷键：' +
-				entries
-					.map((entry) => `${entry.combo} ${entry.description}`)
-					.join(' · ')
-		}
-
-		const setOpen = (open) => {
-			hint.hidden = !open
-			openButton.classList.toggle('is-active', open)
-			openButton.setAttribute('aria-expanded', String(open))
-		}
-
-		openButton.addEventListener('click', () => setOpen(hint.hidden))
-		setOpen(false)
-
-		window.bbShortcuts = {
-			open: () => setOpen(true),
-			close: () => setOpen(false),
-			isOpen: () => !hint.hidden,
-			text: () => hint.textContent ?? '',
+	function renderShortcutList() {
+		const host = document.getElementById('hint')
+		if (!host) return
+		host.textContent = ''
+		for (const entry of list()) {
+			const item = document.createElement('li')
+			item.className = 'shortcut-list__item'
+			const combo = document.createElement('kbd')
+			combo.className = 'shortcut-list__combo'
+			combo.textContent = entry.combo
+			const what = document.createElement('span')
+			what.className = 'shortcut-list__desc'
+			what.textContent = entry.description ?? ''
+			item.append(combo, what)
+			host.append(item)
 		}
 	}
 
-	wireShortcutHelp()
+	renderShortcutList()
 
 	window.bbKeys = {
 		register,

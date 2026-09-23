@@ -1390,12 +1390,6 @@
 			})()
 		})
 	document
-		.getElementById('settings-general-shortcuts')
-		?.addEventListener('click', () => {
-			// 快捷键说明住在顶栏的弹层里，这里把它打开给用户看
-			window.bbShortcuts?.open?.()
-		})
-	document
 		.getElementById('settings-lyrics-window')
 		?.addEventListener(
 			'click',

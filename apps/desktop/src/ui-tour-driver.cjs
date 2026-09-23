@@ -558,7 +558,7 @@ async function run(window) {
 	await shot(
 		window,
 		'07-home',
-		'主页（听歌频率 / 快捷入口 / 最近更新 / 播放历史）',
+		'主页（最近播放 | 快捷入口 / 听歌频率 / 最近更新 / 播放历史）',
 	)
 	// 三个子页签都看一眼
 	for (const [tab, name] of [
@@ -573,7 +573,20 @@ async function run(window) {
 	}
 
 	console.log('\n=== 5) 搜索 ===')
-	await click(window, '[data-testid="nav-search"]')
+	/*
+	 * ⚠️ 这里原来点的是顶栏那颗放大镜（`nav-search`）。卡片化收尾把整条
+	 * 顶栏删掉了，搜索入口现在就是**内容卡顶部那个搜索框** ——
+	 * 不点任何东西，直接把焦点给它就行（顺便验一下它在这种"没点过导航"
+	 * 的状态下真的可用）。
+	 */
+	await evaluate(
+		window,
+		`(() => {
+			const input = document.getElementById('search-input')
+			input?.focus()
+			return Boolean(input)
+		})()`,
+	)
 	await sleep(800)
 	await shot(window, '10-search-empty', '搜索（未输入）')
 	await evaluate(
@@ -589,7 +602,7 @@ async function run(window) {
 	await sleep(4000)
 	await shot(window, '11-search-results', '搜索结果')
 
-	console.log('\n=== 6) 右栏（播放队列）===')
+	console.log('\n=== 6) 播放列表浮层===')
 	// 播放一首，让队列有"正在播放"
 	await click(window, '[data-testid="sidebar-card"]')
 	await sleep(800)
@@ -598,30 +611,21 @@ async function run(window) {
 	await sleep(1300)
 	await click(window, '[data-testid="btn-play-all"]')
 	await sleep(2500)
-	await click(window, '[data-testid="rightbar-toggle"]')
-	await sleep(600)
-	await shot(window, '12-rightbar-queue', '右栏 › 播放队列')
 	/*
-	 * ⚠️ 这里原来拍的是 `13-rightbar-lyrics`（右栏 › 歌词）。
-	 * 阶段 D 之后**右栏没有歌词页签了** —— 歌词搬进了「正在播放」页的中栏
-	 * （同一个功能两个入口是用户明确反对的）。
-	 * 所以这一张改成拍"点播放条上那个按钮呼出播放列表"之后的样子：
+	 * 这一张是"点播放条上的队列按钮，播放列表浮层弹出来"的样子 ——
 	 * 也就是用户给的网易云参考图里、他圈出按钮的那张。
-	 * 「队列收起」的那一版在 8b 的 31-nowplaying 里（默认就是收起）。
+	 *
+	 * ⚠️ 它原来会**顺带切到「正在播放」页**（那时队列的主家是右栏）。
+	 * 卡片化收尾删掉右栏之后，浮层是在**当前页**弹出来的，
+	 * 所以这里不再点 `nowplaying-close` 返回 —— 它本来就没离开过音乐库。
 	 */
 	await click(window, '[data-testid="playbar-queue"]')
 	await sleep(900)
-	await shot(window, '13-nowplaying-playlist', '正在播放 › 呼出播放列表')
-	await click(window, '[data-testid="nowplaying-close"]')
-	await sleep(700)
+	await shot(window, '13-playlist-popover', '当前页 › 呼出播放列表（浮层）')
 
 	console.log('\n=== 6b) 多选 ===')
-	// 收起右栏，免得它把中栏挤窄（多选工具条要在一屏里看全）
-	// ⚠️ 右栏里的「歌词」页签已经去掉（歌词搬进播放详情页），
-	// 所以这里**不能再点 `tab-queue` / `tab-lyrics`** —— 那些 testid 不存在，
-	// 点了是"静默落空"（`click` 找不到元素就返回 false）。直接切右栏开关。
-	await click(window, '[data-testid="rightbar-toggle"]')
-	await sleep(600)
+	// ⚠️ 这里原来要先点一下右栏开关把右栏收起来，免得它把中栏挤窄。
+	// 卡片化收尾把右栏整条删掉了，这一步已经不存在。
 	/*
 	 * ⚠️ 从「正在播放」退回来会落到**音乐库的卡片网格**或**上一次的页签**，
 	 * 而多选工具条在**歌单详情**里。所以这里必须
@@ -702,6 +706,31 @@ async function run(window) {
 	await click(window, '[data-testid="sidebar-brand"]')
 	await sleep(2500)
 	await shot(window, '07b-home-heatmap', '主页 › 听歌频率（有播放记录）')
+	/*
+	 * 主页最下面的「播放历史」滚出来再拍一张。
+	 *
+	 * ⚠️ 这一块在卡片化收尾里从**表格**改成了**歌曲行**（原型如此），
+	 * 而它是整页最靠下的一块 —— 不滚过去的话截图里永远看不到它。
+	 *
+	 * ⚠️ 滚动截图只能在这里做：`verify:desktop:ui` 的窗口是 `show: false`，
+	 * 隐藏窗口里"滚动 + capturePage"会拍到新旧两层混在一起的画面
+	 * （实测：历史那几行画在听歌频率上面，看着像布局重叠，其实量出来是好的）。
+	 */
+	await evaluate(
+		window,
+		`(() => {
+			document
+				.querySelector('[data-testid="home-history"]')
+				?.scrollIntoView({ block: 'end' })
+			return true
+		})()`,
+	)
+	await sleep(800)
+	await shot(
+		window,
+		'07c-home-history',
+		'主页 › 播放历史（滚到最下面：歌曲行）',
+	)
 
 	console.log('\n=== 7) 设置（一级页面：分类列表 + 每个子页）===')
 	await click(window, '[data-testid="sidebar-settings"]')
@@ -805,7 +834,15 @@ async function run(window) {
 	// 并且**断言真的 0 行** —— 拿不到空状态就报成问题，
 	// 而不是继续悄悄拍一张有结果的图。
 	const emptyQuery = 'qzjxvbkwmfnrptyudhglsacoie'
-	await click(window, '[data-testid="nav-search"]')
+	// ⚠️ 顶栏删掉之后没有 `nav-search` 可点了：搜索框常驻在内容卡顶部，
+	// 直接给它焦点即可（见上面 5) 那一段的同一处理）。
+	await evaluate(
+		window,
+		`(() => {
+			document.getElementById('search-input')?.focus()
+			return true
+		})()`,
+	)
 	await sleep(600)
 	await evaluate(
 		window,

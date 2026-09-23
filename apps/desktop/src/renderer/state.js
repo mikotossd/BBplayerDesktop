@@ -30,8 +30,6 @@
 		queueIndex: -1,
 		/** 最近一次搜索关键词 */
 		lastQuery: '',
-		/** 右栏面板：queue | lyrics */
-		rightPanel: 'queue',
 	}
 
 	function get() {

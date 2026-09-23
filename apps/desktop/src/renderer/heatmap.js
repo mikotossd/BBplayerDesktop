@@ -111,11 +111,28 @@
 		const weekdayGutter = 26
 		const monthLabelHeight = 18
 		const minCell = 10
-		const cell = Math.max(
-			minCell,
-			Math.min(18, Math.floor((available - weekdayGutter) / weeks.length) - 3),
-		)
-		const gap = cell >= 14 ? 4 : 3
+		/*
+		 * ⚠️ 格子尺寸必须**减掉真实的列间距**，不能减一个写死的常数。
+		 *
+		 * 原来是 `floor((available - gutter) / weeks) - 3`，而下面按
+		 * `cell >= 14` 把间距选成 **4** —— 于是每一列都多占 1px，
+		 * 53 列就是 **53px 的横向溢出**：热力图下面挂着一条横向滚动条
+		 * （`.heatmap-box` 的 `overflow-x: auto` 兜底被触发），
+		 * 而"格子是方格 / 每格带日期"那些断言全绿 —— 它们不看容器。
+		 *
+		 * 现在先按 4px 间距试算，算出来放不下 14px 就退回 3px 间距重算；
+		 * 两者都保证 `gutter + weeks * (cell + gap) <= available`。
+		 */
+		const weekCount = weeks.length
+		const fitCell = (gap) =>
+			Math.floor((available - weekdayGutter) / weekCount) - gap
+		let gap = 4
+		let cell = Math.min(18, fitCell(gap))
+		if (cell < 14) {
+			gap = 3
+			cell = Math.min(18, fitCell(gap))
+		}
+		cell = Math.max(minCell, cell)
 		const step = cell + gap
 
 		const width = weekdayGutter + weeks.length * step

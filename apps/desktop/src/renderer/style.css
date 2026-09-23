@@ -266,71 +266,45 @@ body {
    主页下沿的两块：⑤ 最近播放 + title ① 快捷入口（阶段 2）
    ────────────────────────────────────────────────────────── */
 /*
- * ⚠️ 它是 `.main` 的**第三个**网格行（`.main` 的网格是
- * `minmax(0,1fr) auto`，这一块被自动放进第三个隐式行 —— 也正是
- * 为什么 `.main` 的网格必须显式写两行：不写的话内容卡会与它抢同一行）。
+ * 主页顶部的左右分栏（最近播放 | 快捷入口）。
  *
- * ⚠️ 左右 margin 与 `.content` / `.playbar` 取**同一个** `--sp-md`：
- * 卡片化之后同一屏里并排的元素必须左边缘对齐，
- * 而探针里那条"播放条与内容卡左右对齐"就是这么量的。
+ * ⚠️ 卡片化收尾把这一块从"内容卡**下面**的独立一条"搬进了**内容卡里面**
+ * （原型 `prototype/pages/home.html` 的第一块就是它）。搬进来之后
+ * 主页只剩一张卡片，而不是"内容卡 + 下沿一块"两个分开的盒子。
+ *
+ * ⚠️ 中间那条 1px 是**网格列**（`minmax(0,1fr) 1px minmax(0,1fr)`），
+ * 不是给某个元素画的边框 —— 两栏高度不等时它自动拉满，
+ * 而 `border` 只会跟着内容高度走。
  */
-.home-strip {
-	flex: none;
+.home-split {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
 	gap: var(--sp-md);
-	margin: 0 var(--sp-md);
-	/*
-	 * ⚠️ 高度要**足够放下标题 + 内容**，但不能靠"卡片自己滚"。
-	 *
-	 * 两次踩坑都记在这里：
-	 *   1. 第一版钉成 96px + 卡片内 `overflow-y: auto` → 标题占掉一行、
-	 *      内容被挤进 30px 高的滚动框，屏幕上只看得到标题。
-	 *   2. 第二版 132px 仍然不够：`.home-quick` 那个网格是
-	 *      `auto-fill minmax(148px, 1fr)`，可用宽度减半之后**三张卡折成两行**，
-	 *      第二行被裁掉（截图里"我的收藏夹"整张看不见）。
-	 *
-	 * 150px 的取法：标题 20 + 卡片内边距 24 + 快捷入口**两行**卡（36×2+8）+ 间隔。
-	 * 宽度再窄时它会继续折行 —— 那时靠 `overflow: hidden` 裁掉，不影响布局。
-	 */
-	height: 136px;
-	align-items: stretch;
+	margin-bottom: var(--sp-xl);
 }
-/* 下沿里的快捷入口是**固定三列**（见 components.css 的 .home-quick--fixed），
-   所以这一块的内容高度是确定的：标题 20 + 内边距 24 + 卡片 84 + 间隔 8。 */
-.home-strip .home-section {
-	margin-bottom: 0;
-}
-.home-strip[hidden] {
-	display: none;
-}
-.home-strip__card {
-	min-width: 0;
-	min-height: 0;
-	background: var(--surface-container);
-	border-radius: var(--r-lg);
-	padding: var(--sp-sm) var(--sp-md);
-	display: flex;
-	flex-direction: column;
-	gap: var(--sp-xs);
-	overflow: hidden;
-}
-/* 两块之间**唯一**的一条竖分隔线（草图明确要求） */
-.home-strip__divider {
+.home-split__divider {
 	background: var(--outline-variant);
 }
-.home-strip__title {
-	margin: 0;
-	font-size: var(--fs-title-small);
-	font-weight: 600;
-	color: var(--on-surface);
+/* 分栏里那两个区块自己不再留下边距 —— 间距由 `.home-split` 决定 */
+.home-split > .home-section {
+	margin-bottom: 0;
 }
-/* ⑤ 那一行：封面 + 曲名/歌手 + 继续播放 */
+
+/* ⑤ 那一行：封面 + 曲名/歌手 + 继续播放（原型里的 `.recent` 卡） */
 .home-recent {
 	display: flex;
 	align-items: center;
 	gap: var(--sp-sm);
 	min-width: 0;
+	padding: var(--sp-xs);
+	background: var(--surface-2);
+	border: 1px solid var(--outline-variant);
+	border-radius: var(--r-lg);
+	cursor: pointer;
+	transition: border-color var(--motion-duration-fast) ease;
+}
+.home-recent:hover {
+	border-color: var(--outline);
 }
 .home-recent__cover {
 	width: 44px;
@@ -379,7 +353,18 @@ body {
 	cursor: pointer;
 	flex: none;
 }
+/*
+ * 空态：**不画那张"卡片脸"**。
+ *
+ * ⚠️ 空态复用了 `.home-recent` 的排布，但那一层 `background + border` 是给
+ * "有一条可以点的最近播放"用的 —— 空的时候留着它，看起来就像一个**空的输入框**
+ * （截图巡检里一眼就能认出来）。
+ */
 .home-recent--empty {
+	padding: 0;
+	background: transparent;
+	border: 0;
+	cursor: default;
 	color: var(--on-surface-variant);
 	font-size: var(--fs-body-small);
 }
@@ -399,13 +384,16 @@ body {
 	display: grid;
 	/*
 	 * ⚠️ 第一列走 `--sidebar-width`（阶段 6：左栏可拖拽改宽）。
-	 * 关键是**收起状态与右栏收起状态互不覆盖**：它们各自只改一个变量/类，
-	 * 如果都去写整条 `grid-template-columns`，后写的会把另一个吃掉 ——
-	 * 那种覆盖在界面上表现为"某次展开/收起莫名失灵"。
+	 * 收起时左栏列宽写 0px（`is-sidebar-collapsed`），改动只落在这一个变量上，
+	 * 不去整条重写 `grid-template-columns` —— 那种覆盖在界面上表现为
+	 * "某次收起莫名失灵"，很难联想到是另一条规则干的。
+	 *
+	 * ⚠️ 这里原来是**三列**（左栏 / 中栏 / 右栏）。卡片化收尾把右栏整条
+	 * 删掉了（播放列表只剩浮层一种形态），所以现在是两列。
 	 */
-	grid-template-columns: var(--sidebar-width, 240px) minmax(0, 1fr) 320px;
+	grid-template-columns: var(--sidebar-width, 240px) minmax(0, 1fr);
 	grid-template-rows: minmax(0, 1fr);
-	grid-template-areas: 'sidebar main rightbar';
+	grid-template-areas: 'sidebar main';
 	/*
 	 * ⚠️ 高度要**减掉自绘标题栏**（卡片化改造）。
 	 * 原来写 `100vh` 时窗口只有原生标题栏、页面从最顶上开始；
@@ -417,23 +405,6 @@ body {
 	position: relative;
 }
 
-/*
- * 右栏收起：宽度归零而不是 `display: none`。
- *
- * 两个理由：
- *   * 过渡能平滑（`display` 不参与动画）；
- *   * 面板里的 DOM 仍然在文档里，探针读队列/歌词不受影响 ——
- *     用 `display: none` 会让它们读不到，表现成"操作完成了但界面没变"。
- */
-.app.is-rightbar-collapsed {
-	/*
-	 * ⚠️ 这里也必须用 `var(--sidebar-width, 240px)` 而不是写死 240px ——
-	 * 原来写死之后，用户把左栏拖宽、再收/放一次右栏，左栏宽度就被**悄悄改回 240**
-	 * （因为这条规则整条重写了 `grid-template-columns`）。这类"拖过之后自己变回去"
-	 * 的 bug 很难联想到是另一条规则干的。
-	 */
-	grid-template-columns: var(--sidebar-width, 240px) minmax(0, 1fr) 0px;
-}
 
 /* 左栏整个收起（拖到极窄） */
 .app.is-sidebar-collapsed .sidebar {
@@ -470,17 +441,6 @@ body {
 	left: 0;
 }
 
-/*
- * 收起时连左边框一起去掉。
- *
- * 轨道宽度是 0，但 `border-left: 1px` 仍然会让元素量出 **1px** 宽 ——
- * 视觉上就是屏幕右边挂着一条无意义的竖线（后面没有任何内容）。
- * 探针也会因为这 1px 判"没有真的收起"。
- */
-.app.is-rightbar-collapsed .rightbar {
-	/* ⚠️ 必须是 `width: 0` 而不是 `color: transparent` —— 颜色透明仍然占 1px 宽 */
-	border-left-width: 0;
-}
 
 /*
  * 左栏：跨两行（内容 + 播放卡），所以它仍然是通高的一列。
@@ -546,9 +506,8 @@ body {
 /*
  * 页面内容：**唯一**会滚的那一层（\`flex: 1 1 auto\` + \`overflow-y: auto\`）。
  *
- * ⚠️ 顶栏与浮层不在这一层里：
- *   * 顶栏是常驻控件，不该被滚动带走；
- *   * 浮层锚在 \`.main\` 底部（绝对定位），放进滚动容器会让定位基准
+ * ⚠️ 播放列表浮层不在这一层里：
+ *   * 它锚在 \`.main\` 底部（绝对定位），放进滚动容器会让定位基准
  *     变成滚动内容。
  *
  * ⚠️ 为什么要包一层而不是让子元素直接排在 \`.main\` 里：
@@ -568,30 +527,6 @@ body {
 /* 播放卡：不参与压缩，永远贴在窗口底部 */
 .main > .playbar {
 	flex: none;
-}
-.rightbar {
-	/*
-	 * ⚠️ `grid-template-areas` 里已经没有右栏了，所以必须**显式钉列**。
-	 * 不写 `grid-column` 的话它会被自动放进下一个空单元格 ——
-	 * 表现是"右栏跑到中栏下面/右边去了"，而 CSS 看着完全正常。
-	 */
-	grid-column: 3;
-	background: var(--surface);
-	/*
-	 * ⚠️ `min-width: 0` 是**必须的**，否则收起不生效。
-	 *
-	 * grid 项默认 `min-width: auto`，也就是"不能小于内容的 min-content 宽度"，
-	 * 于是即使把列宽写成 0px，列也会被内容顶开 —— 表现成"设了收起但没反应"。
-	 * `overflow: hidden` 只裁溢出，管不了最小宽度。这个坑很安静：
-	 * 代码看着完全正确，界面一动不动。
-	 */
-	min-width: 0;
-	/* 收起时列宽为 0，裁掉溢出，否则内容会浮在主区上面 */
-	overflow: hidden;
-	border-left: 1px solid var(--outline-variant);
-	display: flex;
-	flex-direction: column;
-	min-height: 0;
 }
 
 /*
@@ -771,6 +706,24 @@ body {
 .sidebar__card-foot {
 	border-top: 1px solid var(--outline-variant);
 }
+/*
+ * ⚠️ 页头是**一列**（首页 / 收藏夹两行），页脚仍然是一行（设置）。
+ *
+ * 原来页头是"一行：收藏夹 + 数量"。加了「首页」之后如果继续横着排，
+ * 两个入口会在 240px 里各被压到一半宽、文字被省略号吃掉 ——
+ * 用户要的是"同样规格再加一个按钮"，不是"把原来那个挤小"。
+ */
+.sidebar__card-head {
+	flex-direction: column;
+	align-items: stretch;
+	gap: var(--sp-xxs);
+}
+/* 一行入口 + 右端的数量（数量只跟着它所在的那一行） */
+.sidebar__card-row {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-xs);
+}
 .sidebar__card-body {
 	flex: 1 1 auto;
 	min-height: 0;
@@ -913,10 +866,6 @@ body {
 	-webkit-backdrop-filter: var(--material-blur);
 }
 
-/* 顶栏是"内容从它下面滚过去"的典型场景 */
-.topbar.material {
-	background: color-mix(in srgb, var(--bg) 78%, transparent);
-}
 
 /* 抽屉与弹窗盖在整个应用上，材质效果最明显 */
 .settings-drawer.material,
@@ -1073,31 +1022,6 @@ body {
 /* ══════════════════════════════════════════════════════════
    中栏
    ────────────────────────────────────────────────────────── */
-/*
- * 顶栏：搜索框占满剩余宽度，右侧是**一行图标按钮**。
- *
- * ⚠️ 原来是 `flex-direction: column`（搜索框一行、提示文字一行）。
- * 提示文字收进图标按钮之后，多出来的按钮就自己折到了第二行 ——
- * 截图里能看到两个图标孤零零挂在搜索框下面。
- *
- * 现在改成横向一行：`.search-box` 吃掉剩余空间（`flex: 1`），
- * 图标按钮固定在右边、**永不换行**（`flex: none` + `flex-wrap: nowrap`）。
- */
-.topbar {
-	padding: var(--sp-sm) var(--sp-md);
-	/*
-	 * ⚠️ 这里**不用通栏细线**分层（原来是 border-bottom）。
-	 *
-	 * 通栏线从 `.main` 的 x=0 拉过去，而内容是内缩 16px 的 ——
-	 * 两者永远错开 16px。用户复审时一眼指出「各个用于划分页面功能
-	 * 之间的横线没有对齐」。安卓端也不靠这条线分层，靠**面与留白**。
-	 */
-	display: flex;
-	flex-direction: row;
-	align-items: center;
-	gap: var(--sp-xs);
-	flex-wrap: nowrap;
-}
 
 .search-box {
 	display: flex;
@@ -1112,7 +1036,7 @@ body {
  * ⚠️ 它是 `.main` 网格里的一行，而不是塞进 `#content` ——
  * 后者会被各视图 `textContent = ''` 整块清掉。
  *
- * ⚠️ 左右 margin 与 `#content` / `.home-strip` / 播放卡取**同一个**
+ * ⚠️ 左右 margin 与 `#content` / 播放卡取**同一个**
  * `--sp-md`，否则一屏里并排的元素左边缘会差几像素（这个仓库量过好几次）。
  */
 .search-row {
@@ -1123,10 +1047,6 @@ body {
 	display: none;
 }
 
-/* 顶栏右侧留白：把控件都顶到左边 */
-.topbar__spacer {
-	flex: 1 1 auto;
-}
 
 /*
  * 播放列表浮层（卡片化阶段 5）。
@@ -1199,9 +1119,6 @@ body {
 	}
 }
 
-.topbar > .icon-button {
-	flex: none;
-}
 
 .search-box input {
 	flex: 1;
@@ -1218,32 +1135,7 @@ body {
 	outline-offset: -1px;
 }
 
-/*
- * 快捷键说明。
- *
- * ⚠️ 原来是**常驻**在顶栏里的一行灰字（「快捷键：Space 播放/暂停 · …」）。
- * 现在默认 `hidden`，点顶栏的键盘图标才出现 —— 而且要在顶栏**之上**
- * 弹出来，不能再占一行布局（否则展开时又会把图标按钮挤到第二行）。
- */
-.topbar__hint {
-	position: absolute;
-	top: 100%;
-	right: var(--sp-md);
-	z-index: 30;
-	max-width: min(70ch, 70vw);
-	padding: 10px 14px;
-	border-radius: var(--r-md);
-	background: var(--surface-container-high);
-	color: var(--on-surface);
-	font-size: var(--fs-body-small);
-	line-height: var(--lh-body-medium);
-	box-shadow: 0 6px 20px rgb(0 0 0 / 22%);
-}
 
-/* 顶栏本身要成为定位上下文，`top: 100%` 才是"贴着顶栏下沿" */
-.topbar {
-	position: relative;
-}
 
 /*
  * 页面大标题区（阶段 2b）。
@@ -1738,7 +1630,7 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════
-   右栏
+   页签 / 面板
    ────────────────────────────────────────────────────────── */
 /*
  * 页签容器只负责排布：**没有下划线，也没有底部分隔线**。
@@ -2819,7 +2711,7 @@ input[type='range']:focus-visible {
 
 /*
  * ⚠️ `.icon-button` 一直没有 `:focus-visible` ——
- * 顶栏与页头那一排图标按钮（账号 / 队列开关 / 快捷键 / 返回 / 共享 / 刷新）
+ * 页头与播放卡那一排图标按钮（账号 / 队列 / 返回 / 共享 / 刷新）
  * Tab 过去**完全没有可见焦点**，键盘用户不知道回车会按到哪一个。
  */
 .icon-button:focus-visible {
@@ -2898,6 +2790,51 @@ input[type='range']:focus-visible {
 	display: flex;
 	align-items: center;
 	gap: var(--sp-xs);
+}
+
+/*
+ * 快捷键说明（卡片化收尾：原来住在顶栏的弹层里）。
+ *
+ * ⚠️ 它是**设置页里的一份普通列表**，不是浮层：没有"打开 / 关闭"，
+ * 也没有绝对定位。内容由 `keyboard.js` 按**实际注册的快捷键表**渲染，
+ * 所以这里只负责排布 —— 加一条快捷键不需要动这个文件。
+ *
+ * 每一行都是「定宽组合键 + 说明」的两列，于是几十条下来组合键那一列
+ * 左边缘是对齐的，扫一眼就能找到某个动作。
+ */
+.shortcut-list {
+	list-style: none;
+	margin: var(--sp-xs) 0 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-xs);
+}
+
+.shortcut-list__item {
+	display: flex;
+	align-items: baseline;
+	gap: var(--sp-sm);
+}
+
+.shortcut-list__combo {
+	/* 定宽：最长的组合键（Ctrl+Shift+L）也要放得下，右边留一点余量 */
+	flex: none;
+	min-width: 96px;
+	text-align: center;
+	font-family: 'Cascadia Code', Consolas, monospace;
+	font-size: var(--fs-body-small);
+	color: var(--on-surface);
+	background: var(--surface-2);
+	border: 1px solid var(--outline-variant);
+	border-radius: var(--r-sm);
+	padding: 1px 6px;
+	white-space: nowrap;
+}
+
+.shortcut-list__desc {
+	color: var(--on-surface-variant);
+	font-size: var(--fs-body-small);
 }
 
 .settings-row--wrap {

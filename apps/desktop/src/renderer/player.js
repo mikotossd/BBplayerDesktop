@@ -1144,7 +1144,6 @@
 			return {
 				sidebar: visible('[data-testid="sidebar"]'),
 				main: visible('[data-testid="main"]'),
-				rightbar: visible('[data-testid="rightbar"]'),
 				playbar: visible('[data-testid="playbar"]'),
 				navItems: document.querySelectorAll('.nav__item').length,
 				// ⚠️ 用**语义属性**而不是视觉类名来计数。
@@ -1160,7 +1159,6 @@
 					'[data-testid^="track-row-"], .track-table tbody tr',
 				).length,
 				queueItems: document.querySelectorAll('[data-queue-index]').length,
-				activePanel: document.querySelector('.panel.is-active')?.dataset.panel,
 				activeView: document
 					.querySelector('.nav__item.is-active')
 					?.getAttribute('data-view'),

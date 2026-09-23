@@ -170,24 +170,46 @@
 					aria-label="我的歌单"
 					title="音乐库"
 				>
-					<!-- 页头：收藏夹 -->
+					<!--
+						页头：首页 + 收藏夹。
+
+						⚠️ 「首页」这一条是**用户圈图之后追加的**：顶栏删掉之后，
+						「回主页」在界面上没有显式入口了 —— 点左栏顶上那张
+						「BBPlayer」用户卡确实能回主页（它一直是 `data-nav="home"`），
+						但那是一张**卡**，看起来像品牌 / 账户区，不像"一个可以去的地方"。
+						所以按 `.sidebar__entry` 的同一套规格补一条明写的入口，
+						位置按用户要求放在「收藏夹」**上面**。
+					-->
 					<div class="sidebar__card-head">
 						<button
 							class="sidebar__entry"
-							id="sidebar-favorites"
-							data-nav="favorites"
-							data-testid="sidebar-favorites"
-							title="收藏夹"
+							id="sidebar-home"
+							data-nav="home"
+							data-testid="sidebar-home"
+							title="主页"
 						>
-							<span class="icon icon--sm">star</span>
-							收藏夹
+							<span class="icon icon--sm">home</span>
+							首页
 						</button>
-						<span
-							class="sidebar__count muted"
-							id="playlist-count"
-							data-testid="playlist-count"
-							>0</span
-						>
+						<!-- 一行：收藏夹 + 它右端的歌单数量 -->
+						<div class="sidebar__card-row">
+							<button
+								class="sidebar__entry"
+								id="sidebar-favorites"
+								data-nav="favorites"
+								data-testid="sidebar-favorites"
+								title="收藏夹"
+							>
+								<span class="icon icon--sm">star</span>
+								收藏夹
+							</button>
+							<span
+								class="sidebar__count muted"
+								id="playlist-count"
+								data-testid="playlist-count"
+								>0</span
+							>
+						</div>
 					</div>
 
 					<!-- 中段：本地歌单（可滚动） -->
@@ -232,68 +254,21 @@
 				class="main"
 				data-testid="main"
 			>
-				<header class="topbar material">
-					<!--
-						⚠️ 「搜索」入口（卡片化阶段 5）。
-						左栏没有导航项之后，"去搜索这一页"需要一个显式入口；
-						它**不再**是搜索框的宿主 —— 搜索框已经搬进内容卡顶部
-						（用户确认的方案 A），这里只负责跳到那一页。
-						testid 保留 `nav-search`：它是"去搜索"的语义，
-						巡检脚本按它点，语义没变。
-					-->
-					<button
-						class="icon-button icon-only"
-						id="nav-search"
-						data-nav="search"
-						data-testid="nav-search"
-						title="搜索"
-						aria-label="搜索"
-					>
-						<span class="icon icon--md">search</span>
-					</button>
-					<!--
-						右栏（播放队列）的开关。右栏**默认收起** ——
-						它原来常驻 320px，不管有没有内容都占着，观感偏"IDE 面板"。
-					-->
-					<button
-						class="icon-button icon-only"
-						id="rightbar-toggle"
-						data-testid="rightbar-toggle"
-						title="播放队列"
-						aria-label="播放队列"
-						aria-expanded="false"
-					>
-						<span class="icon icon--md">queue_music</span>
-					</button>
-					<!--
-						⚠️ 这里原来是一行**常驻的快捷键说明**（「快捷键：Space 播放/暂停 ·
-						←→ 快退/快进 · Ctrl+F 搜索」）。那是把说明书贴在墙上：用户看第一遍
-						之后每一屏都还要再看一遍，而且它占掉了顶栏最值钱的位置。
+				<!--
+					⭐ 卡片化收尾：**顶栏整条移除**（用户圈出整条要求删掉）。
 
-						改成「键盘」图标按钮：需要时点开看（含全部快捷键）。
-						`#hint` 这个 id 保留，内容是**全部**快捷键，便于探针与用户查阅。
-					-->
-					<button
-						class="icon-button icon-only"
-						id="shortcuts-open"
-						data-testid="shortcuts-open"
-						title="快捷键"
-						aria-label="快捷键"
-					>
-						<span class="icon icon--md">keyboard</span>
-					</button>
-					<div
-						class="topbar__hint muted"
-						id="hint"
-						data-testid="hint"
-						hidden
-					>
-						快捷键：Space 播放/暂停 · ←/→ 快退/快进 · Ctrl+F 搜索 · Ctrl+Q
-						播放列表 · Ctrl+Alt+L 独立歌词窗口
-					</div>
-					<!-- 顶栏右侧留白：把上面几个控件都顶到左边 -->
-					<div class="topbar__spacer"></div>
-				</header>
+					它原来是内容卡上方的一条工具条，里面有三颗按钮与一条隐藏的
+					快捷键说明。删掉的**不只是那三颗按钮**，还有它们背后的交互：
+
+					  * 搜索入口 —— 搜索框本身常驻在内容卡顶部（方案 A），输入即搜，
+					    「跳到搜索页」这个独立目的地不再需要；
+					  * 播放列表开关 —— 播放列表只剩**浮层**一种形态，触发器是播放条
+					    上那颗队列按钮与 `Ctrl+Q`（见 renderer.js 的 toggleQueuePopover）；
+					  * 快捷键按钮 + 说明条 —— 说明搬进「设置 › 通用 › 快捷键」，
+					    就地展开，不再是一个绝对定位的弹层。
+
+					`.topbar` 的样式与脚本绑定也一并删掉了，不留死代码。
+				-->
 
 				<!--
 					── 页面内容（卡片化阶段 7 加的包裹层）────────────────
@@ -508,14 +483,13 @@
 
 					<!--
 					── 播放列表浮层（卡片化阶段 5）────────────────────
-					⚠️ 队列 DOM **只有一份**（`#queue-list`）。它在三个槽位之间搬家：
-					      `#queue-slot`（右栏，主家）、`#queue-popover-slot`（这里）。
-					搬家由 `renderer.js` 的 `placeQueue(slotId)` 统一负责 ——
+					⚠️ 队列 DOM **只有一份**（`#queue-list`），常驻在这个浮层里。
 					复制一份会让 `data-queue-index` 翻倍，探针计数与拖拽都会错。
+					（卡片化收尾之前它还会被搬到右栏；右栏删掉之后只有一个家。）
 
-					⚠️ 它是 `.main` 网格里的一行，靠**网格行高 1fr → 0fr** 展开/收起
-					（见 style.css 的 `.queue-popover`），所以不需要 `position: fixed`
-					也不会盖住下方的播放卡。
+					⚠️ 它是**浮层**：绝对定位锚在 `.main` 底部（见 style.css 的
+					`.queue-popover`），不占布局、也不盖住下方的播放卡。
+					所以它在**任何一页**都能呼出来（不再顺带切到播放详情页）。
 				-->
 					<div
 						class="queue-popover"
@@ -546,52 +520,47 @@
 								class="queue-popover__body"
 								id="queue-popover-slot"
 								data-testid="queue-popover-slot"
-							></div>
+							>
+								<!--
+									队列 DOM **唯一的一份**，常驻在这里（卡片化收尾）。
+
+									它原来在「右栏的 queue-slot」与「浮层的
+									queue-popover-slot」之间被搬来搬去；右栏删掉之后只剩
+									这一个落点，于是 `placeQueue` 这个搬运函数也删了 ——
+									一份 DOM、一个家，不需要搬运。
+
+									⚠️ 元素必须**留在 HTML 里**（而不是由 JS 创建）：
+									`player.js` 渲染队列时按 id 取它。
+								-->
+								<ol
+									class="queue-list"
+									id="queue-list"
+									data-testid="queue-list"
+								></ol>
+								<p
+									class="empty muted"
+									id="queue-empty"
+									data-testid="queue-empty"
+								>
+									队列为空
+								</p>
+							</div>
 						</div>
 					</div>
 
 					<!--
-					── 主页下沿的两块（卡片化阶段 2）──────────────────────
-					⚠️ 它们**常驻在 DOM 里**（不在 `#content` 内），只有主页可见
-					（`renderer.js` 的 `setActiveNav` 切 `hidden`）。
+						⭐ 卡片化收尾：主页的「最近播放 / 快捷入口」两块**搬到内容卡里**了
+						（原型 `prototype/pages/home.html` 的第一块就是那个左右分栏）。
 
-					为什么常驻而不是渲染进 `#content`：
-					  * 它们的内容由 `history.js` 负责（⑤ 最近播放 / 快捷入口），
-					    而 `history.refresh()` 会 `content.textContent = ''` 整块重建 ——
-					    放进去的话每次刷新都要重新创建这两个容器；
-					  * 草图上是"内容卡**下面**的两块"，语义上不属于内容卡。
-
-					⚠️ 两块之间有一条竖分隔线（草图明确要求）。全页只有这一处竖线。
-				-->
-					<div
-						class="home-strip"
-						id="home-strip"
-						data-testid="home-strip"
-						hidden
-					>
-						<!-- ⑤ 最近播放：最近一次播放的曲目（封面 + 名称） -->
-						<section
-							class="home-strip__card"
-							id="home-recent"
-							data-testid="home-recent"
-							aria-label="最近播放"
-						>
-							<h2 class="home-strip__title">最近播放</h2>
-							<div
-								id="home-recent-body"
-								data-testid="home-recent-body"
-							></div>
-						</section>
-
-						<div class="home-strip__divider"></div>
-
-						<!-- title ① 快捷入口 + area ①（由 history.js 渲染） -->
-						<div
-							class="home-strip__card"
-							id="home-quick"
-							data-testid="home-quick-slot"
-						></div>
-					</div>
+						原来它们是内容卡**下面**一条独立的下沿（`#home-strip`），
+						结果是主页看起来是"一张卡片 + 一个孤零零的盒子"两块东西，
+						用户反馈"主页太混乱"。现在主页只有一张内容卡，
+						四块内容按原型从上到下排：
+						  最近播放 | 快捷入口  →  听歌频率  →  最近更新  →  播放历史
+						所以 `#home-strip` 这个常驻容器**整条删掉了** ——
+						它的两个槽位（`home-recent-body` / `home-quick`）由
+						`history.js` 在每次刷新时渲染进 `#content`。
+					-->
 
 					<!--
 					共享歌单视图（Phase 3.4）。
@@ -1394,15 +1363,11 @@
 								></p>
 
 								<h3>快捷键</h3>
-								<div class="settings-row">
-									<button
-										id="settings-general-shortcuts"
-										data-testid="settings-general-shortcuts"
-										class="btn--outlined"
-									>
-										查看全部快捷键
-									</button>
-								</div>
+								<ul
+									class="shortcut-list"
+									id="hint"
+									data-testid="hint"
+								></ul>
 							</section>
 
 							<!-- 关于 -->
@@ -1497,8 +1462,8 @@
 				布局：**艺术背景 + 大封面 + 队列**。封面是**圆角正方形**
 				（用户明确要求过：封面缩略图与曲绘封面都用圆角方形，不用圆形）。
 
-				队列不复制：`#queue-list` 会被搬进 `#nowplaying-queue-slot`
-				（见 placeQueue 的注释）。
+				队列不在这里：播放列表是**浮层**，由播放条上那颗队列按钮
+				（或 `Ctrl+Q`）在当前页呼出。
 			-->
 					<section
 						class="nowplaying"
@@ -1545,9 +1510,9 @@
 							  右卡 = 歌词
 							⚠️ 原来还有第三栏"播放队列"。草图（播放详情页那一张）
 							手写「**放弃原有的三联卡片式**」，所以队列栏删掉了 ——
-							队列仍然只有一份，住在右栏的 `#queue-slot`
-							（见 renderer.js 的 placeQueue）。
-							⚠️ 歌词是**同一份 DOM 搬进来**的，不复制：见 placeLyrics。
+							队列住在播放列表浮层里（见 queue-popover 那一段）。
+							⚠️ 歌词面板现在**常驻**在这张右卡里（卡片化收尾删掉了
+							右栏，它不再需要在两个落点之间被搬运）。
 						-->
 							<div
 								class="nowplaying__columns"
@@ -1679,7 +1644,44 @@
 									class="nowplaying__card nowplaying__card--lyrics"
 									id="nowplaying-lyrics-slot"
 									data-testid="nowplaying-lyrics-slot"
-								></article>
+								>
+									<div
+										class="panel"
+										data-panel="lyrics"
+										data-testid="panel-lyrics"
+									>
+										<div
+											class="lyrics"
+											id="lyrics-panel"
+											data-testid="lyrics-panel"
+										></div>
+										<div
+											class="lyrics-toolbar"
+											data-testid="lyrics-toolbar"
+										>
+											<button
+												id="lyrics-reload"
+												data-testid="lyrics-reload"
+												title="重新匹配歌词"
+											>
+												重新匹配
+											</button>
+											<button
+												id="lyrics-popout"
+												data-testid="lyrics-popout"
+												title="在独立窗口显示歌词"
+											>
+												独立窗口
+											</button>
+											<span
+												class="muted"
+												id="lyrics-status"
+												data-testid="lyrics-status"
+												>未加载歌词</span
+											>
+										</div>
+									</div>
+								</article>
 							</div>
 						</div>
 					</section>
@@ -1854,111 +1856,6 @@
 				</footer>
 			</main>
 
-			<!-- ── 右栏：播放队列 ────────────────────────────────── -->
-			<!--
-				⚠️ 右栏只剩**播放队列**（阶段 D-2）。
-				原来还有一个「歌词」页签，但歌词已经搬进「正在播放」页的中栏
-				（见 renderer.js 的 placeLyrics），页签背后的容器是个空壳 ——
-				用户点进去只会看到空白。同一个功能也不该有两个入口。
-
-				⚠️ 它是 `.app` 的**第三个网格列**（`grid-column: 3`），不是
-				`.main` 的子项 —— 收起时是"列宽 0 + overflow hidden"，
-				DOM 仍然在文档里（探针要读队列/歌词，用 display:none 会读不到）。
-			-->
-			<aside
-				class="rightbar"
-				data-testid="rightbar"
-			>
-				<div
-					class="tabs"
-					data-testid="rightbar-tabs"
-				>
-					<button
-						class="tab is-active"
-						data-panel="queue"
-						data-testid="tab-queue"
-					>
-						播放队列
-					</button>
-				</div>
-
-				<!--
-					队列的**归属槽位**（阶段 4b）。
-					⚠️ `#queue-list` 只有**一份**：它会在"右栏"与"正在播放面板"
-					之间被搬来搬去（renderer.js 的 placeQueue()）。
-
-					为什么不各渲染一份：同一份数据渲染两棵树，
-					两边的 `data-queue-index` 会重复 —— 探针的
-					`querySelectorAll('[data-queue-index]')` 会数出两倍，
-					拖拽/点击也会落到错误的那一棵上。
-				-->
-				<div
-					class="panel is-active"
-					data-panel="queue"
-					data-testid="panel-queue"
-				>
-					<!--
-						⚠️ 列表本身要**留在 HTML 里**（而不是由 JS 创建）：
-						`renderer.js` 的 placeQueue() 只是把它在两个槽位之间搬动，
-						元素必须一开始就存在。第一版把这段换成了空的槽位 div，
-						结果 `#queue-list` 根本不存在 —— 队列永远是空的。
-					-->
-					<div
-						id="queue-slot"
-						data-testid="queue-slot"
-					>
-						<ol
-							class="queue-list"
-							id="queue-list"
-							data-testid="queue-list"
-						></ol>
-					</div>
-					<p
-						class="empty muted"
-						id="queue-empty"
-						data-testid="queue-empty"
-					>
-						队列为空
-					</p>
-				</div>
-
-				<div
-					class="panel"
-					data-panel="lyrics"
-					data-testid="panel-lyrics"
-				>
-					<div
-						class="lyrics"
-						id="lyrics-panel"
-						data-testid="lyrics-panel"
-					></div>
-					<div
-						class="lyrics-toolbar"
-						data-testid="lyrics-toolbar"
-					>
-						<button
-							id="lyrics-reload"
-							data-testid="lyrics-reload"
-							title="重新匹配歌词"
-						>
-							重新匹配
-						</button>
-						<button
-							id="lyrics-popout"
-							data-testid="lyrics-popout"
-							title="在独立窗口显示歌词"
-						>
-							独立窗口
-						</button>
-						<span
-							class="muted"
-							id="lyrics-status"
-							data-testid="lyrics-status"
-							>未加载歌词</span
-						>
-					</div>
-				</div>
-			</aside>
 		</div>
 
 		<!--

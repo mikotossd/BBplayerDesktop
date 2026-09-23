@@ -25,78 +25,15 @@
 	}
 
 	// ---------------------------------------------------------------
-	// 右栏面板切换
-	// ---------------------------------------------------------------
-
-	// ---------------------------------------------------------------
-	// 右栏（可折叠，默认收起）
+	// （右栏已移除）
 	// ---------------------------------------------------------------
 	//
-	// ⚠️ 右栏原来**常驻 320px**，不管有没有内容都占着，于是：
-	//   * 主内容区被压窄；
-	//   * 一个"队列为空"的空面板长期占着三分之一的屏；
-	//   * 三栏 + 边框 + 状态栏叠在一起，观感就是"IDE 面板"而不是播放器。
-	//
-	// 改成**默认收起**、按需展开：点图标按钮或 Ctrl+Q 都能开。
-	// 收起时整列宽度归零（不是 `display:none`），所以过渡是平滑的，
-	// 而且面板里的 DOM 仍然存在 —— 探针读队列/歌词不受影响。
-	const app = document.querySelector('.app')
-	const rightbarToggle = document.getElementById('rightbar-toggle')
-
-	function isRightbarOpen() {
-		return !app?.classList.contains('is-rightbar-collapsed')
-	}
-
-	function setRightbar(open) {
-		if (!app) return
-		app.classList.toggle('is-rightbar-collapsed', !open)
-		rightbarToggle?.classList.toggle('is-active', open)
-		rightbarToggle?.setAttribute('aria-expanded', String(open))
-		window.bbState.set({ rightbarOpen: open })
-	}
-
-	rightbarToggle?.addEventListener('click', () =>
-		setRightbar(!isRightbarOpen()),
-	)
-
-	/**
-	 * 右栏面板（播放队列 / 歌词）的页签。
-	 *
-	 * ⚠️ 选择器必须限定在**右栏**，不能用 `.tab`。
-	 *
-	 * 音乐库的页签条（播放列表 / 收藏夹 / 合集 / 导入）也用了 `.tab` 类
-	 * （视觉上确实是同一套页签）。用 `.tab` 绑事件的话，点「收藏夹」会顺带
-	 * 调 `switchPanel(undefined)` —— 右栏两个面板**全部变成不激活**（一片空白），
-	 * 而且还会擅自把收起状态的右栏展开。
-	 *
-	 * 是靠截图巡检发现的：03–11 那几张里右栏一直是展开的（本该收起），
-	 * 而体检表显示点完音乐库页签后 `.content` 从 1186 变成了 866。
-	 *
-	 * 用 `[data-panel]` 而不是 `#rightbar .tab`：前者是**语义属性**，
-	 * 右栏页签独有的标记，将来改类名也不会误伤。
-	 */
-	const rightbarTabs = document.querySelectorAll('[data-panel]')
-
-	function switchPanel(panel) {
-		if (!panel) return
-		for (const tab of rightbarTabs) {
-			tab.classList.toggle('is-active', tab.dataset.panel === panel)
-		}
-		for (const section of document.querySelectorAll('.panel')) {
-			// ⚠️ 歌词面板被搬进「正在播放」中栏时**不能**跟着右栏页签显隐 ——
-			// 否则用户在播放页点一下右栏的「播放队列」，中栏的歌词会整块消失。
-			if (section.dataset.panel === 'lyrics' && isLyricsInNowPlaying()) continue
-			section.classList.toggle('is-active', section.dataset.panel === panel)
-		}
-		// 切面板的意图就是"我要看它"，所以顺手把栏展开 ——
-		// 否则用户按 Ctrl+Q 会觉得"按了没反应"（栏是收起的，看不见变化）
-		setRightbar(true)
-		window.bbState.set({ rightPanel: panel })
-	}
-
-	for (const tab of rightbarTabs) {
-		tab.addEventListener('click', () => switchPanel(tab.dataset.panel))
-	}
+	// 这里原来是两段：**右栏面板切换**（一个开关按钮 + 一组 `[data-panel]`
+	// 页签）与**右栏折叠**（`is-rightbar-collapsed` 这个类）。卡片化收尾把
+	// 整个右栏删掉了 —— 播放列表只保留"从下方呼出的浮层"这一种形态
+	// （用户要求）。于是 `placeQueue` / `placeLyrics` 这一对搬运函数、
+	// `rightPanel` / `rightbarOpen` 两个状态字段也一并删了：
+	// 队列与歌词各自只剩一个家，不需要搬运，也没有"哪一栏开着"这回事。
 
 	// ---------------------------------------------------------------
 	// 左栏导航（目的地）+ 音乐库页签
@@ -269,22 +206,6 @@
 		// 音乐库的页签条只在音乐库目的地显示
 		const tabs = document.getElementById('library-tabs')
 		if (tabs) tabs.hidden = view !== 'library'
-		/*
-		 * 主页下沿的两块（⑤ 最近播放 + title ① 快捷入口）只在主页显示
-		 * （卡片化阶段 2）。它们**常驻 DOM**（由 `history.js` 渲染），
-		 * 所以这里只切 `hidden`，不创建也不销毁。
-		 *
-		 * ⚠️ 但**切到主页并不等于"内容卡里是主页"**：从主页点进一张歌单卡时
-		 * 目的地仍然是 `library`。所以"内容卡是不是歌单列表"这件事由
-		 * `library.js` 的 `showPlaylistsTab` / `renderTrackCards` 再纠正一次
-		 * —— 两处都改同一个元素，最后写的那次生效。
-		 */
-		if (typeof window.bbLibrary?.setHomeStrip === 'function') {
-			window.bbLibrary.setHomeStrip(view === 'home')
-		} else {
-			const homeStrip = document.getElementById('home-strip')
-			if (homeStrip) homeStrip.hidden = view !== 'home'
-		}
 		// ⚠️ 设置子页的返回按钮只属于设置。不显式关掉的话，
 		// 从「设置 › 某个分类」切到别的页面它会一直挂着 ——
 		// 正在播放面板里就出现了**两个返回按钮**（外壳的 + 面板自己的）。
@@ -332,88 +253,59 @@
 		 * ⚠️ 换了目的地就收起播放列表浮层。
 		 *
 		 * 浮层挂在内容卡下方，切到别的页面之后它还开着就是"浮层跟着串页"
-		 * ——用户会看到播放列表出现在音乐库里。队列 DOM 会被 `placeQueue`
-		 * 搬回右栏，所以这里只需要关掉浮层本身。
+		 * ——用户会看到播放列表出现在音乐库里。
+		 *
+		 * ⚠️ 这里原来是 `if (!showNow) closeQueuePopover()`：当时打开浮层
+		 * 会**顺带切到「正在播放」页**，而"切页"这件事本身不该把刚打开的
+		 * 浮层关掉，于是只能对"非播放详情页"放行。卡片化收尾之后浮层不再
+		 * 换页（它是纯浮层，在当前页呼出），所以任何一次真正的页面切换都
+		 * 关掉它，没有例外。
 		 */
-		if (!showNow) closeQueuePopover()
+		closeQueuePopover()
 		// ⚠️ 正在播放面板**自带标题**（大封面 + 曲名），外壳的页面标题区
 		// 在它上面就是重复的一行 —— 而且会把封面往下挤。
 		const pageHead = document.querySelector('.page-head')
 		if (pageHead) pageHead.hidden = showNow
 		if (showSettings) window.bbSettings?.open?.()
 		/*
-		 * ⚠️ 队列**不再搬进播放详情页**（卡片化阶段 4）。
+		 * ⚠️ 这里原来是 `placeQueue()` + `placeLyrics(showNow)`（两次 DOM 搬运）。
 		 *
-		 * 草图（播放详情页）手写「放弃原有的三联卡片式」—— 第三栏就是队列。
-		 * 从那以后队列只有**一个**家：右栏的 `#queue-slot`。
-		 * `placeQueue` 保留成一个"把队列放回右栏"的幂等操作，因为
-		 * 视图切换仍然需要保证它没被别处搬走（阶段 5 会再加一个浮层槽位）。
+		 * 队列与歌词各自只剩**一个家**了（卡片化收尾删掉右栏）：
+		 *   * 队列列表常驻在播放列表浮层里；
+		 *   * 歌词面板常驻在播放详情页的右卡里。
+		 * 所以搬运函数本身也删了 —— 留一个恒等的 no-op 只会让人以为
+		 * 还有第二个落点。
 		 */
-		placeQueue()
-		// 歌词仍然搬进中栏（见 placeLyrics），出来时搬回右栏
-		placeLyrics(showNow)
 	}
 
 	/**
-	 * 把**唯一那份**队列列表放回右栏。
+	 * 歌词面板的挂载点。
 	 *
-	 * ⚠️ 队列 DOM 只有一份：多渲染一份会让 `data-queue-index` 重复 ——
-	 * 探针的计数翻倍、拖拽与点击落到错误的那一棵上。
+	 * ⚠️ 别把它当成 `#panel-lyrics`：那个元素**没有 `id`**，只有
+	 * `class="panel"` + `data-panel="lyrics"` + `data-testid="panel-lyrics"`。
+	 * 第一版按 id 找 → 恒为 null → 函数直接 return → **中栏永远空着**，
+	 * 而所有既有断言照样通过（没人在看中栏）。
 	 *
-	 * ⚠️ 阶段 4 之前它还会被搬进「正在播放」页的第三栏；那一栏已经按草图
-	 * 删掉（"放弃原有的三联卡片式"），所以现在这里**只有一个落点**。
-	 * 阶段 5 会再加一个浮层槽位 —— 那时仍然只有这一个搬运点。
-	 */
-	function placeQueue(slotId = 'queue-slot') {
-		const list = document.getElementById('queue-list')
-		if (!list) return
-		const slot = document.getElementById(slotId)
-		if (slot && list.parentElement !== slot) slot.appendChild(list)
-	}
-
-	/**
-	 * 把**唯一那份**歌词面板放到正确的位置（阶段 D）。
-	 *
-	 * 与 `placeQueue` 完全同一个理由与手法：歌词在「右栏」和「正在播放的中栏」
-	 * 都要出现，但**不能渲染两份** —— 两份会让 testid 重复、拖拽与点击落到
-	 * 错误的那棵树上，而界面看起来完全正常。
-	 *
-	 * 差别只有一处：右栏里的面板**靠 `is-active` 决定显隐**，而搬到中栏之后
-	 * 它必须一直可见 —— 所以搬过去时自己加上 `is-active`，搬回来时再交还给
-	 * 右栏的页签状态（`switchPanel`）。
-	 */
-	let lyricsPanelHome = null
-	/**
-	 * 歌词面板（整个 `.panel[data-panel="lyrics"]`）当前是不是在「正在播放」中栏里。
-	 *
-	 * ⚠️ 搬的是**整个面板壳**，不只是 `#lyrics-panel` 挂载点 ——
-	 * 壳里还有「重新匹配 / 独立窗口 / 状态」那条工具条，只搬挂载点会让它们
-	 * 失去入口（用户点不到）。
-	 *
-	 * ⚠️ 也别把它当成 `#panel-lyrics`：那个元素**没有 `id`**，只有
-	 * `data-panel="lyrics"`。第一版就是按 id 找的 → 恒为 null → 函数直接 return →
-	 * **中栏永远空着**，而所有既有断言照样通过（没人在看中栏）。
+	 * ⚠️ 它现在是**常驻**在播放详情页右卡里的（卡片化收尾删掉了右栏），
+	 * 不再是"搬来搬去"的：一份 DOM、一个家。
 	 */
 	function lyricsPanelEl() {
 		return document.querySelector('.panel[data-panel="lyrics"]')
 	}
-	function isLyricsInNowPlaying() {
-		const panel = lyricsPanelEl()
-		return Boolean(
-			panel && panel.parentElement?.id === 'nowplaying-lyrics-slot',
-		)
-	}
+
 	/**
 	 * 歌词面板现在**真的**能被用户看到吗。
 	 *
-	 * 判据是"在文档里 + 祖先链上没有 `hidden`/`display:none`"，
-	 * 而不是"右栏的哪个页签是激活的" —— 后者只在歌词住在右栏时才成立，
-	 * 而它现在的主场是播放详情页的中栏（见 `timeupdate` 里的注释：
-	 * 用页签做判据会让歌词高亮**永远不前进**）。
+	 * 判据是"在文档里 + 祖先链上没有 `hidden`/`display:none`"，而不是
+	 * "右栏的哪个页签是激活的" —— 后者是歌词还住在右栏时留下的写法
+	 * （见 `timeupdate` 里的注释：用页签做判据会让歌词高亮**永远不前进**）。
 	 *
 	 * ⚠️ `getBoundingClientRect().width > 0` 不能当判据：面板在
 	 * `display: none` 的祖先下时宽高确实是 0，但在**过渡动画中**
 	 * 也可能是 0 —— 那会变成偶发不更新。
+	 *
+	 * ⚠️ 这个函数原来**被定义了两遍**（内容一模一样，后一份覆盖前一份，
+	 * 所以行为没错，但是纯粹的复制粘贴残留）。删掉右栏时一并收敛成一份。
 	 */
 	function isLyricsPanelVisible() {
 		const panel = lyricsPanelEl()
@@ -427,49 +319,6 @@
 			if (getComputedStyle(node).display === 'none') return false
 		}
 		return true
-	}
-	/**
-	 * 歌词面板现在**真的**能被用户看到吗。
-	 *
-	 * 判据是"在文档里 + 祖先链上没有 `hidden`/`display:none`"，
-	 * 而不是"右栏的哪个页签是激活的" —— 后者只在歌词住在右栏时才成立，
-	 * 而它现在的主场是播放详情页的中栏（见 `timeupdate` 里的注释：
-	 * 用页签做判据会让歌词高亮**永远不前进**）。
-	 *
-	 * ⚠️ `getBoundingClientRect().width > 0` 不能当判据：面板在
-	 * `display: none` 的祖先下时宽高确实是 0，但在**过渡动画中**
-	 * 也可能是 0 —— 那会变成偶发不更新。
-	 */
-	function isLyricsPanelVisible() {
-		const panel = lyricsPanelEl()
-		if (!panel || !panel.isConnected) return false
-		for (
-			let node = panel;
-			node && node !== document.body;
-			node = node.parentElement
-		) {
-			if (node.hidden) return false
-			if (getComputedStyle(node).display === 'none') return false
-		}
-		return true
-	}
-	function placeLyrics(intoNowPlaying) {
-		const panel = lyricsPanelEl()
-		if (!panel) return
-		if (!lyricsPanelHome) lyricsPanelHome = panel.parentElement
-		if (intoNowPlaying) {
-			const slot = document.getElementById('nowplaying-lyrics-slot')
-			if (!slot) return
-			if (panel.parentElement !== slot) slot.appendChild(panel)
-			// 右栏那个壳靠 `is-active` 显隐；搬到中栏后它必须一直可见
-			panel.classList.add('is-active')
-			return
-		}
-		if (lyricsPanelHome && panel.parentElement !== lyricsPanelHome) {
-			lyricsPanelHome.appendChild(panel)
-		}
-		// 回到右栏：显隐交回给页签（右栏现在只有"播放队列"一页，所以是隐藏）
-		panel.classList.remove('is-active')
 	}
 
 	/**
@@ -529,13 +378,20 @@
 		/*
 		 * ⚠️ 只让**最内层**的入口生效。
 		 *
-		 * 歌单卡本体是 `data-nav="library"`，而它的页头「收藏夹」是
-		 * `data-nav="favorites"`、页脚「设置」是 `data-nav="settings"` ——
-		 * 三者是**嵌套**的。点击会冒泡，于是"点收藏夹"会先切到收藏夹、
-		 * 紧接着又被卡片的 handler 切回音乐库（表现是"点了没反应"）。
-		 * 判据：事件目标就是当前 handler 的元素时才是真正被点的那个。
+		 * 歌单卡本体是 `data-nav="library"`，而它的页头「首页」是
+		 * `data-nav="home"`、「收藏夹」是 `data-nav="favorites"`、页脚「设置」是
+		 * `data-nav="settings"` —— 它们是**嵌套**的。点击会冒泡，于是"点收藏夹"
+		 * 会先切到收藏夹、紧接着又被卡片的 handler 切回音乐库（表现是"点了没反应"）。
+		 * 判据：被点的那个入口必须**就是**当前 handler 的元素。
+		 *
+		 * ⚠️ 不能写成 `event.target === event.currentTarget`（原来是这么写的）：
+		 * 入口按钮里有 `<span class="icon">` 与文字，点在**图标那一小块**上时
+		 * `target` 是那个 span，严格相等会把这次点击**整个丢掉** ——
+		 * 表现是"点图标没反应、点旁边的字就行"（按钮看起来是坏的）。
+		 * 所以先用 `closest` 找出最内层入口，再比较它是不是当前 handler 的元素。
 		 */
-		if (event && event.target !== event.currentTarget) return
+		const inner = event?.target?.closest?.('[data-nav]')
+		if (inner && inner !== event.currentTarget) return
 		if (name === 'favorites') {
 			window.bbUI?.setLibraryTab?.('favorites')
 			return
@@ -756,31 +612,25 @@
 	 *
 	 * 参考图里用户圈的就是这个动作：传输条上一个按钮，点了播放列表出现/消失。
 	 * 语义（**播放条按钮、`Ctrl+Q`、顶部菜单那一项三者共用这一份实现**）：
-	 *   * 不在「正在播放」页 → 先进那一页，并把播放列表**显示出来**；
-	 *   * 已经在那一页 → 切换播放列表的显隐。
+	 * 在**当前页**把播放列表浮层显示出来 / 收起来。
 	 *
-	 * ⚠️ 实现变过三次，记下来避免再绕回去：
+	 * ⚠️ 实现变过四次，记下来避免再绕回去：
 	 *   1. 最初切的是**右栏的队列/歌词两个页签**——歌词页签去掉后语义消失；
 	 *   2. 阶段 D 改成切「正在播放」页第三栏的显隐（`is-queue-hidden`）——
 	 *      卡片化**阶段 4** 把那第三栏整个删了（草图「放弃原有的三联卡片式」），
 	 *      于是这个函数变成了对着一个不存在的类名做 `classList` 操作：
 	 *      按钮点了**毫无反应**，而所有既有断言都读那个类，于是全都"通过"
 	 *      （一条假绿：探针读的是 classList，不是"界面上有没有东西出现"）；
-	 *   3. **阶段 5** 起它弹的是内容卡下方的**播放列表浮层**。
-	 *      队列 DOM 仍然只有一份 —— 在右栏与浮层之间搬家（见 placeQueue）。
+	 *   3. **阶段 5** 起它弹的是内容卡下方的**播放列表浮层**，但会顺带
+	 *      **切到「正在播放」页**（那时队列的主家是右栏，"呼出"被理解成
+	 *      "去那一页"）；
+	 *   4. **卡片化收尾**删掉右栏之后，浮层成了播放列表**唯一**的形态，
+	 *      于是它不再换页 —— 你在音乐库按 Ctrl+Q，浮层就在音乐库弹出来。
+	 *      换页反而是噪音：用户只想看一眼队列，不想离开当前页。
 	 */
 	function toggleQueuePopover(force) {
 		const popover = document.getElementById('queue-popover')
 		if (!popover) return
-		/*
-		 * ⚠️ **顺序很重要**：`setNowPlaying(true)` 会走 `showMainPane()`，
-		 * 而那里有一句"换目的地就收起浮层"（`closeQueuePopover()`）。
-		 * 如果先算 open 再切页，切页那一步会把刚打开的状态又关掉 ——
-		 * 症状是"Ctrl+Q 之后队列 DOM 已经搬到浮层里了，但浮层没展开"
-		 * （探针第一版就是这么红的）。
-		 * 所以：先切页（可能会顺带关一次），**再**重新算一次 open。
-		 */
-		if (currentView !== 'nowplaying') setNowPlaying(true)
 		const open =
 			typeof force === 'boolean'
 				? force
@@ -799,10 +649,6 @@
 		 * 而过渡动画仍然由 CSS 负责（图层可见时自然会动）。
 		 */
 		setTimeout(() => popover.classList.toggle('is-open', open), 0)
-		// 队列 DOM 搬进/搬出浮层，**始终只有一份**
-		placeQueue(open ? 'queue-popover-slot' : 'queue-slot')
-		// 浮层只属于播放详情页：那一页不显示搜索框
-		syncShellForView('nowplaying')
 		syncQueueTriggers(open)
 	}
 
@@ -876,7 +722,7 @@
 	 * ⚠️ 原来它注册成 `scope: 'input'`（只在输入框里有意义，只清搜索框），
 	 * 于是登录弹窗、快捷键提示、正在播放页、右栏**都没有键盘关闭路径** ——
 	 * `keyboard.js` 的全局分发会把焦点在非输入框时的 Escape 直接丢掉。
-	 * 现在改成全局作用域，按"层"的顺序处理（弹窗 → 提示 → 播放页 → 右栏），
+	 * 现在改成全局作用域，按"层"的顺序处理（弹窗 → 播放列表浮层 → 播放页 → 输入框），
 	 * 处理了才 `preventDefault`，没处理就让别的监听器（如多选的 Esc）接手。
 	 */
 	keys.register('escape', { description: '关闭当前浮层' }, (event) => {
@@ -899,27 +745,13 @@
 			event.preventDefault?.()
 			return
 		}
-		// 3) 快捷键提示
-		const hint = document.getElementById('hint')
-		if (hint && !hint.hidden) {
-			hint.hidden = true
-			event.preventDefault?.()
-			return
-		}
 		// 3) 「正在播放」页 → 回到进入前的目的地
 		if (currentView === 'nowplaying') {
 			setNowPlaying(false)
 			event.preventDefault?.()
 			return
 		}
-		// 4) 展开中的右栏 → 收起
-		const shell = document.querySelector('.app')
-		if (shell && !shell.classList.contains('is-rightbar-collapsed')) {
-			shell.classList.add('is-rightbar-collapsed')
-			event.preventDefault?.()
-			return
-		}
-		// 5) 输入框：清空并失焦（保留原来的行为）
+		// 4) 输入框：清空并失焦（保留原来的行为）
 		const input = document.getElementById('search-input')
 		if (input && document.activeElement === input) {
 			input.value = ''
@@ -1447,7 +1279,6 @@
 	// ---------------------------------------------------------------
 
 	window.bbUI = {
-		switchPanel,
 		setActiveNav,
 		/** 外壳自己记的"现在在哪一屏"（探针用；`bbState.view` 是另一回事） */
 		shellView: () => currentView,
@@ -1455,9 +1286,6 @@
 		setLibraryTab,
 		/** 打开一个目的地（同上） */
 		openView,
-		/** 右栏开关（阶段 2：默认收起，按需展开） */
-		setRightbar,
-		isRightbarOpen,
 		/** 只同步外壳外观（搜索行等），不动导航状态 —— 给设置页的 open() 用 */
 		syncShellForView,
 		/** 播放列表浮层开着吗（阶段 5；供快捷键与探针读） */
@@ -1552,11 +1380,6 @@
 		// 当前目的地决定显隐。启动时如果不调，界面停在"音乐库"但**页签条不出现**
 		// —— 代码看着对，界面缺少一整条导航。由探针的「音乐库有 4 个页签」抓到。
 		setActiveNav('library')
-
-		// 右栏默认收起：初次进入时界面只有「导航 + 内容 + 播放条」三块，
-		// 队列/歌词按需展开。这里显式设一次，而不是靠 HTML 上的初始类 ——
-		// 状态只有一处真相（`is-rightbar-collapsed`）。
-		setRightbar(false)
 
 		// 主题变量要在宣布「就绪」之前落地。
 		// 否则探针（和用户）可能在 `<style id="bb-theme-vars">` 还空着的时候

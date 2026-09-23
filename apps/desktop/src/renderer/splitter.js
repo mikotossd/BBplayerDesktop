@@ -10,11 +10,14 @@
  *
  * ## 为什么宽度走 CSS 变量而不是改内联样式
  *
- * `.app` 是网格：`grid-template-columns: 240px minmax(0,1fr) 320px`。
- * 把第一列写成 `var(--sidebar-width, 240px)` 之后，**收起状态（0）与
- * 右栏收起状态（`is-rightbar-collapsed`）可以同时成立** —— 它们各自只改
- * 一个变量/类，不会互相覆盖（如果两个状态都直接写 `grid-template-columns`，
- * 后写的那个会把另一个吃掉，而这种覆盖在界面上表现为"某次展开/收起失灵"）。
+ * `.app` 是网格：`grid-template-columns: var(--sidebar-width, 240px) minmax(0,1fr)`。
+ * 把左栏宽度写成 `var(--sidebar-width, 240px)` 之后，**"拖到某个宽度"与
+ * "收起（0）"这两种状态都只改这一个变量** —— 它们不会互相覆盖
+ * （如果两个状态都直接写 `grid-template-columns`，后写的那个会把另一个吃掉，
+ * 而这种覆盖在界面上表现为"某次展开/收起失灵"）。
+ *
+ * ⚠️ 这里原来还有一个 `--rightbar` 的上限常量与"右栏收起状态"的说法。
+ * 卡片化收尾把右栏整条删掉了，外壳现在是两列。
  */
 ;(function () {
 	'use strict'
@@ -22,7 +25,7 @@
 	const DEFAULT_WIDTH = 240
 	/** 再窄就没有可用性了；到这个值以下**自动收起**（用户确认的行为） */
 	const MIN_WIDTH = 150
-	/** 右栏展开时的上限：再宽就把内容挤没了 */
+	/** 左栏拖宽时的上限：再宽就把中栏挤没了 */
 	const MAX_WIDTH = 520
 
 	const app = document.querySelector('.app')

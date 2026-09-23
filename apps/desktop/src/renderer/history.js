@@ -37,16 +37,6 @@
 	const els = {
 		content: document.getElementById('content'),
 		status: document.getElementById('status'),
-		/*
-		 * 主页下沿的两块（卡片化阶段 2）。
-		 *
-		 * ⚠️ 它们是**常驻 DOM**（不在 `#content` 内）：`refresh()` 会
-		 * `content.textContent = ''` 整块重建内容卡，而这两块要活下来。
-		 * 由 `renderer.js` 的 `setActiveNav` 按视图切 `#home-strip` 的 `hidden`。
-		 */
-		strip: document.getElementById('home-strip'),
-		recent: document.getElementById('home-recent-body'),
-		quick: document.getElementById('home-quick'),
 	}
 
 	const setStatus = (text, kind) => {
@@ -132,7 +122,7 @@
 	// 渲染
 	// ---------------------------------------------------------------
 
-	function renderTabs(container) {
+	function buildHistoryTabs() {
 		const tabs = document.createElement('div')
 		tabs.className = 'tabs tabs--sub'
 		tabs.dataset.testid = 'history-tabs'
@@ -150,12 +140,134 @@
 			})
 			tabs.appendChild(button)
 		}
-		container.appendChild(tabs)
+		return tabs
 	}
 
-	function renderTable(container, rows, { showCount, showPosition }) {
-		const tracks = rows.map(toTrack).filter(Boolean)
-		if (tracks.length === 0) {
+	/**
+	 * 播放历史的一行（紧凑歌曲行，与歌单详情同一套 `.song-row`）。
+	 *
+	 * ⚠️ 卡片化收尾：这里原来是 `.track-table` 的表格行，标签页切换会
+	 * 换一组列（次数 / 上次听到）。主页按原型重做之后改成行 ——
+	 * 那两个"只在某些页签下存在"的列改成**行右侧那一格**的文字：
+	 *   * 最常播放 / 最近播放 → 「N 次」；
+	 *   * 继续收听 → 「上次 1:32」；
+	 *   * 热力图点进来的某一天 → 时长。
+	 * 相对时间（「3 天前」）并进歌手那一格，不另开一列 ——
+	 * 它是补充信息，不该和曲名抢宽度。
+	 */
+	function buildHistoryRow(row, index, tracks, options) {
+		const track = toTrack(row)
+		const item = document.createElement('li')
+		item.className = 'song-row song-row--no-more'
+		item.dataset.testid = `history-row-${index}`
+		item.dataset.bvid = track.bvid
+		if (window.bbPlayer.getCurrent()?.bvid === track.bvid) {
+			item.classList.add('is-playing')
+		}
+
+		const activate = () => {
+			const queueIndex = tracks.indexOf(track)
+			window.bbPlayer.setQueue(tracks, queueIndex)
+			window.bbPlayer.playAt(queueIndex)
+			// 「继续收听」要从上次的位置接着播
+			if (track.resumeAt && track.resumeAt > 5) {
+				// seek 必须在元数据就绪后才有意义；播放器会在 loadedmetadata 后
+				// 应用 pendingSeek（见 player.js），所以这里直接调即可
+				window.bbPlayer.seekTo(track.resumeAt)
+			}
+			void window.bbPlayer.play()
+		}
+
+		// ① 悬停才出现的「播放这一首」
+		const play = document.createElement('button')
+		play.type = 'button'
+		play.className = 'song-row__play'
+		play.dataset.testid = `history-play-${index}`
+		play.title = '播放这一首'
+		play.setAttribute('aria-label', '播放这一首')
+		play.innerHTML = window.bbComponents.iconHtml('play_arrow', 'icon--sm')
+		play.addEventListener('click', (event) => {
+			event.stopPropagation()
+			activate()
+		})
+		item.appendChild(play)
+
+		// ② 序号
+		const number = document.createElement('span')
+		number.className = 'song-row__index'
+		number.textContent = String(index + 1).padStart(2, '0')
+		item.appendChild(number)
+
+		// ③ 封面
+		item.appendChild(
+			window.bbComponents.art({
+				title: track.title,
+				coverUrl: track.cover ?? null,
+				extraClass: 'song-row__cover',
+			}),
+		)
+
+		// ④ 标题
+		const title = document.createElement('span')
+		title.className = 'song-row__title'
+		title.textContent = track.title || '(无标题)'
+		title.title = title.textContent
+		item.appendChild(title)
+
+		// ⑤ 歌手 · 相对时间
+		const artist = document.createElement('span')
+		artist.className = 'song-row__artist'
+		const when = formatRelative(row.last_played_at)
+		artist.textContent = [track.artist || '—', when].filter(Boolean).join(' · ')
+		artist.title = artist.textContent
+		item.appendChild(artist)
+
+		// ⑥ 那一格：次数 / 上次听到 / 时长
+		const meta = document.createElement('span')
+		meta.className = 'song-row__time'
+		meta.dataset.testid = `history-meta-${index}`
+		if (options.showCount) {
+			meta.dataset.kind = 'count'
+			meta.textContent = `${row.play_count ?? 0} 次`
+		} else if (options.showPosition) {
+			meta.dataset.kind = 'position'
+			meta.textContent = `上次 ${formatDuration(row.last_position_seconds)}`
+		} else {
+			meta.dataset.kind = 'duration'
+			meta.textContent = formatDuration(track.duration)
+		}
+		item.appendChild(meta)
+
+		item.addEventListener('dblclick', (event) => {
+			event.preventDefault()
+			activate()
+		})
+		return item
+	}
+
+	/**
+	 * 原始历史行 → 「原始行 + 能播的曲目」配对。
+	 *
+	 * ⚠️ `toTrack` 会丢掉**没有 `bvid`** 的历史记录（播放器靠 bvid 解析音频），
+	 * 所以行下标与队列下标都必须基于这一份配对，而不是原始 `rows`：
+	 * 不能按 `bvid` 回查原始行 —— 同一首歌可能有多条历史记录。
+	 */
+	function historyEntries(rows) {
+		return rows
+			.map((row) => ({ row, track: toTrack(row) }))
+			.filter((entry) => entry.track)
+	}
+
+	/**
+	 * 播放历史的列表（`.song-list` + `.song-row`）。
+	 *
+	 * ⚠️ 行**不做多选**：桌面端的多选是"歌单 / 收藏夹里挑几首去操作"，
+	 * 而历史不是可编辑的集合。所以这里不接选中态，也不给行加「⋮」
+	 * （`.song-row--no-more` 把那一列去掉）。
+	 */
+	function renderHistoryList(container, rows, options) {
+		const entries = historyEntries(rows)
+		if (entries.length === 0) {
 			container.appendChild(
 				window.bbComponents.empty({
 					testid: 'history-empty',
@@ -170,141 +282,109 @@
 			return
 		}
 
-		const actions = document.createElement('div')
-		actions.className = 'row-actions'
-		const playAll = document.createElement('button')
-		playAll.dataset.testid = 'history-play-all'
-		playAll.innerHTML = '<span class="icon icon--sm">play_arrow</span> 播放全部'
-		playAll.addEventListener('click', () => {
-			window.bbPlayer.setQueue(tracks, 0)
-			window.bbPlayer.playAt(0)
-			void window.bbPlayer.play()
+		const tracks = entries.map((entry) => entry.track)
+		const list = document.createElement('ul')
+		list.className = 'song-list'
+		list.dataset.testid = 'history-list'
+		entries.forEach((entry, index) => {
+			list.appendChild(buildHistoryRow(entry.row, index, tracks, options))
 		})
-		actions.appendChild(playAll)
-		container.appendChild(actions)
+		container.appendChild(list)
+	}
 
-		const table = document.createElement('table')
-		table.className = 'track-table'
-		table.dataset.testid = 'history-table'
+	/**
+	 * 区块 4：播放历史。
+	 *
+	 * ⚠️ 原型把**三个页签 + 汇总 + 「播放全部」都放在区块的标题行里** ——
+	 * 这一块本来就没有独立标题（页签就是标题），而外壳的 `#page-title`
+	 * 已经写着「主页」。所以这里不建 `<h2>`，只建一行 `.home-section__head`。
+	 *
+	 * ⚠️ 热力图点进来的"某一天"不再是标题的一部分（没有标题了），
+	 * 改由右侧那句汇总说明：`2026-09-23 · 12 次播放`。
+	 */
+	function buildHistorySection(rows, options, summary) {
+		const section = document.createElement('section')
+		section.className = 'home-section'
+		section.dataset.testid = 'home-history'
 
-		const thead = document.createElement('thead')
-		const headRow = document.createElement('tr')
-		const columns = [
-			['#', 'col-index'],
-			['标题', 'col-title'],
-			['作者', 'col-artist'],
-			showCount ? ['播放次数', 'col-count'] : null,
-			showPosition ? ['上次听到', 'col-position'] : null,
-			['时长', 'col-duration'],
-			['最近播放', 'col-when'],
-		].filter(Boolean)
-		for (const [label, cls] of columns) {
-			const th = document.createElement('th')
-			th.className = cls
-			th.textContent = label
-			headRow.appendChild(th)
-		}
-		thead.appendChild(headRow)
-		table.appendChild(thead)
+		const head = document.createElement('div')
+		head.className = 'home-section__head'
+		head.appendChild(buildHistoryTabs())
 
-		const tbody = document.createElement('tbody')
-		rows.forEach((row, index) => {
-			const track = toTrack(row)
-			if (!track) return
-			const tr = document.createElement('tr')
-			tr.dataset.testid = `history-row-${index}`
-			tr.dataset.bvid = track.bvid
-			if (window.bbPlayer.getCurrent()?.bvid === track.bvid) {
-				tr.classList.add('is-playing')
-			}
+		const spacer = document.createElement('span')
+		spacer.className = 'home-section__spacer'
+		head.appendChild(spacer)
 
-			const cells = [
-				[String(index + 1), 'col-index'],
-				[track.title || '(无标题)', 'col-title'],
-				[track.artist || '—', 'col-artist'],
-				showCount ? [String(row.play_count ?? 0), 'col-count'] : null,
-				showPosition
-					? [formatDuration(row.last_position_seconds), 'col-position']
-					: null,
-				[formatDuration(track.duration), 'col-duration'],
-				[formatRelative(row.last_played_at), 'col-when'],
-			].filter(Boolean)
+		const meta = document.createElement('span')
+		meta.className = 'home-section__meta'
+		meta.dataset.testid = 'history-summary'
+		meta.textContent = pickedDate
+			? `${pickedDate} · ${rows.length} 次播放`
+			: summary.sessionCount === 0
+				? '暂无记录'
+				: `${summary.trackCount} 首 · ${summary.sessionCount} 次播放 · 累计 ${Math.round(summary.totalSeconds / 60)} 分钟`
+		head.appendChild(meta)
 
-			for (const [text, cls] of cells) {
-				const td = document.createElement('td')
-				td.className = cls
-				td.title = text
-				/*
-				 * ⚠️ 标题列要套一层 `.col-title__text`。
-				 *
-				 * 省略号规则（`white-space: nowrap` + `text-overflow: ellipsis`）
-				 * 挂在内层 span 上，而 `td.col-title` 自己是 `max-width: 0` ——
-				 * 直接把长标题写进 `td` 会让它**换行成 2–3 行**，行高与音乐库
-				 * 那张表对不上（同一个 `.track-table` 类，两种长相）。
-				 */
-				if (cls === 'col-title') {
-					const span = document.createElement('span')
-					span.className = 'col-title__text'
-					span.textContent = text
-					td.appendChild(span)
-				} else {
-					td.textContent = text
-				}
-				tr.appendChild(td)
-			}
-
-			tr.addEventListener('dblclick', () => {
-				const queueIndex = tracks.indexOf(track)
-				window.bbPlayer.setQueue(tracks, queueIndex)
-				window.bbPlayer.playAt(queueIndex)
-				// 「继续收听」要从上次的位置接着播
-				if (track.resumeAt && track.resumeAt > 5) {
-					// seek 必须在元数据就绪后才有意义；播放器会在 loadedmetadata 后
-					// 应用 pendingSeek（见 player.js），所以这里直接调即可
-					window.bbPlayer.seekTo(track.resumeAt)
-				}
+		const tracks = historyEntries(rows).map((entry) => entry.track)
+		if (tracks.length > 0) {
+			const playAll = document.createElement('button')
+			playAll.className = 'btn--outlined'
+			playAll.dataset.testid = 'history-play-all'
+			playAll.innerHTML = `${window.bbComponents.iconHtml('play_arrow', 'icon--sm')} 播放全部`
+			playAll.addEventListener('click', () => {
+				window.bbPlayer.setQueue(tracks, 0)
+				window.bbPlayer.playAt(0)
 				void window.bbPlayer.play()
 			})
-			tr.addEventListener('click', () => {
-				for (const other of tbody.querySelectorAll('tr')) {
-					other.classList.remove('is-selected')
-				}
-				tr.classList.add('is-selected')
-			})
-
-			tbody.appendChild(tr)
-		})
-		table.appendChild(tbody)
-		container.appendChild(table)
+			head.appendChild(playAll)
+		}
+		section.appendChild(head)
+		renderHistoryList(section, rows, options)
+		return section
 	}
 
 	// ---------------------------------------------------------------
 	// 主页的区块（阶段 6d）
 	// ---------------------------------------------------------------
 
-	/** 一个主页区块：标题 +（可选）说明 + 内容 */
-	function homeSection(title, { hint, testid } = {}) {
+	/**
+	 * 区块的**标题行**：标题 + 可选右侧说明。
+	 *
+	 * ⚠️ 说明在**右边**而不是下面（原型就是这么画的）。放在下面每块白占一行。
+	 */
+	function sectionHead(title, meta) {
+		const head = document.createElement('div')
+		head.className = 'home-section__head'
+		const h2 = document.createElement('h2')
+		h2.className = 'home-section__title'
+		h2.textContent = title
+		head.appendChild(h2)
+		if (meta) {
+			const spacer = document.createElement('span')
+			spacer.className = 'home-section__spacer'
+			head.appendChild(spacer)
+			const note = document.createElement('span')
+			note.className = 'home-section__meta'
+			note.textContent = meta
+			head.appendChild(note)
+		}
+		return head
+	}
+
+	/** 一个主页区块：标题行 + 内容（内容由调用方继续 append） */
+	function homeSection(title, { meta, testid } = {}) {
 		const section = document.createElement('section')
 		section.className = 'home-section'
 		if (testid) section.dataset.testid = testid
-		const h3 = document.createElement('h2')
-		h3.className = 'home-section__title'
-		h3.textContent = title
-		section.appendChild(h3)
-		if (hint) {
-			const note = document.createElement('p')
-			note.className = 'home-section__hint'
-			note.textContent = hint
-			section.appendChild(note)
-		}
+		section.appendChild(sectionHead(title, meta))
 		return section
 	}
 
-	/** 区块 1：听歌频率热力图（主题色） */
+	/** 区块 1：听歌频率热力图（主题色）—— 这一块是**用户的 GitHub 贡献墙**，不动 */
 	function renderHeatmapSection() {
 		const section = homeSection('听歌频率', {
 			testid: 'home-heatmap',
-			hint: '最近一年每天听了几次。点一格可以看那一天的记录。',
+			meta: '点一格可以看那一天的记录',
 		})
 		const box = document.createElement('div')
 		box.className = 'heatmap-box'
@@ -350,29 +430,25 @@
 	/**
 	 * 区块 2：快捷入口（title ① 与 area ①）。
 	 *
-	 * ⚠️ 卡片化阶段 2：它不再挂进 `#content`，而是**渲染进常驻的
-	 * `#home-quick`**（内容卡下面那一块的右半）。这样做的前提是
-	 * `#home-quick` 每次都要先清空 —— 否则每刷一次主页就叠一层。
+	 * ⚠️ 卡片化收尾：它现在**返回**一个区块（由 `refresh()` 放进内容卡顶部的
+	 * 左右分栏里），而不是渲染进一个常驻的 `#home-quick`。四张胶囊卡与原型
+	 * （`prototype/pages/home.html`）一致：最近播放 / 继续收听 / 收藏夹 / 音乐库。
 	 */
 	function renderQuickAccess() {
-		const host = els.quick
-		if (!host) return null
-		host.textContent = ''
-		const section = homeSection('快捷入口')
+		const section = homeSection('快捷入口', { testid: 'home-quick-slot' })
 		const grid = document.createElement('div')
-		// ⚠️ 主页下沿那块宽度只有半屏，用 `--fixed` 钉三列（见 components.css）
-		grid.className = 'home-quick home-quick--fixed'
+		grid.className = 'home-quick'
 		section.appendChild(grid)
 
 		/*
 		 * ⚠️ 桌面端没有「稍后再看」（那是 B 站账号侧的列表，桌面端未接入），
-		 * 所以第三张换成本地真实存在的入口，而不是摆一个点了没用的卡。
+		 * 所以第四张换成本地真实存在的入口（音乐库），而不是摆一个点了没用的卡。
 		 */
 		const cards = [
 			{
 				testid: 'quick-recent',
 				icon: 'history',
-				label: '最近常听',
+				label: '最近播放',
 				run: () => gotoTab('recent'),
 			},
 			{
@@ -384,8 +460,14 @@
 			{
 				testid: 'quick-favorites',
 				icon: 'star',
-				label: '我的收藏夹',
+				label: '收藏夹',
 				run: () => window.bbUI?.setLibraryTab?.('favorites'),
+			},
+			{
+				testid: 'quick-library',
+				icon: 'library_music',
+				label: '音乐库',
+				run: () => window.bbUI?.openView?.('library'),
 			},
 		]
 		for (const card of cards) {
@@ -403,38 +485,24 @@
 			button.addEventListener('click', () => card.run())
 			grid.appendChild(button)
 		}
-		host.appendChild(section)
 		return section
 	}
 
 	/**
 	 * 区块 ⑤：最近播放（最近**一次**播放的曲目）。
 	 *
-	 * 数据来自 `history.resume(1)` —— 与「继续收听」页签同一个 IPC，
-	 * 取第一条即可。取不到（空库）时给一句空态，而不是留一个空框。
+	 * 数据由 `refresh()` 提前取好传进来（`history.resume(1)`，与「继续收听」
+	 * 同一个 IPC，取第一条）。取不到（空库）时给一句空态，而不是留一个空框。
 	 */
-	async function renderRecentStrip() {
-		const host = els.recent
-		if (!host) return
-		host.textContent = ''
-		let track = null
-		try {
-			const rows = unwrap(
-				await window.bbplayer.history.resume(1),
-				'读取最近播放',
-			)
-			track = Array.isArray(rows) ? (rows[0] ?? null) : null
-		} catch {
-			// 读不到就当没有 —— 这一块是锦上添花，不该让整个主页报错
-			track = null
-		}
+	function renderRecentStrip(track) {
+		const section = homeSection('最近播放', { testid: 'home-recent' })
 
 		if (!track) {
 			const empty = document.createElement('div')
 			empty.className = 'home-recent home-recent--empty'
 			empty.textContent = '还没有播放记录'
-			host.appendChild(empty)
-			return
+			section.appendChild(empty)
+			return section
 		}
 
 		const row = document.createElement('div')
@@ -482,7 +550,27 @@
 		})
 		row.appendChild(play)
 
-		host.appendChild(row)
+		section.appendChild(row)
+		return section
+	}
+
+	/**
+	 * 主页顶部的左右分栏：最近播放 | 快捷入口。
+	 *
+	 * ⚠️ 中间的竖线是**网格列**（见 style.css 的 `.home-split`），
+	 * 不是边框 —— 两栏高度不等时它自动拉满。
+	 */
+	function buildTopSplit(left, right) {
+		const wrap = document.createElement('div')
+		wrap.className = 'home-split'
+		wrap.dataset.testid = 'home-split'
+		wrap.appendChild(left)
+		const divider = document.createElement('div')
+		divider.className = 'home-split__divider'
+		divider.dataset.testid = 'home-split-divider'
+		wrap.appendChild(divider)
+		wrap.appendChild(right)
+		return wrap
 	}
 
 	/** 切换历史子页签并把那一块滚进视野（快捷入口用） */
@@ -504,7 +592,7 @@
 	async function renderRecentPlaylists(content) {
 		const section = homeSection('最近更新', {
 			testid: 'home-recent-playlists',
-			hint: '按歌单最近一次修改排序（不是最近听过）。',
+			meta: '按歌单最近一次修改排序（不是最近听过）',
 		})
 		const grid = document.createElement('div')
 		grid.className = 'media-grid'
@@ -609,40 +697,41 @@
 			}
 			if (stale()) return null
 
-			const head = document.createElement('div')
-			head.className = 'view-head'
-			const h2 = document.createElement('h2')
-			// ⚠️ 主页的第一个 `.view-head` 是**播放历史**（它在页面下半部分）。
-			// 主页自己的标题由外壳的 `#page-title` 负责（「主页」）——
-			// 见 README 的「标题只有一处」。
-			h2.textContent = pickedDate ? `播放历史 · ${pickedDate}` : '播放历史'
-			head.appendChild(h2)
-			const meta = document.createElement('span')
-			meta.className = 'muted'
-			meta.dataset.testid = 'history-summary'
-			meta.textContent = pickedDate
-				? `${rows.length} 次播放`
-				: summary.sessionCount === 0
-					? '暂无记录'
-					: `${summary.trackCount} 首 · ${summary.sessionCount} 次播放 · 累计 ${Math.round(summary.totalSeconds / 60)} 分钟`
-			head.appendChild(meta)
 			/*
-			 * ⚠️ 区块顺序与容器（卡片化阶段 2）：
-			 *   * 热力图 / 最近更新 / 播放历史 → 内容卡（`#content`）
-			 *   * **快捷入口** → 内容卡**下面**那一块的右半（`#home-quick`）
-			 *   * **最近播放（⑤）** → 那一块的左半（`#home-recent-body`）
-			 *
-			 * 原来四处全挤在 `#content` 一个流里，而草图上是"内容卡 + 下沿两块"。
+			 * 最近播放那一条（⑤）先单独取一次：它与「继续收听」是同一个 IPC，
+			 * 取第一条即可。读不到就当没有 —— 这一块是锦上添花，
+			 * 不该让整个主页报错。
 			 */
-			content.appendChild(renderHeatmapSection())
-			renderQuickAccess()
-			await renderRecentPlaylists(content)
-			await renderRecentStrip()
+			let recentTrack = null
+			try {
+				const list = unwrap(
+					await window.bbplayer.history.resume(1),
+					'读取最近播放',
+				)
+				recentTrack = Array.isArray(list) ? (list[0] ?? null) : null
+			} catch {
+				recentTrack = null
+			}
 			if (stale()) return null
-			content.appendChild(head)
 
-			renderTabs(content)
-			renderTable(content, rows, options)
+			/*
+			 * ⚠️ 区块顺序按**原型**（`prototype/pages/home.html`），四块全在内容卡里：
+			 *   ① 左右分栏（最近播放 | 快捷入口）→ ② 听歌频率 → ③ 最近更新 → ④ 播放历史
+			 *
+			 * 卡片化阶段 2 曾把 ① 放到内容卡**下面**一条独立的下沿里，
+			 * 主页因此看起来是"一张卡片 + 一个孤零零的盒子"两块东西
+			 * （用户反馈"太混乱"）。现在回到一张卡片里的一条流。
+			 */
+			content.appendChild(
+				buildTopSplit(renderRecentStrip(recentTrack), renderQuickAccess()),
+			)
+			// ⚠️ 热力图那一块要**同步**挂上去（它的占位网格是同步画的，
+			// 见 renderHeatmapSection 的注释），所以放在任何 await 之前。
+			content.appendChild(renderHeatmapSection())
+			await renderRecentPlaylists(content)
+			if (stale()) return null
+
+			content.appendChild(buildHistorySection(rows, options, summary))
 
 			// 清空按钮（放在最后，避免误点）
 			if (summary.sessionCount > 0) {
@@ -732,9 +821,8 @@
 		setActiveTab: (tab) => {
 			activeTab = tab
 		},
-		/** 供自动化：直接读表格里的行数 */
+		/** 供自动化：直接读列表里的行数 */
 		getRowCount: () =>
-			document.querySelectorAll('[data-testid="history-table"] tbody tr')
-				.length,
+			document.querySelectorAll('[data-testid^="history-row-"]').length,
 	}
 })()

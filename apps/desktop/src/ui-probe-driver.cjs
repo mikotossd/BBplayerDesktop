@@ -261,49 +261,66 @@ async function run(window) {
 	if (!ready.ok) return finish(window)
 
 	// ---------------------------------------------------------------
-	// 1. 三栏 shell
+	// 1. 两栏 shell
 	// ---------------------------------------------------------------
-	console.log('\n[ui] 1) 三栏 shell')
+	console.log('\n[ui] 1) 两栏 shell')
 	let ui = await uiState(window)
 	check('左栏渲染', ui.sidebar)
 	check('中栏渲染', ui.main)
-	// ⚠️ 右栏**默认收起**（阶段 2）。原来它常驻 320px，不管有没有内容都占着，
-	// 三栏 + 边框 + 状态栏叠起来观感就是"IDE 面板"而不是播放器。
-	// 所以这里断言的是"存在但宽度为 0"，而不是"渲染出来了"。
-	const rightbarState = await evaluate(
-		window,
-		`(() => {
-			const el = document.querySelector('[data-testid="rightbar"]')
-			if (!el) return null
-			return {
-				width: Math.round(el.getBoundingClientRect().width),
-				collapsed: Boolean(
-					document.querySelector('.app')?.classList.contains('is-rightbar-collapsed'),
-				),
-				hasToggle: Boolean(
+	/*
+	 * 卡片化收尾：**顶栏与右栏整条删掉**（用户圈掉顶栏，并要求播放列表
+	 * 只保留"从下方呼出的浮层"这一种形态）。
+	 *
+	 * ⚠️ 这里断言的是"它们真的不在了"，而不是"宽度为 0" ——
+	 * 只删样式不删 DOM 的话，队列/歌词会被渲染进一个看不见的容器里，
+	 * 而所有既有断言照样通过（它们读的是 id，不是"在不在屏幕上"）。
+	 */
+	const chromeRemoved = JSON.parse(
+		await evaluate(
+			window,
+			`(() => JSON.stringify({
+				topbar: Boolean(document.querySelector('.topbar')),
+				rightbar: Boolean(document.querySelector('[data-testid="rightbar"]')),
+				rightbarToggle: Boolean(
 					document.querySelector('[data-testid="rightbar-toggle"]'),
 				),
-			}
-		})()`,
+			}))()`,
+		),
 	)
 	check(
-		'右栏默认收起（宽度 0，不占屏）',
-		rightbarState?.collapsed === true && rightbarState.width === 0,
-		JSON.stringify(rightbarState),
+		'顶栏与右栏都已移除（不是藏起来）',
+		chromeRemoved.topbar === false &&
+			chromeRemoved.rightbar === false &&
+			chromeRemoved.rightbarToggle === false,
+		JSON.stringify(chromeRemoved),
 	)
-	check('右栏有展开入口（顶栏的开关按钮）', rightbarState?.hasToggle === true)
-	// 收起必须**真的能展开**——否则就是"藏起来了打不开"，比常驻还糟
-	await click(window, '[data-testid="rightbar-toggle"]')
-	await sleep(300)
-	const expanded = await evaluate(
-		window,
-		`Math.round(document.querySelector('[data-testid="rightbar"]').getBoundingClientRect().width)`,
-	)
-	check('点开关能展开右栏', Number(expanded) > 200, `展开后宽度 ${expanded}px`)
-	// 再收回去，后续断言按"收起"的初始状态走
-	await click(window, '[data-testid="rightbar-toggle"]')
-	await sleep(300)
 	check('底部播放条渲染', ui.playbar)
+	/*
+	 * 播放列表只剩**浮层**一种形态。队列 DOM 必须**只有一份**，并且常驻在
+	 * 浮层里 —— 复制一份会让 `data-queue-index` 翻倍，探针计数与拖拽都会错。
+	 */
+	const queueHome = JSON.parse(
+		await evaluate(
+			window,
+			`(() => JSON.stringify({
+				lists: document.querySelectorAll('#queue-list').length,
+				parent: document.getElementById('queue-list')?.parentElement?.id ?? null,
+				open: Boolean(
+					document.getElementById('queue-popover')?.classList.contains('is-open'),
+				),
+			}))()`,
+		),
+	)
+	check(
+		'队列 DOM 只有一份，且住在播放列表浮层里',
+		queueHome.lists === 1 && queueHome.parent === 'queue-popover-slot',
+		JSON.stringify(queueHome),
+	)
+	check(
+		'播放列表浮层默认收起',
+		queueHome.open === false,
+		`is-open=${queueHome.open}`,
+	)
 	// 阶段 2b（信息架构分层）：左栏只留**目的地**。
 	//
 	// 原来是 7 个平铺入口，把"目的地"（音乐库 / 搜索）和"某个页面里的子集或
@@ -365,6 +382,50 @@ async function run(window) {
 		sidebarProbe.hasFavorites && sidebarProbe.hasSettings,
 		`收藏夹=${sidebarProbe.hasFavorites} 设置=${sidebarProbe.hasSettings}`,
 	)
+	/*
+	 * 卡片化收尾（追加）：顶栏删掉之后，「回主页」在界面上**没有显式入口**了
+	 * （点左上角那张用户卡能回，但它看起来像品牌 / 账户区）。
+	 * 用户圈了「收藏夹」要求"用同样规格在它上面加一个首页"。
+	 *
+	 * 断言的是**位置与规格**，不是"元素存在"：
+	 *   * 在「收藏夹」上面（用户明确要求的位置）；
+	 *   * 与「收藏夹」同高、同圆角（同一套 .sidebar__entry），不是被挤窄的小按钮。
+	 */
+	const homeEntry = JSON.parse(
+		await evaluate(
+			window,
+			`(() => {
+				const home = document.getElementById('sidebar-home')
+				const fav = document.getElementById('sidebar-favorites')
+				if (!home || !fav) return JSON.stringify({ ok: false })
+				const h = home.getBoundingClientRect()
+				const f = fav.getBoundingClientRect()
+				return JSON.stringify({
+					ok: true,
+					nav: home.dataset.nav ?? null,
+					above: h.bottom <= f.top + 1,
+					sameHeight: Math.abs(h.height - f.height) <= 1,
+					// 收藏夹那一行右边有个数量，所以它一定更窄；首页不该反而更窄
+					wider: h.width >= f.width - 1,
+					radius: getComputedStyle(home).borderRadius,
+				})
+			})()`,
+		),
+	)
+	check(
+		'「首页」入口在歌单卡页头、**在收藏夹上面**，且与收藏夹同规格',
+		homeEntry.ok === true &&
+			homeEntry.nav === 'home' &&
+			homeEntry.above === true &&
+			homeEntry.sameHeight === true &&
+			homeEntry.wider === true,
+		JSON.stringify(homeEntry),
+	)
+	check(
+		'「首页」入口也是胶囊（与收藏夹同一套 .sidebar__entry）',
+		homeEntry.radius === '9999px',
+		String(homeEntry.radius),
+	)
 	const libraryTabs = JSON.parse(
 		await evaluate(
 			window,
@@ -383,49 +444,44 @@ async function run(window) {
 	)
 	check('音乐库页内保留了「共享」动作入口', libraryTabs.hasShareAction === true)
 
-	// 点音乐库页签**不该影响右栏**。
+	// 点音乐库页签**不该顺带弹出播放列表浮层**。
 	//
-	// ⚠️ 这是截图巡检发现的一个真 bug：音乐库页签条与右栏页签**共用 `.tab` 类**，
-	// 而右栏的点击处理器绑在**所有** `.tab` 上 —— 点「收藏夹」会顺带
-	// `switchPanel(undefined)`：右栏两个面板全部变成不激活（一片空白），
-	// 而且还会擅自把收起状态的右栏展开。
+	// ⚠️ 这是截图巡检发现过的一个真 bug：音乐库页签条与（当时的）右栏页签
+	// **共用 `.tab` 类**，而右栏的点击处理器绑在**所有** `.tab` 上 ——
+	// 点「收藏夹」会顺带 `switchPanel(undefined)`：右栏两个面板全部变成
+	// 不激活（一片空白），而且还会擅自把收起的右栏展开。
 	//
-	// 表现很隐蔽：断言全绿（没人检查"点了 A 会不会影响 B"），
-	// 是靠巡检里"03–11 那几张的右栏一直是展开的"发现的；
-	// 体检表的 `.content` 宽度从 1186 变成 866 给出了确证。
+	// 右栏删掉之后那条代码路径没有了，但**"点 A 不该影响 B"这条判据要留着**：
+	// 现在它守的是"点页签不会顺带把播放列表浮层弹出来 / 不会把内容区切走"。
 	const tabIsolation = JSON.parse(
 		await evaluate(
 			window,
 			`(() => {
-				const before = {
-					collapsed: document
-						.querySelector('.app')
-						?.classList.contains('is-rightbar-collapsed'),
-					activePanels: document.querySelectorAll('.panel.is-active').length,
-				}
+				const snapshot = () => ({
+					popover: Boolean(
+						document.getElementById('queue-popover')?.classList.contains('is-open'),
+					),
+					contentHidden: document.getElementById('content')?.hidden ?? null,
+				})
+				const before = snapshot()
 				// 点一个音乐库页签，再回到播放列表
 				const tab = document.querySelector('[data-testid="lib-tab-favorites"]')
 				tab?.click()
-				const during = {
-					collapsed: document
-						.querySelector('.app')
-						?.classList.contains('is-rightbar-collapsed'),
-					activePanels: document.querySelectorAll('.panel.is-active').length,
-				}
+				const during = snapshot()
 				document.querySelector('[data-testid="lib-tab-playlists"]')?.click()
 				return JSON.stringify({ before, during })
 			})()`,
 		),
 	)
 	check(
-		'点音乐库页签不会顺带展开右栏（两套页签共用 .tab，必须按 data-panel 隔离）',
-		tabIsolation.before.collapsed === tabIsolation.during.collapsed,
-		`收起状态 ${tabIsolation.before.collapsed} → ${tabIsolation.during.collapsed}`,
+		'点音乐库页签不会顺带呼出播放列表浮层',
+		tabIsolation.during.popover === tabIsolation.before.popover,
+		`浮层 ${tabIsolation.before.popover} → ${tabIsolation.during.popover}`,
 	)
 	check(
-		'点音乐库页签不会把右栏面板全部关掉',
-		tabIsolation.during.activePanels === 1,
-		`激活的右栏面板数 ${tabIsolation.during.activePanels}（应为 1）`,
+		'点音乐库页签不会把内容区切走',
+		tabIsolation.during.contentHidden === false,
+		`content.hidden=${tabIsolation.during.contentHidden}`,
 	)
 
 	// `hidden` 必须**真的**隐藏。
@@ -465,10 +521,19 @@ async function run(window) {
 		hiddenAudit.length === 0,
 		hiddenAudit.length > 0 ? hiddenAudit.join('；') : '全部已隐藏',
 	)
+	/*
+	 * 卡片化收尾：外壳是**两列**（左栏 + 中栏）。这里量的是计算后的
+	 * 轨道数，而不是"某个选择器不存在" —— 有人把第三列加回来
+	 * （哪怕只是为了放一个空容器）这条就会红。
+	 */
+	const shellColumns = await evaluate(
+		window,
+		`getComputedStyle(document.querySelector('.app')).gridTemplateColumns`,
+	)
 	check(
-		'右栏默认显示队列',
-		ui.activePanel === 'queue',
-		`实际 ${ui.activePanel}`,
+		'外壳是两列（左栏 + 中栏，没有第三条轨道）',
+		String(shellColumns).trim().split(/\s+/).length === 2,
+		String(shellColumns),
 	)
 	await shot(window, 'ui-01-shell')
 
@@ -767,15 +832,20 @@ async function run(window) {
 					/*
 					 * 判据本身没变：全工程只允许一种选中视觉
 					 * （secondary-container 底 + on-secondary-container 字 +
-					 * 胶囊圆角 + 无下划线）。这里验的是"右栏页签与分段控件
+					 * 胶囊圆角 + 无下划线）。这里验的是"另一处选中态
 					 * 跟左栏是同一套"。
+					 *
+					 * ⚠️ 对照物原来是右栏的页签（data-panel 那个选择器）。
+					 * 卡片化收尾把右栏整条删掉了，于是换成**音乐库的页签**：
+					 * 它与左栏入口视觉上本来就该一致，而且它现在就在屏幕上
+					 * （这一节跑在音乐库视图下）。
+					 *
+					 * ⚠️ 必须写成 #library-tabs 下的 .tab.is-active（限定在页签条里），
+					 * 不能只写 .tab.is-active —— 后者会命中登录弹窗等别的页签条
+					 * （历史上就因为查询太宽而"一直在测错的元素"）。
 					 */
 					nav,
-					// ⚠️ 用 [data-panel] 而不是 .tab —— 音乐库的页签条也用 .tab
-					// 且 DOM 顺序在前，用 .tab.is-active 查询会先命中
-					// **音乐库页签**。那条「选中态一致性」断言因此一直在测错的
-					// 元素（两边视觉本来就一样，所以看不出来）。
-					tab: read(document.querySelector('[data-panel].is-active')),
+					tab: read(document.querySelector('#library-tabs .tab.is-active')),
 					segmented: read(
 						document.querySelector('.segmented button.is-active'),
 					),
@@ -790,12 +860,12 @@ async function run(window) {
 		JSON.stringify(activeStyles.nav),
 	)
 	check(
-		'右栏页签的选中底色与左栏入口**完全一致**（不再一套一套地写）',
+		'音乐库页签的选中底色与左栏入口**完全一致**（不再一套一套地写）',
 		activeStyles.tab !== null && activeStyles.tab.bg === activeStyles.nav?.bg,
-		`nav=${activeStyles.nav?.bg} tab=${activeStyles.tab?.bg} diag=${JSON.stringify(activeStyles.diag)}`,
+		`nav=${activeStyles.nav?.bg} tab=${activeStyles.tab?.bg}`,
 	)
 	check(
-		'右栏页签的选中前景色也与左栏一致',
+		'音乐库页签的选中前景色也与左栏一致',
 		activeStyles.tab?.color === activeStyles.nav?.color,
 		`nav=${activeStyles.nav?.color} tab=${activeStyles.tab?.color}`,
 	)
@@ -1010,15 +1080,18 @@ async function run(window) {
 					const el = document.querySelector(sel)
 					return el ? el.getBoundingClientRect() : null
 				}
-				const topbar = rect('.topbar')
-				// 顶栏里的图标按钮是否与搜索框在同一水平线上（第一版会折到第二行）
-				const topbarButtons = [...document.querySelectorAll('.topbar .icon-button')]
-				const strayButtons = topbarButtons
-					.filter((b) => {
-						const r = b.getBoundingClientRect()
-						return topbar && r.top - topbar.top > topbar.height * 0.6
-					})
-					.map((b) => b.id || b.className)
+				/*
+				 * 卡片化收尾：顶栏整条移除 —— 中栏的**第一个子元素**必须就是
+				 * 内容层（class 是 main-stack）。判据是"内容之上没有工具条"，
+				 * 而不是"某个具体的选择器不存在"：将来插进任何一条常驻横条，
+				 * 这条都会红。
+				 *
+				 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
+				 */
+				const mainFirst = document.querySelector('[data-testid="main"]')?.firstElementChild
+				const stripAboveContent = Boolean(
+					mainFirst && !mainFirst.classList.contains('main-stack'),
+				)
 
 				// 导航项是否被压成两行（第一版文字徽标挤掉了品牌名）
 				const wrappedNav = [...document.querySelectorAll('.nav__item')]
@@ -1034,7 +1107,7 @@ async function run(window) {
 				return JSON.stringify({
 					hasStatusBar: Boolean(document.querySelector('.status-bar')),
 					hasStatusElement: Boolean(document.getElementById('status')),
-					strayButtons,
+					stripAboveContent,
 					wrappedNav,
 					playbarRadius: Number.parseFloat(playbarStyle.borderRadius),
 					playbarShadow: playbarStyle.boxShadow !== 'none',
@@ -1089,11 +1162,11 @@ async function run(window) {
 		shell.hasStatusElement === true,
 	)
 	check(
-		'顶栏图标按钮不再折到第二行（缺陷 2 的同源问题）',
-		shell.strayButtons.length === 0,
-		shell.strayButtons.length > 0
-			? `折行：${shell.strayButtons.join('、')}`
-			: '同行',
+		'内容之上没有任何工具条（顶栏已移除）',
+		shell.stripAboveContent === false,
+		shell.stripAboveContent
+			? '中栏第一个子元素不是内容层'
+			: '内容层就是中栏第一项',
 	)
 	check(
 		'左栏导航项都是单行（缺陷 2：按钮换行）',
@@ -2807,7 +2880,7 @@ async function run(window) {
 	// ---------------------------------------------------------------
 	//
 	// 移动端的"点迷你播放条展开"落到桌面上就是这一屏：
-	// 艺术背景 + 大封面 + 队列。
+	// 艺术背景 + 大封面 + 歌词（队列住在播放列表浮层里）。
 	//
 	// ⚠️ 队列是**同一份 DOM** 被搬进来的（不是复制）。
 	// 这条必须断言：复制一份的话 `data-queue-index` 会有两份，
@@ -2833,8 +2906,8 @@ async function run(window) {
 		),
 	)
 	check(
-		'展开前队列在右栏的槽位里',
-		queueBefore.parent === 'queue-slot',
+		'展开前队列住在播放列表浮层里',
+		queueBefore.parent === 'queue-popover-slot',
 		String(queueBefore.parent),
 	)
 
@@ -2955,8 +3028,8 @@ async function run(window) {
 		`grid-template-columns=${nowPlaying.gridColumns} 队列栏存在=${nowPlaying.hasQueueColumn}`,
 	)
 	check(
-		'队列**没被搬进**详情页（它在右栏，且 data-queue-index 不翻倍）',
-		nowPlaying.queueParent === 'queue-slot' &&
+		'队列**没被搬进**详情页（它在浮层里，data-queue-index 不翻倍）',
+		nowPlaying.queueParent === 'queue-popover-slot' &&
 			nowPlaying.queueRows === queueBefore.rows,
 		`行数 ${queueBefore.rows} → ${nowPlaying.queueRows}，父节点 ${nowPlaying.queueParent}`,
 	)
@@ -2979,7 +3052,7 @@ async function run(window) {
 		),
 	)
 	check(
-		'歌词面板被**搬进**「正在播放」的中栏（同一份 DOM，不是复制）',
+		'歌词面板常驻在「正在播放」的右卡里（只有一份）',
 		lyricsPlaced.inSlot && lyricsPlaced.count === 1 && lyricsPlaced.rect > 100,
 		JSON.stringify(lyricsPlaced),
 	)
@@ -3005,8 +3078,8 @@ async function run(window) {
 		),
 	)
 	check(
-		'返回后队列搬回右栏（没有丢、也没有留两份）',
-		afterClose.viewHidden && afterClose.queueParent === 'queue-slot',
+		'返回后队列还在浮层里（没有丢、也没有留两份）',
+		afterClose.viewHidden && afterClose.queueParent === 'queue-popover-slot',
 		`父节点=${afterClose.queueParent}，行数=${afterClose.rows}`,
 	)
 
@@ -3500,11 +3573,12 @@ async function run(window) {
 	// 6. 快捷键：Ctrl+Q 呼出 / 收起播放列表
 	// ---------------------------------------------------------------
 	//
-	// ⚠️ 这个动作的实现改过三次（见 renderer.js 的 toggleQueueColumn 注释）：
-	// 切队列/歌词页签 → 切「正在播放」页第三栏 → **卡片化阶段 4** 之后
-	// 那第三栏被草图删掉了，于是改成切**右栏（播放队列真正的家）**。
-	// 这一节的断言同步跟着改，判据本身没变：
-	// "按一次队列出现、再按一次队列收起、DOM 始终只有一份"。
+	// ⚠️ 这个动作的实现改过四次（见 renderer.js 的 toggleQueuePopover 注释）：
+	// 切队列/歌词页签 → 切「正在播放」页第三栏 → 阶段 4 删掉那一栏之后
+	// 改成切**右栏** → **卡片化收尾**把右栏整条删掉，于是它现在是在
+	// **当前页**弹一个浮层，不换页（换页是噪音：用户只想看一眼队列）。
+	// 这一节的判据同步跟着改，不变的是：
+	// "按一次浮层出现、再按一次收起、DOM 始终只有一份"。
 	console.log('\n[ui] 6) 快捷键：Ctrl+Q 呼出/收起播放列表')
 	const readColumns = async () =>
 		JSON.parse(
@@ -3534,16 +3608,16 @@ async function run(window) {
 	await sleep(600)
 	const columnsAfter = await readColumns()
 	check(
-		'Ctrl+Q 呼出播放列表浮层（并进入「正在播放」页）',
-		columnsAfter.viewHidden === false &&
-			columnsAfter.popoverOpen === true &&
+		'Ctrl+Q 呼出播放列表浮层（**不换页**）',
+		columnsAfter.popoverOpen === true &&
 			columnsAfter.queueParent === 'queue-popover-slot' &&
-			columnsAfter.rows > 0,
-		`面板隐藏=${columnsBefore.viewHidden} → ${columnsAfter.viewHidden}；` +
+			columnsAfter.rows > 0 &&
+			columnsAfter.viewHidden === columnsBefore.viewHidden,
+		`换页=${columnsBefore.viewHidden} → ${columnsAfter.viewHidden}；` +
 			`浮层展开=${columnsBefore.popoverOpen} → ${columnsAfter.popoverOpen}；` +
 			`队列父节点=${columnsAfter.queueParent}；队列 ${columnsAfter.rows} 项`,
 	)
-	await shot(window, 'ui-05-nowplaying-queue')
+	await shot(window, 'ui-05-queue-popover-library')
 	/*
 	 * ⚠️ 截图必须**在浮层真的展开之后**再拍。
 	 *
@@ -3575,10 +3649,9 @@ async function run(window) {
 	await sleep(600)
 	const columnsBack = await readColumns()
 	check(
-		'再按一次收起浮层（队列 DOM 仍在，只是搬回右栏）',
-		columnsBack.viewHidden === false &&
-			columnsBack.popoverOpen === false &&
-			columnsBack.queueParent === 'queue-slot' &&
+		'再按一次收起浮层（队列 DOM 仍在浮层里，只是藏起来）',
+		columnsBack.popoverOpen === false &&
+			columnsBack.queueParent === 'queue-popover-slot' &&
 			columnsBack.rows === columnsAfter.rows,
 		`浮层展开=${columnsBack.popoverOpen} 队列父节点=${columnsBack.queueParent} 队列 ${columnsBack.rows} 项`,
 	)
@@ -4048,10 +4121,10 @@ async function run(window) {
 	// ⚠️ 这一条是补的，因为踩了一整轮很安静的坑：中栏原来是 CSS **网格**，
 	// 而"直接子元素有几个"一直变（顶栏 / 搜索行 / 标题 / 页签条 / 工具条 /
 	// 内容区 / 三个互斥视图 / 播放卡）—— 网格自动布局不会报错，只会安静地
-	// 把元素摆错地方（顶栏吃掉整屏、播放卡跑到页面标题那一行、
+	// 把元素摆错地方（第一个子元素吃掉整屏、播放卡跑到页面标题那一行、
 	// 列表溢到播放卡下面）。现在中栏是 **flex 纵向**，判据跟着改成：
-	//   * 顶栏在最上面、播放卡在最下面，两者之间是 `.main-stack`；
-	//   * `.main-stack` 是**唯一**会滚的那一层（顶栏与播放卡不该被滚走）；
+	//   * `.main-stack` 是**第一个**子元素、播放卡是**最后**一个，两者不重叠；
+	//   * `.main-stack` 是**唯一**会滚的那一层（播放卡不该被滚走）；
 	//   * 不含互斥视图之外的"孤儿"（跑到 `.main` 外面的元素会画在屏幕外）。
 	console.log('\n[ui] 13) 中栏的纵向排列')
 	const layout = JSON.parse(
@@ -4070,30 +4143,35 @@ async function run(window) {
 						flex: getComputedStyle(el).flex,
 					}
 				}
-				const topbar = box('.topbar')
+				const mainBox = box('[data-testid="main"]')
 				const stack = box('.main-stack')
 				const playbar = box('.playbar')
-				// 五个"页面级容器"必须在 .main 里（跑到 body 下会画到屏幕外）
+				// 四个"页面级容器"必须在 .main 里（跑到 body 下会画到屏幕外）
 				const orphans = [
 					'#content',
 					'#view-share',
 					'#view-settings',
 					'#view-nowplaying',
-					'.home-strip',
 				]
 					.map((sel) => document.querySelector(sel))
 					.filter((el) => el && !main?.contains(el))
 					.map((el) => el.id || el.className)
 				return JSON.stringify({
 					layout: getComputedStyle(main).display,
-					topbar,
+					mainBox,
 					stack,
 					playbar,
 					orphans,
 					// 播放卡必须真的在最底下（顶边在 stack 底边之下）
 					orderOk: Boolean(
-						topbar && stack && playbar &&
-							topbar.top <= stack.top &&
+						mainBox && stack && playbar &&
+							// 不能要求 stack.top 与 .main 的顶边相等：.main 自己有
+							// padding-top（--sp-xs），内容层从 padding 之下开始。
+							// 这里要证的是"内容之上没有别的横条"，所以留一个
+							// padding 量级的余量；任何一条常驻工具条（38px 起）
+							// 都会被这条抓住。
+							stack.top >= mainBox.top &&
+							stack.top - mainBox.top <= 16 &&
 							stack.bottom <= playbar.top + 2,
 					),
 				})
@@ -4101,27 +4179,25 @@ async function run(window) {
 		),
 	)
 	check(
-		'中栏是纵向排列：顶栏在上、内容居中、播放卡在下（不重叠）',
+		'中栏是纵向排列：内容层在上、播放卡在下（不重叠）',
 		layout.layout === 'flex' && layout.orderOk,
 		JSON.stringify({
 			display: layout.layout,
-			topbar: layout.topbar?.top,
+			main: layout.mainBox?.top,
 			stack: [layout.stack?.top, layout.stack?.bottom],
 			playbar: layout.playbar?.top,
 		}),
 	)
 	check(
-		'只有 .main-stack 会滚（顶栏与播放卡不该被滚走）',
-		layout.stack?.overflow === 'auto' &&
-			layout.topbar?.overflow !== 'auto' &&
-			layout.playbar?.overflow !== 'auto',
-		`topbar=${layout.topbar?.overflow} stack=${layout.stack?.overflow} playbar=${layout.playbar?.overflow}`,
+		'只有 .main-stack 会滚（播放卡不该被滚走）',
+		layout.stack?.overflow === 'auto' && layout.playbar?.overflow !== 'auto',
+		`stack=${layout.stack?.overflow} playbar=${layout.playbar?.overflow}`,
 	)
 	check(
 		'页面级容器都在 .main 里（跑到 body 下会画到屏幕外）',
 		layout.orphans.length === 0,
 		layout.orphans.length === 0
-			? '五个容器都在'
+			? '四个容器都在'
 			: `跑到外面：${layout.orphans.join('、')}`,
 	)
 
@@ -4141,9 +4217,32 @@ async function run(window) {
 	// ⚠️ 这一段放在最后：它要**换目的地**（点导航），放中间会污染后面
 	// 依赖"当前视图"的断言（这个仓库已经踩过一次"测试之间相互污染"）。
 	console.log('\n[ui] 10) 主页（热力图 + 快捷入口 + 最近更新）')
-	// ⚠️ 入口从「左栏导航项」改成「用户卡本体」（卡片化阶段 1）
-	await click(window, '[data-testid="sidebar-brand"]')
+	/*
+	 * ⚠️ 入口从「左栏导航项」改成「用户卡本体」（卡片化阶段 1），
+	 * 卡片化收尾又补了明写的「首页」入口（.sidebar__entry）。
+	 *
+	 * 这里**故意点在图标那个 span 上**，而不是按钮本体：
+	 * 按钮里有 `<span class="icon">`，`activateNav` 原来用
+	 * `event.target === event.currentTarget` 判"是不是最内层入口"，
+	 * 点在图标上时 target 是 span → 那次点击被**整个丢掉**
+	 * （表现是"点图标没反应、点旁边的字就行"）。这条断言把那个坑钉住。
+	 */
+	const homeIconClicked = await evaluate(
+		window,
+		`(() => {
+			const icon = document.querySelector('#sidebar-home .icon')
+			if (!icon) return false
+			icon.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+			return true
+		})()`,
+	)
+	check('「首页」入口的图标 span 存在', homeIconClicked === true)
 	await sleep(2500)
+	check(
+		'点「首页」入口的**图标**也能回主页（不是只有点文字才生效）',
+		(await evaluate(window, 'window.bbUI.shellView()')) === 'home',
+		String(await evaluate(window, 'window.bbUI.shellView()')),
+	)
 
 	const home = JSON.parse(
 		await evaluate(
@@ -4184,9 +4283,10 @@ async function run(window) {
 		),
 	)
 	check(
-		'主页有三块新内容（听歌频率 / 快捷入口 / 最近更新）+ 保留的播放历史',
-		home.sections.includes('听歌频率') &&
+		'主页四块：最近播放 / 快捷入口 / 听歌频率 / 最近更新 + 播放历史',
+		home.sections.includes('最近播放') &&
 			home.sections.includes('快捷入口') &&
+			home.sections.includes('听歌频率') &&
 			home.sections.includes('最近更新') &&
 			home.historyStillThere,
 		home.sections.join(' / '),
@@ -4197,81 +4297,151 @@ async function run(window) {
 		`${home.cells} 格，带日期 ${home.dated}，空单元色 ${home.emptyFill}`,
 	)
 	check(
-		'快捷入口三张卡 + 最近更新用歌单卡（与音乐库同一张卡）',
-		home.quick.length === 3 && home.usesMediaCard,
+		'快捷入口四张卡（与原型一致）+ 最近更新用歌单卡（与音乐库同一张卡）',
+		home.quick.length === 4 && home.usesMediaCard,
 		`${home.quick.join(' / ')}，最近更新 ${home.playlistCards} 张`,
 	)
 
 	/*
-	 * 卡片化阶段 2：主页下沿那两块（⑤ 最近播放 + title ① 快捷入口）。
+	 * ⭐ 主页的四块（卡片化收尾按原型 prototype/pages/home.html 重做）。
 	 *
-	 * ⚠️ 这一组验的是**结构**（位置 + 竖分隔线 + 只在主页可见），
-	 * 不是"有没有这个类名"：
-	 *   * 两块必须在 `#content` **之外**（内容卡会整块重建，放进去会被清掉）；
-	 *   * 它们之间必须有一条真的竖线（草图明确要求，且全页只此一条）；
-	 *   * 切到别的页面必须真的藏起来（不是留个空框）。
+	 * ⚠️ 这一组验的是**结构与顺序**，不是"有没有这个类名"：
+	 *   * 四块都在 #content **里面** —— 主页现在只有一张卡片。
+	 *     原来「最近播放 / 快捷入口」在内容卡**外面**一条独立的下沿里，
+	 *     主页看起来是"一张卡片 + 一个孤零零的盒子"，用户反馈"太混乱"；
+	 *   * 顺序必须是 分栏 → 听歌频率 → 最近更新 → 播放历史（原型就是这个顺序）；
+	 *   * 分栏里那条竖线要真的竖着（宽 <= 2px、高 > 40px）。
 	 */
-	const homeStrip = JSON.parse(
+	/*
+	 * ⚠️ 先切到「最近播放」再量结构。
+	 *
+	 * 默认页签是「继续收听」，而它只列"未听完"的曲目 —— 探针跑到这里时
+	 * 那段历史很可能已经被前面的用例听完了，于是渲染的是**空态**，
+	 * "有没有行"就变成一条看运气的断言（第一次跑就是这么红的）。
+	 */
+	await click(window, '[data-testid="history-tab-recent"]')
+	await sleep(1200)
+	const homeLayout = JSON.parse(
 		await evaluate(
 			window,
 			`(() => {
-				const strip = document.getElementById('home-strip')
 				const content = document.getElementById('content')
-				const divider = strip?.querySelector('.home-strip__divider')
-				const r = (el) => el?.getBoundingClientRect() ?? null
-				const dividerRect = r(divider)
+				const split = document.querySelector('[data-testid="home-split"]')
+				const divider = document.querySelector(
+					'[data-testid="home-split-divider"]',
+				)
+				const d = divider ? divider.getBoundingClientRect() : null
 				return JSON.stringify({
-					exists: Boolean(strip),
-					visible: Boolean(strip && !strip.hidden),
-					// ⚠️ 必须在内容卡**外面**（在里面的话 refresh() 会把它清掉）
-					outsideContent: Boolean(strip && !content?.contains(strip)),
-					// 竖线：宽 <= 2px 且高 > 40px
-					divider: dividerRect
-						? {
-								w: Math.round(dividerRect.width),
-								h: Math.round(dividerRect.height),
-							}
+					// 内容卡里直接子元素的顺序（主页现在全部在这一层里）
+					order: [...(content?.children ?? [])].map(
+						(el) => el.dataset.testid || el.className.split(' ')[0],
+					),
+					insideContent: Boolean(split && content?.contains(split)),
+					// 分栏的两列：左 = 最近播放，右 = 快捷入口
+					splitCols: split
+						? [...split.children].map(
+								(el) => el.dataset.testid || el.className,
+							)
+						: [],
+					divider: d
+						? { w: Math.round(d.width), h: Math.round(d.height) }
 						: null,
-					// 两块各自有内容（不是空框）
 					hasRecent: Boolean(
-						document.querySelector('[data-testid="home-recent-body"]')
-							?.firstElementChild,
+						document.querySelector('[data-testid="home-recent"] .home-recent'),
 					),
 					hasQuick: Boolean(
-						document.querySelector('[data-testid="home-quick-slot"]')
-							?.firstElementChild,
+						document.querySelector('[data-testid="home-quick-slot"] .home-quick'),
 					),
-					// 下沿两块与内容卡左右对齐（同一屏里的并排元素必须对齐）
-					stripLeft: r(strip) ? Math.round(r(strip).left) : null,
-					contentLeft: r(content) ? Math.round(r(content).left) : null,
+					// 主页四块**不重叠**（这一轮改的就是块的位置，量一次才敢信）
+					blockRects: [
+						'home-split',
+						'home-heatmap',
+						'home-recent-playlists',
+						'home-history',
+					].map((id) => {
+						const el = document.querySelector(
+							'[data-testid="' + id + '"]',
+						)
+						if (!el) return null
+						const r = el.getBoundingClientRect()
+						return {
+							id,
+							top: Math.round(r.top),
+							bottom: Math.round(r.bottom),
+						}
+					}),
+					historyRows: document.querySelectorAll(
+						'[data-testid^="history-row-"]',
+					).length,
+					historyTable: Boolean(
+						document.querySelector('[data-testid="history-table"]'),
+					),
+					historyList: Boolean(
+						document.querySelector('[data-testid="history-list"]'),
+					),
 				})
 			})()`,
 		),
 	)
 	check(
-		'主页下沿有两块（⑤ 最近播放 + title ① 快捷入口），且在**内容卡外面**',
-		homeStrip.exists && homeStrip.visible && homeStrip.outsideContent,
-		JSON.stringify(homeStrip),
+		'主页四块都在内容卡里（不再是"卡片 + 下面一条"）',
+		homeLayout.insideContent === true,
+		JSON.stringify({
+			order: homeLayout.order,
+			inside: homeLayout.insideContent,
+		}),
 	)
 	check(
-		'两块之间有一条**竖**分隔线（草图明确要求，全页只此一条）',
-		homeStrip.divider !== null &&
-			homeStrip.divider.w <= 2 &&
-			homeStrip.divider.h > 40,
-		homeStrip.divider
-			? `${homeStrip.divider.w}×${homeStrip.divider.h}px`
-			: '找不到分隔线',
+		'四块的顺序与原型一致：分栏 → 听歌频率 → 最近更新 → 播放历史',
+		(() => {
+			const want = [
+				'home-split',
+				'home-heatmap',
+				'home-recent-playlists',
+				'home-history',
+			]
+			const at = want.map((id) => homeLayout.order.indexOf(id))
+			return (
+				at.every((i) => i >= 0) && at.every((v, i) => i === 0 || v > at[i - 1])
+			)
+		})(),
+		homeLayout.order.join(' → '),
+	)
+	check(
+		'顶部左右分栏里是「最近播放 | 快捷入口」，中间一条**竖**线',
+		homeLayout.splitCols.includes('home-recent') &&
+			homeLayout.splitCols.includes('home-quick-slot') &&
+			homeLayout.divider !== null &&
+			homeLayout.divider.w <= 2 &&
+			homeLayout.divider.h > 40,
+		JSON.stringify({
+			cols: homeLayout.splitCols,
+			divider: homeLayout.divider,
+		}),
 	)
 	check(
 		'两块都真的渲染出了内容（不是空框）',
-		homeStrip.hasRecent && homeStrip.hasQuick,
-		`最近播放=${homeStrip.hasRecent} 快捷入口=${homeStrip.hasQuick}`,
+		homeLayout.hasRecent === true && homeLayout.hasQuick === true,
+		`最近播放=${homeLayout.hasRecent} 快捷入口=${homeLayout.hasQuick}`,
 	)
 	check(
-		'下沿两块与内容卡**左边缘对齐**',
-		homeStrip.stripLeft !== null &&
-			Math.abs(homeStrip.stripLeft - homeStrip.contentLeft) <= 1,
-		`下沿=${homeStrip.stripLeft}px 内容卡=${homeStrip.contentLeft}px`,
+		'主页四块**互不重叠**（改过布局的页面必须量一次）',
+		(() => {
+			const rects = homeLayout.blockRects
+			if (rects.some((r) => r === null || r.bottom <= r.top)) return false
+			for (let i = 1; i < rects.length; i += 1) {
+				if (rects[i].top < rects[i - 1].bottom - 1) return false
+			}
+			return true
+		})(),
+		JSON.stringify(homeLayout.blockRects),
+	)
+	check(
+		'播放历史是**歌曲行**列表（原型如此），不再是表格',
+		homeLayout.historyRows > 0 &&
+			homeLayout.historyTable === false &&
+			homeLayout.historyList === true,
+		`行 ${homeLayout.historyRows} 行，表格=${homeLayout.historyTable}`,
 	)
 
 	// ⚠️ **真正端到端**的那一条：热力图的数据必须真的从 IPC 来。
@@ -4362,8 +4532,17 @@ async function run(window) {
 		`l4=${levels.l4} vs --primary=${levels.primary}`,
 	)
 	await shot(window, 'ui-09-home')
-	// 卡片化阶段 2：截一张"主页整套"（内容卡 + 下沿两块），用于人眼核对
-	await shot(window, 'ui-09b-home-strip')
+	// 截一张"主页整套"（四块都在同一张内容卡里），用于人眼核对
+	await shot(window, 'ui-09b-home-card')
+	/*
+	 * ⚠️ 这里**不再**滚到最下面补拍"播放历史"那一张。
+	 *
+	 * 探针窗口是 `show: false` 的，而**隐藏窗口里"滚动 + capturePage"会拍到
+	 * 新旧两层混在一起的画面**（实测：播放历史那几行画在听歌频率上面，
+	 * 看着像布局重叠，而几何断言量出来四块是 178–298 / 322–508 / 532–792 /
+	 * 816–1100，规规矩矩地排着）。滚动截图交给 `verify:desktop:tour` ——
+	 * 那边的窗口是可见的，`02c-library-scrolled-head` 一直是干净的。
+	 */
 
 	// 最近更新的卡片点得开（"卡片在"不等于"点了能进歌单"）。
 	//
@@ -4387,32 +4566,27 @@ async function run(window) {
 					trackTable: Boolean(document.querySelector('[data-testid="track-table"]')),
 					emptyState: Boolean(document.querySelector('[data-testid="content-empty"]')),
 					/*
-					 * ⚠️ "离开主页"要在**内容卡内部**看，不能全文档数。
-					 * 卡片化阶段 2 之后下沿那两块（⑤ 最近播放 / 快捷入口）
-					 * 是**常驻 DOM**，只是被 hidden 藏起来 ——
-					 * 全文档数 .home-section__title 会一直数到它们，
-					 * 于是"已经离开主页"永远为 false。
+					 * ⚠️ "离开主页"要在**内容卡内部**看，不能全文档数：
+					 * 播放详情页 / 设置页是互斥视图，内容卡会被整块重建。
 					 *
 					 * ⚠️ 这段注释在模板字符串里，**不能出现反引号**。
 					 */
 					leftHome:
 						document.querySelectorAll('#content .home-section__title')
 							.length === 0,
-					// 下沿两块在别的页面必须真的藏起来（不是只留个空框）
-					homeStripHidden: Boolean(
-						document.getElementById('home-strip')?.hidden,
-					),
+					// 主页的区块真的没了（不是被藏起来留个空框）
+					homeSplitGone: !document.querySelector('[data-testid="home-split"]'),
 					back: Boolean(document.querySelector('[data-testid="playlist-back"]')),
 				})
 			})()`,
 		),
 	)
 	check(
-		'点主页的歌单卡进入**那张卡对应的**歌单详情（且主页下沿两块已藏起来）',
+		'点主页的歌单卡进入**那张卡对应的**歌单详情（主页的区块也不再留着）',
 		cardOpened.clicked &&
 			cardOpened.title === cardOpened.want &&
 			cardOpened.leftHome &&
-			cardOpened.homeStripHidden &&
+			cardOpened.homeSplitGone &&
 			(cardOpened.trackTable || cardOpened.emptyState),
 		JSON.stringify(cardOpened),
 	)
@@ -4438,7 +4612,7 @@ async function run(window) {
 		),
 	)
 	check(
-		'快捷入口「我的收藏夹」切到音乐库 › 收藏夹',
+		'快捷入口「收藏夹」切到音乐库 › 收藏夹',
 		quickJump.libraryTab === 'favorites' && quickJump.favoriteBar,
 		JSON.stringify(quickJump),
 	)

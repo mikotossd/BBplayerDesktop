@@ -329,7 +329,7 @@ async function run(window) {
 	const resumeRows = await waitFor(
 		window,
 		`(() => {
-			const rows = document.querySelectorAll('[data-testid="history-table"] tbody tr').length
+			const rows = document.querySelectorAll('[data-testid^="history-row-"]').length
 			return rows > 0 ? { ok: true, rows } : false
 		})()`,
 		20_000,
@@ -343,38 +343,54 @@ async function run(window) {
 			: JSON.stringify(resumeRows.value),
 	)
 
-	const resumeColumns = await evaluate(
-		window,
-		`Array.from(document.querySelectorAll('[data-testid="history-table"] thead th')).map((th) => th.textContent)`,
+	const resumeMetaProbe = JSON.parse(
+		await evaluate(
+			window,
+			`(() => JSON.stringify({
+				kind: document.querySelector('[data-testid="history-meta-0"]')?.dataset.kind ?? null,
+				text: document.querySelector('[data-testid="history-meta-0"]')?.textContent ?? null,
+			}))()`,
+		),
 	)
+	const resumeKind = resumeMetaProbe.kind
+	const resumeMeta = resumeMetaProbe.text
+	/*
+	 * ⚠️ 判据从"表头有没有这一列"改成"**行里那一格显示的是什么**"：
+	 * 主页按原型重做之后，播放历史是歌曲行而不是表格，
+	 * 「上次听到 / 播放次数」不再各占一列，而是**同一格**按页签换内容
+	 * （见 history.js 的 buildHistoryRow，它给那一格标了 data-kind）。
+	 */
 	check(
-		'「继续收听」表头包含「上次听到」',
-		resumeColumns?.includes('上次听到'),
-		JSON.stringify(resumeColumns),
+		'「继续收听」那一格显示的是「上次听到的位置」',
+		resumeKind === 'position' && /^上次 \d+:\d\d$/.test(String(resumeMeta)),
+		`kind=${resumeKind} 文本=${resumeMeta}`,
 	)
-	// ⚠️ 同时只能有**一张**表。
-	// 点导航与点页签都会触发 refresh()，两者并发时慢的那次会把表格追加到
-	// 快的那次之后 —— 界面上出现两张表（第一版就是，读表头读到重复两组列）。
+	/*
+	 * ⚠️ 同时只能有**一份**播放历史列表。
+	 *
+	 * 点导航与点页签都会触发 refresh()，两者并发时慢的那次会把内容追加到
+	 * 快的那次之后 —— 界面上会出现两份（第一版就是：读"表头"读到重复两组列，
+	 * 也就是两张表叠在一起）。这里量的是列表容器与分区块的数量。
+	 */
 	check(
-		'并发刷新只渲染一张表（没有重复表格）',
+		'并发刷新只渲染一份播放历史（没有重复列表）',
 		(await evaluate(
 			window,
-			`document.querySelectorAll('[data-testid="history-table"]').length`,
-		)) === 1,
-		`${await evaluate(window, `document.querySelectorAll('[data-testid="history-table"]').length`)} 张表`,
-	)
-	check(
-		'表头没有被重复渲染',
-		resumeColumns?.length === 6,
-		`${resumeColumns?.length} 列`,
+			`document.querySelectorAll('[data-testid="history-list"]').length`,
+		)) === 1 &&
+			(await evaluate(
+				window,
+				`document.querySelectorAll('[data-testid="home-history"]').length`,
+			)) === 1,
+		`${await evaluate(window, `document.querySelectorAll('[data-testid="history-list"]').length`)} 份列表`,
 	)
 	const resumePosition = await evaluate(
 		window,
-		`document.querySelector('[data-testid="history-table"] tbody tr td.col-position')?.textContent ?? null`,
+		`document.querySelector('[data-testid="history-meta-0"]')?.textContent ?? null`,
 	)
 	check(
-		'「上次听到」列显示正确的位置（80 秒 -> 1:20）',
-		resumePosition === '1:20',
+		'那一格显示正确的位置（80 秒 -> 上次 1:20）',
+		resumePosition === '上次 1:20',
 		String(resumePosition),
 	)
 	await shot(window, 'history-02-resume')
@@ -382,7 +398,7 @@ async function run(window) {
 	const recentRows = await waitFor(
 		window,
 		`(() => {
-			const rows = document.querySelectorAll('[data-testid="history-table"] tbody tr').length
+			const rows = document.querySelectorAll('[data-testid^="history-row-"]').length
 			return rows > 0 ? { ok: true, rows } : false
 		})()`,
 		20_000,
@@ -402,7 +418,7 @@ async function run(window) {
 	const recentTabRows = await waitFor(
 		window,
 		`(() => {
-			const rows = document.querySelectorAll('[data-testid="history-table"] tbody tr').length
+			const rows = document.querySelectorAll('[data-testid^="history-row-"]').length
 			return rows > 0 ? { ok: true, rows } : false
 		})()`,
 		20_000,
@@ -416,22 +432,35 @@ async function run(window) {
 			: JSON.stringify(recentTabRows.value),
 	)
 
-	const recentColumns = await evaluate(
-		window,
-		`Array.from(document.querySelectorAll('[data-testid="history-table"] thead th')).map((th) => th.textContent)`,
+	/*
+	 * ⚠️ 原来是"表头里有没有「播放次数」与「最近播放」两列"。
+	 * 现在播放次数在行右侧那一格（data-kind=count），最近播放时间并进了
+	 * 歌手那一格（「初音未来 · 3 天前」）—— 两个都要验。
+	 */
+	const recentRowProbe = JSON.parse(
+		await evaluate(
+			window,
+			`(() => JSON.stringify({
+				kind: document.querySelector('[data-testid="history-meta-0"]')?.dataset.kind ?? null,
+				meta: document.querySelector('[data-testid="history-meta-0"]')?.textContent ?? null,
+				artist: document.querySelector('.song-row__artist')?.textContent ?? null,
+			}))()`,
+		),
 	)
 	check(
-		'「最近播放」表头包含播放次数与最近播放时间',
-		recentColumns?.includes('播放次数') && recentColumns?.includes('最近播放'),
-		JSON.stringify(recentColumns),
+		'「最近播放」那一格是播放次数，且行里有相对时间',
+		recentRowProbe.kind === 'count' &&
+			/^\d+ 次$/.test(String(recentRowProbe.meta)) &&
+			/(前|刚刚|\d{4})/.test(String(recentRowProbe.artist)),
+		JSON.stringify(recentRowProbe),
 	)
 	await shot(window, 'history-02-recent')
 
 	await click(window, '[data-testid="history-tab-most"]')
 	await sleep(700)
-	const mostColumns = await evaluate(
+	const mostMeta = await evaluate(
 		window,
-		`Array.from(document.querySelectorAll('[data-testid="history-table"] thead th')).map((th) => th.textContent)`,
+		`document.querySelector('[data-testid="history-meta-0"]')?.textContent ?? null`,
 	)
 	check(
 		'「最常播放」页签切换生效',
@@ -439,7 +468,7 @@ async function run(window) {
 			window,
 			`document.querySelector('[data-testid="history-tab-most"]')?.classList.contains('is-active')`,
 		)) === true,
-		JSON.stringify(mostColumns),
+		String(mostMeta),
 	)
 
 	// ---------- 7. 汇总文本 ----------
