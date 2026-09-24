@@ -1026,11 +1026,19 @@ function registerIpcHandlers() {
 	 *
 	 * 白名单只放**确实需要外链**的几个站，且强制 https。
 	 * 以后要加外链，往这里加 —— 不要在渲染进程里拼 URL 绕过它。
+	 *
+	 * ⚠️ 本仓库那一条**从 `package.json` 的 `homepage` 派生**，不在这里写死：
+	 * 换仓库地址（这个项目换过一次 fork）时，`homepage` 是 electron-builder
+	 * 生成 deb / rpm 元数据也要读的同一处，写死就会出现"包里指向新仓库、
+	 * 关于页指向旧仓库"这种一半新一半旧的状态。原来这里、渲染进程、
+	 * 帮助菜单**三处各写一遍**，实测漏改过。
 	 */
+	const PACKAGE = require('../package.json')
 	const EXTERNAL_ALLOWLIST = [
-		'https://github.com/xiongzikun0106/BBPlayerDesktop',
-		'https://github.com/xiongzikun0106/BBPlayer',
-	]
+		PACKAGE.homepage,
+		// 上游项目（移动端）：报上游的 bug 时用
+		'https://github.com/bbplayer-app/BBPlayer',
+	].filter(Boolean)
 	ipcMain.handle('app:openExternal', (_event, url) => {
 		try {
 			const target = String(url ?? '')
@@ -1065,6 +1073,13 @@ function registerIpcHandlers() {
 					dataDir: ports.dataDir,
 					dbFile: ports.dbFile,
 					logFile: ports.logFile,
+					/*
+					 * 本仓库地址。关于页的「前往 GitHub」用它，**不在渲染进程里
+					 * 写死** —— 那个按钮要走 `app:openExternal`，而白名单也是从
+					 * 同一个 `homepage` 派生的；两处各自写死就会漂移
+					 * （换过一次仓库，实测漏改）。
+					 */
+					repoUrl: PACKAGE.homepage,
 					// B 站凭据的落盘方式（`describePorts()` 已经报过，不重复查一次）
 					bilibiliCredentialEncrypted: ports.login?.encrypted ?? null,
 					// BBPlayer 账号（共享歌单用）的后端与令牌存储

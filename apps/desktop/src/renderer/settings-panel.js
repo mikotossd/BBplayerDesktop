@@ -1373,17 +1373,22 @@
 	/*
 	 * 关于页的「前往 GitHub」。
 	 *
-	 * URL 写死在渲染进程这一侧，主进程还有**白名单**兜底 ——
-	 * 两处都指向同一个仓库地址，改动时两边要一起改
-	 * （否则表现为"点了没反应 + 一条错误状态"）。
+	 * ⚠️ **地址不写在这里**：从 `window.bbplayer.diagnostics()` 的 `repoUrl` 取，
+	 * 那个值由主进程从 `package.json` 的 `homepage` 读出（`app:openExternal`
+	 * 的白名单与帮助菜单也来自同一处）。写死四次的下场是换仓库时漏改 ——
+	 * 这个项目换过一次，实测漏改成了"点了没反应 + 一条错误状态"。
 	 */
 	document
 		.getElementById('settings-about-github')
 		?.addEventListener('click', () => {
 			void (async () => {
-				const result = await window.bbplayer.openExternal?.(
-					'https://github.com/xiongzikun0106/BBPlayerDesktop',
-				)
+				const info = await window.bbplayer.diagnostics?.()
+				const url = info?.ok ? info.data?.repoUrl : null
+				if (!url) {
+					setStatus(els.backupStatus, '拿不到仓库地址', 'bad')
+					return
+				}
+				const result = await window.bbplayer.openExternal?.(url)
 				if (result && result.ok === false) {
 					setStatus(els.backupStatus, `打不开链接：${result.error}`, 'bad')
 				}

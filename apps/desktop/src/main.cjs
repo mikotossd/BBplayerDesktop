@@ -316,10 +316,10 @@ function buildPlaybackMenu() {
 			submenu: [
 				{
 					label: '前往 GitHub',
+					// 从 `package.json` 的 `homepage` 派生：换仓库地址时只有那一处要改
+					// （白名单与关于页的按钮也从同一个字段来，见 ipc-handlers.cjs）
 					click: () =>
-						void shell.openExternal(
-							'https://github.com/xiongzikun0106/BBPlayerDesktop',
-						),
+						void shell.openExternal(require('../package.json').homepage),
 				},
 				{ type: 'separator' },
 				// ⚠️ 这两个是刻意保留的：打包后出问题时，用户/我们只能靠它们

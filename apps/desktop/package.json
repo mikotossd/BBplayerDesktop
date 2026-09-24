@@ -3,7 +3,7 @@
 	"version": "0.1.0",
 	"private": true,
 	"description": "BBPlayer 桌面端（Electron）—— 播放 B 站音频 / 歌单 / 登录同步 / 下载 / WebDAV 备份",
-	"homepage": "https://github.com/xiongzikun0106/BBPlayerDesktop",
+	"homepage": "https://github.com/mikotossd/BBplayerDesktop",
 	"author": "BBPlayer",
 	"main": "src/main.cjs",
 	"scripts": {

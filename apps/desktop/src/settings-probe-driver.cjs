@@ -1208,10 +1208,18 @@ async function run(window) {
 	})
 	await click(window, '[data-testid="settings-about-github"]')
 	await sleep(500)
+	/*
+	 * 期望值也从 `package.json` 的 `homepage` 派生，**不写死字面量** ——
+	 * 写死的话这条断言会在换仓库地址时变成"断言旧地址"，
+	 * 而它在生产代码漏改时**照样报绿**（两边一起旧）。
+	 */
+	const expectedRepoUrl = require('../package.json').homepage
 	check(
 		'关于页有「前往 GitHub」按钮，点击打开的是**仓库地址**',
-		openedUrl === 'https://github.com/xiongzikun0106/BBPlayerDesktop',
-		openedUrl ? `打开了 ${String(openedUrl)}` : '点了按钮但没调用 openExternal',
+		openedUrl === expectedRepoUrl,
+		openedUrl
+			? `打开了 ${String(openedUrl)}（期望 ${expectedRepoUrl}）`
+			: '点了按钮但没调用 openExternal',
 	)
 	/*
 	 * 诊断信息的画风：不能是"裸 dl 平铺"。
