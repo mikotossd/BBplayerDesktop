@@ -1,0 +1,49 @@
+{
+	"capturedAt": "2026-09-24T14:43:13.614Z",
+	"theme": "light",
+	"shots": [
+		{
+			"name": "library",
+			"note": "音乐库 › 歌单详情",
+			"file": "assets/screenshots/library.png",
+			"width": 2160,
+			"height": 1350
+		},
+		{
+			"name": "search",
+			"note": "搜索结果",
+			"file": "assets/screenshots/search.png",
+			"width": 2160,
+			"height": 1350
+		},
+		{
+			"name": "nowplaying",
+			"note": "正在播放（大封面 + 歌词高亮）",
+			"file": "assets/screenshots/nowplaying.png",
+			"width": 2160,
+			"height": 1350
+		},
+		{
+			"name": "queue",
+			"note": "从下方呼出的播放列表浮层",
+			"file": "assets/screenshots/queue.png",
+			"width": 2160,
+			"height": 1350
+		},
+		{
+			"name": "home",
+			"note": "主页（最近播放 / 听歌频率 / 最近更新 / 播放历史）",
+			"file": "assets/screenshots/home.png",
+			"width": 2160,
+			"height": 1350
+		},
+		{
+			"name": "settings",
+			"note": "设置（10 个分类）",
+			"file": "assets/screenshots/settings.png",
+			"width": 2160,
+			"height": 1350
+		}
+	],
+	"problems": []
+}

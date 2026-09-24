@@ -104,6 +104,14 @@ const HISTORY_PROBE_MODE = process.argv.includes('--history-probe')
 const IMPORT_PROBE_MODE = process.argv.includes('--import-probe')
 /** 共享歌单验收模式（Phase 3.4，见 share-probe-driver.cjs） */
 const SHARE_PROBE_MODE = process.argv.includes('--share-probe')
+/**
+ * README 截图模式（见 readme-shots-driver.cjs）。
+ *
+ * 与 `--ui-tour` 的分工：那个是**审计**（37 张，覆盖每个空状态与弹窗），
+ * 这个是**展示**（6 张，每张都必须处在能拿出去见人的状态，例如播放页的
+ * 歌词必须真的匹配上并渲染出来）。
+ */
+const README_SHOTS_MODE = process.argv.includes('--readme-shots')
 
 /** 对比模式的「不安全」变体：关掉 webSecurity，用于量化其代价 */
 const INSECURE_MODE = process.argv.includes('--insecure')
@@ -136,6 +144,7 @@ const PROBE_ENABLED = [
 	'--history-probe',
 	'--import-probe',
 	'--share-probe',
+	'--readme-shots',
 ].some((flag) => process.argv.includes(flag))
 
 /**
@@ -649,6 +658,19 @@ void app.whenReady().then(() => {
 			void run(mainWindow)
 				.catch((error) => {
 					console.error('[desktop] UI 巡检失败:', error)
+				})
+				.finally(() => {
+					setTimeout(() => app.exit(probeFailed ? 1 : 0), 500)
+				})
+		})
+	} else if (README_SHOTS_MODE) {
+		// README 截图：只拍表格里要用的那几张，每张都先摆成展示态。
+		mainWindow.webContents.once('did-finish-load', () => {
+			const { run } = require('./readme-shots-driver.cjs')
+			void run(mainWindow)
+				.catch((error) => {
+					probeFailed = true
+					console.error('[desktop] README 截图失败:', error)
 				})
 				.finally(() => {
 					setTimeout(() => app.exit(probeFailed ? 1 : 0), 500)

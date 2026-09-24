@@ -15,6 +15,14 @@
  * electron-builder 会从这个 256×256 PNG 自动生成 `.ico`（Windows）
  * 与多尺寸 PNG（Linux），所以只需要提供一张。
  *
+ * ## 为什么同时写一份到 `assets/icon.png`
+ *
+ * README 顶部要放 logo。`build/` 是 gitignore 的（构建产物），从那里引用
+ * 在 clone 之后就是坏链 —— 而图标本来就只有这一份来源。所以这里顺手把
+ * 同一张图写到 `assets/icon.png` 并**随源码提交**，理由与
+ * `renderer/assets/material-symbols-rounded.woff2` 相同：内容由脚本决定，
+ * 但别人 clone 之后不该需要先跑一次构建才能看到 README 的图。
+ *
  * 用法：node scripts/build-icons.mjs
  */
 import fs from 'node:fs'
@@ -25,6 +33,8 @@ const require = createRequire(import.meta.url)
 const ROOT = path.resolve(import.meta.dirname, '..', '..', '..')
 const DESKTOP = path.join(ROOT, 'apps', 'desktop')
 const OUT_DIR = path.join(DESKTOP, 'build')
+/** README 引用它（随源码提交，见文件头） */
+const README_ICON = path.join(ROOT, 'assets', 'icon.png')
 
 // 复用任务栏图标的 PNG 编码器（零依赖，Node 内置 zlib）
 const { encodePng } = require(path.join(DESKTOP, 'src', 'thumbar-icons.cjs'))
@@ -91,6 +101,10 @@ function main() {
 	const png = encodePng(SIZE, pixel)
 	const outFile = path.join(OUT_DIR, 'icon.png')
 	fs.writeFileSync(outFile, png)
+	// 同一份字节写到 README 引用的位置（见文件头）—— 不重新编码，
+	// 免得两张图出现肉眼看不见的差异
+	fs.mkdirSync(path.dirname(README_ICON), { recursive: true })
+	fs.writeFileSync(README_ICON, png)
 
 	// 校验产物真的是合法 PNG（只写文件不验证等于没验证）
 	const width = png.readUInt32BE(16)
@@ -120,6 +134,7 @@ function main() {
 	console.log(`  ✓ ${outFile}`)
 	console.log(`    ${width}x${height}，${(png.length / 1024).toFixed(1)} KB`)
 	console.log(`    不透明像素 ${(ratio * 100).toFixed(1)}%`)
+	console.log(`  ✓ ${README_ICON}（README 的 logo，同一份字节）`)
 	console.log(
 		'\nelectron-builder 会用它生成 Windows 的 .ico 与 Linux 的多尺寸 PNG。',
 	)

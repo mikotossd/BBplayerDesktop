@@ -1,99 +1,154 @@
 <div align="center">
+<img src="./assets/icon.png" alt="logo" width="50" />
 <h1>BBPlayer Desktop</h1>
 
-Windows / Linux 桌面端 —— 播放 B 站音频、管理歌单、同步收藏夹、下载与 WebDAV 备份。
+一款使用 Electron 构建的本地优先的 Bilibili 桌面音频播放器。更轻量 & 舒服的听歌体验，远离臃肿卡顿的 Bilibili 客户端。
 
-基于 [Electron](https://www.electronjs.org/)，与 [BBPlayer](https://github.com/bbplayer-app/BBPlayer) 移动端共享
-[`packages/core`](./packages/core) 的平台无关逻辑，备份格式与数据库结构两端互通。
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-20232A?style=flat-square&logo=electron&logoColor=9FEAF9)
+![Electron](https://img.shields.io/badge/Electron-20232A?style=flat-square&logo=electron&logoColor=9FEAF9)
+![Material Design 3](https://img.shields.io/badge/Material%20Design-3-6750A4?style=flat-square&logo=materialdesign&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
 
 </div>
 
 ---
 
-## 功能
+与 [BBPlayer](https://github.com/bbplayer-app/BBPlayer) 移动端共享 [`packages/core`](./packages/core) 的平台无关逻辑，
+**数据库结构与备份格式两端互通** —— 桌面端的备份可以直接在手机上恢复，反之亦然。
 
-- **播放**：播放 / 暂停、循环、随机、播放队列、响度均衡、断点续播、启动自动播放。
-  音频由主进程经自定义协议 `bbplayer-audio://` 代理（B 站主线 CDN 强制校验 `Referer`，渲染进程设不上去）。
-- **登录**：扫码 / 粘贴 Cookie / 密码三条路并存；凭据经 Electron `safeStorage` 加密落盘，cookie 从不到达渲染进程。
-- **搜索**：BV / AV 号、`b23.tv` 短链解析，收藏夹与本地歌单内搜索。
-- **歌单**：本地歌单增删改、收藏夹与 UP 合集同步、多选批量操作、跨端顺序互通（`sort_key`）。
-- **歌词**：SPL / LRC 解析、逐字进度、罗马音与翻译、偏移量调整；另有**无边框透明置顶独立歌词窗口**。
-- **外部歌单导入**：粘贴网易云歌单链接，逐首搜索、加权打分、负向词罚分后落库（QQ 音乐未做，接口需登录态签名）。
-- **共享歌单**：把歌单分享到 [`apps/backend`](./apps/backend)，他人订阅后双向同步（LWW + outbox 增量）。
-- **下载**：`.m4a` 落盘、HTTP `Range` 断点续传、完整性校验、备用地址回退。
-- **备份**：ZIP + 原始 SQLite 快照，与移动端格式互通（含两处会静默毁数据的迁移表 / `sort_key` 差异处理）。
-- **系统集成**：`navigator.mediaSession`（Windows SMTC / Linux MPRIS）、任务栏缩略图按钮（图标运行时零依赖生成）、可选硬件媒体键。
-- **界面**：Material Design 3 语义色（令牌由 [`packages/design-tokens`](./packages/design-tokens) 生成）、浅色 / 深色、封面主色背景、可拖拽左栏、播放列表浮层、热力图。
+## 屏幕截图
 
-## UI 参考
+|                  首页                  |                     播放器                     |                 播放列表                 |                    搜索                    |                    音乐库                    |                      设置                      |
+| :------------------------------------: | :--------------------------------------------: | :--------------------------------------: | :----------------------------------------: | :------------------------------------------: | :--------------------------------------------: |
+| ![home](./assets/screenshots/home.png) | ![player](./assets/screenshots/nowplaying.png) | ![queue](./assets/screenshots/queue.png) | ![search](./assets/screenshots/search.png) | ![library](./assets/screenshots/library.png) | ![settings](./assets/screenshots/settings.png) |
 
-`assets/screenshots/` 下是**移动端**界面截图（1182×2560），保留在仓库里作为交互基线：
-桌面端阶段 6 的既定方法论是「先读移动端怎么做 → 再决定桌面端怎么做 → 写明为什么」，
-只在"鼠标 + 宽屏确实要求不同"的地方才改，不因为"桌面软件通常这样"就发明新惯例。
+> 上面六张由 `pnpm shots:readme` 在真实的 Electron 窗口里现拍（真实 B 站数据、真实歌词匹配），
+> 不是手绘稿也不是拼图。要重拍就再跑一次那条命令；每张图拍的是什么见
+> [`assets/screenshots/manifest.json`](./assets/screenshots/manifest.json)。
+>
+> 另有移动端界面截图在 [`assets/screenshots-mobile/`](./assets/screenshots-mobile)，作为桌面端对齐交互时的对照基线。
 
-桌面端自身的截图巡检产物在 `apps/desktop/probe-output/`（不入库，由 `pnpm verify:desktop:tour` 生成）。
+## 主要功能
+
+### 核心播放体验
+
+- **Bilibili 登录**: 支持通过**扫码**、**密码**或手动粘贴 Cookie 登录。凭据经系统密钥库（Electron `safeStorage`）加密落盘，**cookie 从不到达渲染进程**。
+- **播放源**: 自由添加本地播放列表，登录账号后也可直接访问账号内**收藏夹**与 UP **合集**。音频由主进程经自定义协议代理（B 站主线 CDN 强制校验 `Referer`，渲染进程设不上去）。
+- **导入外部歌单**: 支持粘贴**网易云音乐**歌单链接，逐首搜索、加权打分后匹配到 B 站视频并保存为播放列表。
+- **全功能播放器**: 提供播放/暂停、循环、随机、播放队列、响度均衡、断点续播、启动自动播放等功能。
+- **搜索**: 智能搜索，支持 BV/AV 号、b23.tv 短链解析。同时提供收藏夹和本地播放列表内搜索。
+
+### 歌词系统
+
+- **支持 SPL**: 支持**逐字进度**、**罗马音注音**及**翻译歌词**展示。
+- **智能获取**: 支持自动匹配歌词（网易云 / QQ 音乐 / 酷狗音乐），并支持手动搜索、粘贴 LRC/SPL 文本及偏移量调整。
+- **多样展示**: 支持**独立歌词窗口** —— 无边框 + 透明背景 + 置顶悬浮，可用 `Ctrl+Alt+L` 呼出。
+
+### 主题系统
+
+- **浅色 / 深色 / 跟随系统** 三种模式，语义色与字阶来自 [`packages/design-tokens`](./packages/design-tokens) 的 Material Design 3 令牌（主进程生成 CSS 变量下发给渲染进程，不是手抄一份）。
+- **封面主色背景**：播放详情页的背景取自当前封面。
+- **材质与模糊强度**可调，左栏宽度**可拖拽**并记忆（双击还原）。
+
+### 其他特性
+
+- **下载**: 支持缓存歌曲并离线播放，HTTP `Range` 断点续传 + 完整性校验 + 备用地址回退。
+- **共享歌单**: 把歌单分享到 [`apps/backend`](./apps/backend)，别人订阅后**双向同步**（owner / editor 可改，subscriber 只读）。
+- **备份与恢复**: ZIP + 原始 SQLite 快照，**与移动端格式互通**。
+- **系统集成**: Windows 走 **SMTC**、Linux 走 **MPRIS**；任务栏缩略图按钮（图标运行时零依赖生成）；可选硬件媒体键兜底。
+- **实用工具**: 定时关闭、播放历史与听歌频率热力图、多选批量操作。
+
+## 技术栈
+
+- **框架**: Electron
+- **数据库**: `node:sqlite`（Electron 内置）+ Drizzle ORM
+- **渲染进程**: 原生 DOM —— **没有框架，也没有打包器**，每个模块是 `index.html` 里的普通 `<script>`
+- **UI**: Material Design 3
+- **核心逻辑**: [`packages/core`](./packages/core)（平台无关，与移动端共用），构建期用 esbuild 打成 CJS 单文件随应用分发
+
+## 项目结构 (Monorepo)
+
+- **[apps/desktop](./apps/desktop)**: BBPlayer 桌面端核心代码（主进程 + 渲染进程 + 验证套件）。
+- **[apps/backend](./apps/backend)**: 共享歌单后端（Cloudflare Worker + Hono + Drizzle + Postgres）。
+- **[packages/core](./packages/core)**: 平台无关核心 —— DB schema 与迁移、B 站 / 网易云 API、歌词候选、WebDAV、备份格式。
+- **[packages/splash](./packages/splash)**: 歌词解析与转换核心库（SPL / LRC）。
+- **[packages/design-tokens](./packages/design-tokens)**: Material Design 3 语义色与字阶。
+- **[docs](./docs)**: 方案、各阶段施工图、进展与**踩坑记录**。
+- **[prototype](./prototype)**: 界面改造的静态 HTML 原型（改主页 / 播放页前先看它）。
 
 ## 快速开始
 
 ```bash
 pnpm install
 
-# 国内网络首次安装需要下载 Electron 二进制（约 142 MB，懒下载）
+# 国内网络首次安装需要下载 Electron 二进制（约 142 MB）；Electron ≥ 42 是懒下载，
+# 刚装完 dist/ 是空的属于正常现象
 ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/ pnpm install
 
 pnpm --filter @bbplayer/desktop start      # 开窗口运行
 ```
 
+打包（Windows 出 NSIS + portable，Linux 出 deb / rpm / AppImage）：
+
+```bash
+pnpm --filter @bbplayer/desktop build:win
+pnpm --filter @bbplayer/desktop build:linux
+```
+
+质量检查：
+
 ```bash
 pnpm lint          # oxlint --type-aware
 pnpm type-check    # tsgo --build --noEmit
-pnpm format        # oxfmt
 pnpm check:core    # packages/core 平台无关性守卫
-pnpm check:probes  # 探针脚本静态检查（已接 pre-commit）
+pnpm check:probes  # 探针脚本静态检查
+pnpm shots:readme  # 重拍本文档的截图
 ```
 
-打包：
+另有 21 个验证套件（1000+ 条断言，含真实播放、真实登录链路、截图巡检），
+清单与边界见 [`apps/desktop/README.md`](./apps/desktop/README.md)。
 
-```bash
-pnpm --filter @bbplayer/desktop build:win     # NSIS + portable
-pnpm --filter @bbplayer/desktop build:linux   # deb + rpm + AppImage
-```
+## 平台与状态
 
-完整验证套件（21 个脚本、1000+ 条断言）见 [`apps/desktop/README.md`](./apps/desktop/README.md)。
+- **Windows / Linux** 的安装包均已构建并在真机验证；macOS 未适配。
+- **安装包未签名**：Windows SmartScreen 会提示，属预期。
+- **外部歌单导入只支持网易云**：QQ 音乐的歌单接口需要 `uin` + zzc 签名，未登录拿不到完整列表。
+- **歌词面板有一处未定位的缺陷**：主界面里歌词状态正确、DOM 也更新了，但行元素有时不渲染。独立歌词窗口走另一份实现，没有这个问题。详见 [`docs/LYRICS.md`](./docs/LYRICS.md)。
 
-## 仓库结构
+## 隐私与数据统计
 
-```
-apps/
-  desktop/   Electron 桌面端（主进程 CJS + 无打包器的渲染进程）
-  backend/   共享歌单后端（Cloudflare Worker + Hono + Drizzle + Postgres）
-packages/
-  core/          平台无关核心：DB schema / 迁移 / B 站与网易云 API / 歌词 / WebDAV / 备份格式
-  splash/        歌词解析与转换（SPL / LRC）
-  design-tokens/ Material Design 3 语义色与字阶
-scripts/         验证套件、探针静态检查、core 纯度守卫
-docs/            桌面端方案与各阶段施工图、进展与踩坑记录
-prototype/       卡片化改造的静态 HTML 原型（`prototype/pages/home.html` 等）
-assets/          移动端界面截图（交互对照用）
-```
+桌面端**不集成**任何统计或崩溃上报 SDK（移动端的 Firebase Analytics / Sentry 没有带过来）。
 
-## 与上游 BBPlayer 的关系
+### 数据流向
 
-本仓库是 [bbplayer-app/BBPlayer](https://github.com/bbplayer-app/BBPlayer) monorepo 中**桌面端部分的独立拆分**，
-已剔除移动端（React Native）、文档站、热更新与发版工具等与桌面端无关的代码，历史也相应重写（已无上游 remote）。
+1. **本机**：播放列表、播放历史、下载的歌曲、设置项都存在本机 `userData` 下。
+2. **B 站**：搜索、取流、收藏夹与合集同步直接请求 B 站 API。
+3. **歌词来源**：自动匹配歌词时会请求网易云 / QQ 音乐 / 酷狗音乐。
+4. **共享歌单**：只有在你主动使用该功能时才访问 [`apps/backend`](./apps/backend)（地址可自建）。
+5. **WebDAV**：只有在你配置了备份地址后才访问你自己填的服务器。
 
-因此代码注释与 `docs/` 里仍会看到 `apps/mobile` / `packages/orpheus` 这类**历史交叉引用** ——
-它们记录的是"这件事在移动端是怎么做的"，是有效的设计依据，不是失效链接。
+### 隐私承诺
 
-`apps/backend` 是桌面端「共享歌单」功能所依赖的服务端，与移动端共用同一套协议。
+- **登录凭据不出本机**：B 站 cookie 只存在于主进程，渲染进程拿不到；二维码轮询也在主进程完成。
+- **统计代码开源可见**：没有任何隐藏上报。
+- **可自建后端**：共享歌单后端地址可配，不强制走官方实例。
 
-## 隐私
+## 感谢
 
-桌面端**不集成**任何统计或崩溃上报 SDK（移动端的 Firebase Analytics / Sentry 未带过来）。
-数据只落在本机 `userData` 下；登录凭据交给 Electron `safeStorage`。
-唯一的外部请求是 B 站 API、歌词来源（网易云 / QQ / 酷狗）、可自建的共享歌单后端，以及你自己配置的 WebDAV。
+本项目开发过程中很多功能和设计的灵感都来自前辈们，包括但不限于：
+
+- [AzusaPlayer](https://github.com/lovegaoshi/azusa-player-mobile)
+- [BiliSound](https://github.com/bilisound/client-mobile)
+- [Salt Player](https://github.com/Moriafly/SaltPlayerSource)
+- [Spotify](https://spotify.com)
+
+以及最重要的：[Bilibili](https://www.bilibili.com/)
+
+在此表示感谢！（鞠躬）
 
 ## 开源许可
 
 本项目采用 MIT 许可，见 [LICENSE](./LICENSE)。
-原始项目版权归 [BBPlayer](https://github.com/bbplayer-app/BBPlayer) 作者所有。
+
+本仓库是 [bbplayer-app/BBPlayer](https://github.com/bbplayer-app/BBPlayer) 中**桌面端部分的独立拆分**，
+原始项目版权归其作者所有。
