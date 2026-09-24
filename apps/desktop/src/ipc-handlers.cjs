@@ -206,6 +206,26 @@ function registerIpcHandlers() {
 	})
 
 	/**
+	 * 删除一个歌单（卡片化收尾追加：左栏歌单行的「更多 › 删除歌单」）。
+	 *
+	 * ⚠️ 与 `db:createPlaylist` 同一个形状：**这一层只做包装**，
+	 * 事务、级联、返回什么摘要全在 `db.deletePlaylist` 里。
+	 *
+	 * 歌单不存在时返回 `ok: false`（而不是"成功删了 0 个"）——
+	 * 界面上一句「已删除」而实际什么都没发生，是最难查的那种假成功。
+	 */
+	ipcMain.handle('playlist:delete', (_event, playlistId) => {
+		try {
+			const removed = db.deletePlaylist(Number(playlistId))
+			return removed
+				? { ok: true, data: removed }
+				: { ok: false, error: `找不到歌单 ${playlistId}` }
+		} catch (error) {
+			return { ok: false, error: error.message }
+		}
+	})
+
+	/**
 	 * 把若干曲目加入某个本地歌单（阶段 6c「添加到歌单」的写库路径）。
 	 *
 	 * 语义（重复静默忽略 / 追加到末尾 / 整批一个事务）全在

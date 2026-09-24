@@ -3407,35 +3407,32 @@ input[type='range']:focus-visible {
 	color: var(--bad);
 }
 
-/* ── 左栏歌单行的「分享 / 同步」 ───────────────────────── */
+/* ── 左栏歌单行尾的「⋯」（卡片化收尾） ───────────────────── */
 .playlist-list__name {
 	flex: 1 1 auto;
 }
 
-.playlist-list__share {
+/*
+ * ⚠️ 这一块原来叫 `.playlist-list__share` —— 行尾是一颗**分享图标按钮**。
+ * 卡片化收尾按用户给的参考图改成「⋯ → 二级菜单」之后，分享/同步与删除歌单
+ * 都进了菜单，这里只需要保证「⋯」在行尾占位稳定。
+ *
+ * ⚠️ 不能再给它画边框/底色：`.list-row__trailing` 那一格在**每一行**都有，
+ * 按钮一旦"看起来像个控件"，一屏十几行就全是方块（同 `.icon-only` 的理由）。
+ */
+.playlist-list__more {
 	flex: 0 0 auto;
-	background: var(--surface-3);
-	border: 1px solid var(--outline-variant);
-	border-radius: var(--r-sm);
-	color: var(--on-surface-variant);
-	cursor: pointer;
-	font: inherit;
-	font-size: var(--fs-label-medium);
-	padding: 1px 8px;
-	white-space: nowrap;
 }
 
-.playlist-list__item[data-shared='true'] .playlist-list__share {
+/*
+ * 已共享的歌单：把「⋯」染成主色 —— 图标形状不再表达状态（都是三点），
+ * 于是状态只剩颜色这一条线索。不标的话用户看不出哪些歌单在云端。
+ */
+.playlist-list__item[data-shared='true'] .playlist-list__more {
 	color: var(--primary);
-	border-color: var(--primary);
 }
 
-.playlist-list__share:hover {
-	background: var(--surface-2);
-	color: var(--on-surface);
-}
-
-.playlist-list__share:disabled {
+.playlist-list__more:disabled {
 	opacity: 0.5;
 	cursor: default;
 }

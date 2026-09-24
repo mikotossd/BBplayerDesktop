@@ -240,6 +240,11 @@ contextBridge.exposeInMainWorld('bbplayer', {
 		/** 从歌单移除一首曲目；共享歌单会顺带把删除推给协作者 */
 		removeTrack: (payload) =>
 			ipcRenderer.invoke('playlist:removeTrack', payload),
+		/**
+		 * 删除一个歌单（连带它的曲目关联；`tracks` 表不动）。
+		 * 返回被删歌单的摘要（标题 / 曲目数 / 是否共享），供界面如实报告。
+		 */
+		delete: (playlistId) => ipcRenderer.invoke('playlist:delete', playlistId),
 	},
 	/**
 	 * 诊断信息（实现细节唯一的去处）。

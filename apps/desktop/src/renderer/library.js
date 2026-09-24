@@ -44,31 +44,45 @@
 			els.playlistCount.textContent = String(playlists.length)
 
 		for (const playlist of playlists) {
-			// 已共享的歌单按钮显示「同步」：用户的意图是同一个 —— 让云端与本地一致
+			// 已共享的歌单显示「同步」：用户的意图是同一个 —— 让云端与本地一致
+			//
+			// ⚠️ 行尾是**一颗「⋯」**（卡片化收尾，用户给的参考图就是播放列表行的
+			// 三点菜单）。原来那里直接摆着一颗分享图标 —— 一颗图标只能表达一个
+			// 动作，于是"删除歌单"根本没有地方放；而且分享/同步是**低频且不可逆**
+			// 的动作，摆在每一行上太吵。现在点 ⋯ 弹出菜单：
+			//   分享到云端 / 同步到云端（按是否已共享换文案与图标）+ 删除歌单。
 			//
 			// ⚠️ 原来是**文字按钮**（「分享」/「同步」），在 240px 宽的行里吃掉
 			// 40 多像素，把歌单名挤成「合集·BILIB…」（§1.5 的第 3 个缺陷）。
 			// 改成图标按钮：语义靠图标 + `title`/`aria-label`，把宽度还给标题。
 			const shared = Boolean(playlist.share_id)
-			const shareButton = document.createElement('button')
-			shareButton.className = 'icon-only playlist-list__share'
-			shareButton.dataset.testid = `playlist-share-${playlist.id}`
+			const moreButton = document.createElement('button')
+			moreButton.className = 'icon-only playlist-list__more'
+			// ⚠️ 叫 `playlist-row-more-<id>` 而不是 `playlist-more-<id>`：
+			// 歌单详情页页头那颗「⋮」的 testid 正好是 `playlist-more`
+			// （见 buildPlaylistHead），两个名字只差一个后缀，将来按前缀查会串。
+			moreButton.dataset.testid = `playlist-row-more-${playlist.id}`
 			// `data-action` 比 testid 稳定（testid 里带歌单 id，值每次都可能不同），
-			// 探针与未来的快捷键都靠它定位
-			shareButton.dataset.action = 'share'
-			shareButton.title = shared
-				? `已共享（${playlist.share_role ?? '成员'}）· 点一下同步云端改动`
-				: '把这个歌单分享到云端（共享歌单）'
-			shareButton.setAttribute('aria-label', shared ? '同步到云端' : '分享歌单')
-			// 图标形状本身也表达状态：未共享是 share，已共享是 sync
-			shareButton.innerHTML = window.bbComponents.iconHtml(
-				shared ? 'sync' : 'share',
+			// 探针与未来的快捷键都靠它定位。
+			//
+			// ⚠️ 值必须是 `playlist-more` 而**不能是 `more`**：曲目行尾那颗「⋯」
+			// 也叫 `data-action="more"`，而"每行曲目都有「⋯」"那条断言是按
+			// `[data-action="more"]` 数元素的 —— 左栏这两颗会被一起数进去，
+			// 于是断言在"数量对不上"上红掉，而真正的问题（两个不同的东西
+			// 共用一个定位属性）看不出来。
+			moreButton.dataset.action = 'playlist-more'
+			// 图标形状本身也表达状态：未共享是「⋯」，已共享的也还是「⋯」——
+			// 但 title 里说清楚它会同步
+			moreButton.title = shared ? '更多（已共享，可同步）' : '更多'
+			moreButton.setAttribute('aria-label', '更多')
+			moreButton.innerHTML = window.bbComponents.iconHtml(
+				'more_vert',
 				'icon--sm',
 			)
-			shareButton.addEventListener('click', (event) => {
+			moreButton.addEventListener('click', (event) => {
 				// 否则会顺带触发行上的「打开歌单」
 				event.stopPropagation()
-				void sharePlaylist(playlist, shareButton)
+				openPlaylistMenu(playlist, moreButton)
 			})
 
 			// 用组件层的 `.list-row`（封面/首字方块 + 主标题 + 副标题 + 尾部动作），
@@ -82,7 +96,7 @@
 				title: playlist.title,
 				sub: `${playlist.item_count ?? 0} 首`,
 				coverUrl: playlist.cover_url ?? null,
-				trailing: [shareButton],
+				trailing: [moreButton],
 				tag: 'li',
 			})
 			if (playlist.id === selectedId) li.classList.add('is-active')
@@ -192,6 +206,98 @@
 	}
 
 	/**
+	 * 左栏歌单行尾「⋯」的二级菜单（卡片化收尾）。
+	 *
+	 * 用户在参考图里圈的就是这个形状：**行尾一颗「⋯」**，点开是二级菜单
+	 * （那张图上写的是「下一首播放 / 添加到歌单 / 从歌单移除」）。
+	 * 歌单行这里是同一套组件（`bbComponents.menu`），所以外观与曲目行的
+	 * 菜单**完全一致** —— 包括危险项的红色。
+	 *
+	 * ⚠️ 分享/同步从"行上那颗图标"搬到这里，是因为一颗图标只能表达一个动作，
+	 * 而"删除歌单"没有地方放；顺带把低频动作收进菜单，行上只剩"打开歌单"。
+	 */
+	function openPlaylistMenu(playlist, anchor) {
+		const shared = Boolean(playlist.share_id)
+		window.bbComponents.menu(anchor, [
+			{
+				label: shared ? '同步到云端' : '分享到云端',
+				icon: shared ? 'sync' : 'share',
+				testid: `playlist-menu-share-${playlist.id}`,
+				onSelect: () => void sharePlaylist(playlist, anchor),
+			},
+			{
+				label: '删除歌单',
+				icon: 'delete',
+				danger: true,
+				testid: `playlist-menu-delete-${playlist.id}`,
+				onSelect: () => void deletePlaylist(playlist),
+			},
+		])
+	}
+
+	/**
+	 * 删除一个歌单（卡片化收尾追加）。
+	 *
+	 * ⚠️ 这是**不可逆**的写操作，所以：
+	 *   * 先说清楚删什么（歌单名 + 曲目数 + "曲目本身不会被删"），再让用户确认；
+	 *   * 共享歌单**先取消共享** —— 否则远端会留下一张谁也管不着的歌单。
+	 *     取消失败也照样删本地（用户的意图是"我这儿不要它了"），
+	 *     但必须如实说明"远端可能还在"，不能假装干净。
+	 */
+	async function deletePlaylist(playlist) {
+		const count = Number(playlist.item_count ?? 0)
+		const shared = Boolean(playlist.share_id)
+		const confirmed = window.confirm(
+			`确定删除歌单「${playlist.title}」吗？\n\n` +
+				`将移除这个歌单${count > 0 ? `（${count} 首）` : ''}。` +
+				'曲目本身不会被删除，它们还在别的歌单与收藏夹里。' +
+				(shared ? '\n\n这是一张共享歌单：会同时取消共享。' : ''),
+		)
+		if (!confirmed) return false
+
+		let unshareFailed = false
+		if (shared) {
+			setStatus(`正在取消共享「${playlist.title}」…`, 'busy')
+			try {
+				unwrap(await window.bbplayer.share.unshare(playlist.id), '取消共享')
+			} catch {
+				// 取消共享失败不阻塞删除：用户要的是"我这儿不再有它"
+				unshareFailed = true
+			}
+		}
+
+		try {
+			unwrap(await window.bbplayer.playlist.delete(playlist.id), '删除歌单')
+			/*
+			 * ⚠️ 删掉的正好是当前打开的那张歌单时，要**退回歌单列表**：
+			 * 否则内容卡里留着的是"一个已经不存在的歌单的曲目表"，
+			 * 而左栏已经没有对应的高亮项 —— 用户点「返回」都不知回哪。
+			 */
+			if (window.bbState.get().selectedPlaylistId === playlist.id) {
+				await showPlaylistsTab()
+			}
+			await refreshPlaylists()
+			setStatus(
+				`已删除歌单「${playlist.title}」` +
+					(shared
+						? unshareFailed
+							? '（取消共享失败：远端可能还留着）'
+							: '（已取消共享）'
+						: ''),
+				unshareFailed ? 'busy' : 'ok',
+			)
+			return true
+		} catch (error) {
+			setStatus(error.message, 'bad')
+			// 删本地失败时把共享状态说清楚，免得用户以为"至少云端没了"
+			if (shared && !unshareFailed) {
+				setStatus(`${error.message}（云端共享已取消，本地歌单还在）`, 'bad')
+			}
+			return false
+		}
+	}
+
+	/**
 	 * 左栏歌单行上的「分享 / 同步」（Phase 3.4）。
 	 *
 	 * 分享是幂等的（已共享时主进程直接返回 `alreadyShared`），所以这里不担心
@@ -199,12 +305,14 @@
 	 *
 	 * ⚠️ `skipped > 0` 必须如实说出来：只有带 B 站 bvid 的曲目能被共享，
 	 * 纯本地文件会**静默**上传不了 —— 不说的话用户会对着一个缺歌的云歌单发呆。
+	 *
+	 * ⚠️ 进度**只走状态胶囊**，不再把按钮文字改成「分享中…」：那个动作会把
+	 * 图标按钮变回一个宽文字按钮，在 240px 的行里又把歌单名挤没
+	 * （§1.5 的第 3 个缺陷就是这么来的）。而且现在它是菜单项，早就关掉了。
 	 */
 	async function sharePlaylist(playlist, button) {
 		const shared = Boolean(playlist.share_id)
-		button.disabled = true
-		const original = button.textContent
-		button.textContent = shared ? '同步中…' : '分享中…'
+		if (button?.isConnected) button.disabled = true
 		setStatus(
 			shared ? `同步中…（${playlist.title}）` : `分享中…（${playlist.title}）`,
 			'busy',
@@ -269,10 +377,7 @@
 			setStatus(error.message, 'bad')
 		} finally {
 			// 重绘会换掉按钮节点，所以先确认它还在文档里
-			if (button.isConnected) {
-				button.disabled = false
-				button.textContent = original
-			}
+			if (button?.isConnected) button.disabled = false
 		}
 	}
 

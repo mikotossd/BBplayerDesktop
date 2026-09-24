@@ -364,6 +364,46 @@ function getPlaylist(id) {
 	return sqlite.getFirstSync('SELECT * FROM playlists WHERE id = ?', [id])
 }
 
+/**
+ * 删除一个歌单（卡片化收尾追加：左栏歌单行的「更多 › 删除歌单」）。
+ *
+ * ⚠️ 只删**歌单与它的关联行**，`tracks` 表一行都不动：同一首歌可能还在别的
+ * 歌单或收藏夹里 —— "删歌单"不该顺手把曲目从库里抹掉（那是用户没要求的事，
+ * 而且不可逆）。
+ *
+ * ⚠️ 显式删 `playlist_tracks` / `dynamic_playlist_sources` / `playlist_sync_queue`，
+ * 不只依赖 `ON DELETE cascade`：级联要 `PRAGMA foreign_keys = ON` 才生效，
+ * 而那条 PRAGMA 是**连接级**的（见 `ports.cjs`）—— 换个连接、或用外部工具
+ * 打开这个库时级联就没了，留下一堆指向不存在歌单的孤儿行。
+ * 显式删一遍，两种情况下结果一致。
+ *
+ * `dynamic_playlist_sources` 两边都要删：被删的歌单可能既是别人动态歌单的
+ * **来源**，自己也有一批来源。
+ *
+ * 返回被删歌单的摘要（供界面如实报告删了什么）；歌单不存在时返回 `null`。
+ */
+function deletePlaylist(id) {
+	const playlist = getPlaylist(id)
+	if (!playlist) return null
+	sqlite.withTransactionSync(() => {
+		sqlite.runSync(
+			'DELETE FROM dynamic_playlist_sources WHERE playlist_id = ? OR source_playlist_id = ?',
+			[id, id],
+		)
+		sqlite.runSync('DELETE FROM playlist_sync_queue WHERE playlist_id = ?', [
+			id,
+		])
+		sqlite.runSync('DELETE FROM playlist_tracks WHERE playlist_id = ?', [id])
+		sqlite.runSync('DELETE FROM playlists WHERE id = ?', [id])
+	})
+	return {
+		id,
+		title: playlist.title,
+		itemCount: playlist.item_count ?? 0,
+		wasShared: Boolean(playlist.share_id),
+	}
+}
+
 function listPlaylists() {
 	/*
 	 * playlists 本身没有 sort_key（那是 playlist_tracks 的列），按置顶 + 创建时间排。
@@ -1179,6 +1219,8 @@ module.exports = {
 	listTables,
 	createPlaylist,
 	getPlaylist,
+	/** 删除歌单（连带关联行；`tracks` 表不动），见函数头注释 */
+	deletePlaylist,
 	listPlaylists,
 	upsertTrack,
 	addTrackToPlaylist,

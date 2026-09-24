@@ -508,20 +508,31 @@ async function run(window) {
 	check('能切回音乐库', toLibrary)
 	await sleep(900)
 
+	/*
+	 * ⚠️ 分享入口从"行尾那颗分享图标"搬进了**行尾「⋯」的二级菜单**
+	 * （卡片化收尾，按用户给的参考图）。所以这里要点两下：
+	 * 先点「⋯」打开菜单，再点「分享到云端 / 同步到云端」。
+	 *
+	 * ⚠️ 菜单挂在 `document.body` 上（`bbComponents.menu` 的做法，为了不被行的
+	 * `overflow` 裁掉），所以菜单项**不在 row 里面** —— 第二下要查全文档。
+	 */
 	const shareButtonClicked = await evaluate(
 		window,
 		`(() => {
 			const rows = [...document.querySelectorAll('[data-testid="playlist-row"], .playlist-row, [data-playlist-id]')]
 			const row = rows.find((r) => (r.innerText || '').includes(${JSON.stringify(PREP.localTitle)}))
 			if (!row) return 'no-row'
-			const btn = row.querySelector('[data-testid="playlist-share"], [data-action="share"]')
-			if (!btn) return 'no-button'
-			btn.click()
+			const more = row.querySelector('[data-action="playlist-more"]')
+			if (!more) return 'no-more-button'
+			more.click()
+			const item = document.querySelector('[data-testid^="playlist-menu-share-"]')
+			if (!item) return 'no-menu-item'
+			item.click()
 			return 'clicked'
 		})()`,
 	)
 	check(
-		'音乐库里待分享歌单有「分享」按钮且能点',
+		'音乐库里待分享歌单的「⋯ › 分享到云端」能点开并生效',
 		shareButtonClicked === 'clicked',
 		String(shareButtonClicked),
 	)

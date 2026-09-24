@@ -1721,6 +1721,213 @@ async function run(window) {
 	)
 
 	// ---------------------------------------------------------------
+	// 2.5b 歌单行尾的「⋯」二级菜单：分享 + 删除歌单（卡片化收尾）
+	// ---------------------------------------------------------------
+	//
+	// 用户给的参考图就是"行尾一颗「⋯」，点开是二级菜单"。歌单行这里用**同一套**
+	// 组件（`bbComponents.menu`），所以外观与曲目行的菜单完全一致；
+	// 原来直接摆在行上的分享图标收进菜单，并新增一条「删除歌单」。
+	//
+	// ⚠️ 删除是**不可逆**的写操作，所以这一段走完整路径：
+	// 建一个一次性歌单 → 从菜单删掉 → 断言它**真的**从库里没了
+	// （不是"点了没报错"——那是这个仓库反复踩过的假绿）。
+	console.log('\n[ui] 2.5b) 歌单行尾「⋯」：分享 + 删除歌单')
+	const rowMenus = JSON.parse(
+		await evaluate(
+			window,
+			`(() => {
+				const rows = [...document.querySelectorAll('#playlist-list [data-playlist-id]')]
+				return JSON.stringify({
+					rows: rows.length,
+					withMore: rows.filter((r) =>
+						r.querySelector('[data-action="playlist-more"]'),
+					).length,
+					/*
+					 * ⚠️ 行尾**只有一颗**按钮。
+					 *
+					 * 原来这里查的是「还有没有 data-action=share 的按钮」——
+					 * 那个属性值改完之后就不存在了，于是断言**恒为真**（假绿）。
+					 * 换成量"行尾按钮数"：分享图标要是被加回来，这里立刻变 2。
+					 */
+					trailingCounts: rows.map(
+						(r) => r.querySelectorAll('.list-row__trailing button').length,
+					),
+					// 行尾必须是 more_vert 那个字形（图标名写错时 textContent 会是别的）
+					glyphs: [
+						...new Set(
+							rows.map(
+								(r) =>
+									r.querySelector('[data-action="playlist-more"]')?.textContent ?? '',
+							),
+						),
+					],
+				})
+			})()`,
+		),
+	)
+	check(
+		'左栏每一行歌单都有一个「⋯」按钮，且它渲染成 more_vert 字形',
+		rowMenus.rows > 0 &&
+			rowMenus.withMore === rowMenus.rows &&
+			rowMenus.glyphs.length === 1 &&
+			rowMenus.glyphs[0] === 'more_vert',
+		JSON.stringify(rowMenus),
+	)
+	check(
+		'行尾只有一颗按钮（分享 / 同步已经收进菜单，不再是每行一颗图标）',
+		Array.isArray(rowMenus.trailingCounts) &&
+			rowMenus.trailingCounts.every((n) => n === 1),
+		JSON.stringify(rowMenus.trailingCounts),
+	)
+
+	const menuProbe = JSON.parse(
+		await evaluate(
+			window,
+			`(() => {
+				const row = [...document.querySelectorAll('#playlist-list [data-playlist-id]')]
+					.find((r) => (r.textContent || '').includes('探针新建的歌单'))
+				if (!row) return JSON.stringify({ ok: false, reason: 'no-row' })
+				row.querySelector('[data-action="playlist-more"]').click()
+				const menu = document.querySelector('[data-testid="track-menu"]')
+				if (!menu) return JSON.stringify({ ok: false, reason: 'no-menu' })
+				const items = [...menu.querySelectorAll('.menu__item')]
+				/*
+				 * ⚠️ 标签要取**最后一个 span** 的文字，不能取整个按钮的 textContent：
+				 * 图标是 ligature 字体，它的 textContent 就是图标名本身
+				 * （「share分享到云端」）—— 直接 includes('分享到云端') 会因为
+				 * 前面那串字形名而对不上，第一版就是这么红的。
+				 */
+				const labelOf = (b) =>
+					(b.querySelector('span:last-child')?.textContent ?? '').trim()
+				const labels = items.map(labelOf)
+				const danger = items
+					.filter((b) => b.classList.contains('menu__item--danger'))
+					.map(labelOf)
+				// 量完关掉：菜单挂在 body 上，留着会让后面"点⋯弹菜单"的用例读到它
+				window.bbComponents.closeMenu()
+				return JSON.stringify({
+					ok: true,
+					labels,
+					danger,
+					shareItem: labels.includes('分享到云端'),
+					deleteItem: labels.includes('删除歌单'),
+				})
+			})()`,
+		),
+	)
+	check(
+		'点「⋯」弹出二级菜单：分享到云端 + 删除歌单（后者是危险项）',
+		menuProbe.ok === true &&
+			menuProbe.shareItem === true &&
+			menuProbe.deleteItem === true &&
+			menuProbe.danger.length === 1 &&
+			menuProbe.danger[0] === '删除歌单',
+		JSON.stringify(menuProbe),
+	)
+	check(
+		'菜单里没有多余项（二级菜单只放低频动作，不是第二个工具栏）',
+		Array.isArray(menuProbe.labels) && menuProbe.labels.length === 2,
+		JSON.stringify(menuProbe.labels),
+	)
+	check(
+		'量完菜单真的关掉了（否则它会一直挂在 body 上影响后面的用例）',
+		(await evaluate(
+			window,
+			`!document.querySelector('[data-testid="track-menu"]')`,
+		)) === true,
+	)
+	/*
+	 * 拍一张「⋯ 菜单打开」的样子 —— 用户给的参考图就是这个形状
+	 * （行尾一颗「⋯」+ 二级菜单），这张图是给他做 1:1 对照用的。
+	 */
+	await evaluate(
+		window,
+		`(() => {
+			const row = [...document.querySelectorAll('#playlist-list [data-playlist-id]')]
+				.find((r) => (r.textContent || '').includes('探针新建的歌单'))
+			row?.querySelector('[data-action="playlist-more"]')?.click()
+			return true
+		})()`,
+	)
+	await sleep(400)
+	await shot(window, 'ui-11-playlist-menu')
+	await evaluate(
+		window,
+		`(() => { window.bbComponents.closeMenu(); return true })()`,
+	)
+
+	// 一次性歌单：建出来 → 从菜单删掉
+	await evaluate(
+		window,
+		`(() => { document.querySelector('[data-testid="track-menu"]')?.remove(); return true })()`,
+	)
+	await click(window, '[data-testid="playlist-new"]')
+	await sleep(300)
+	await click(window, '[data-testid="playlist-new-local"]')
+	await sleep(400)
+	await typeInto(
+		window,
+		'[data-testid="create-playlist-name"]',
+		'探针待删的歌单',
+	)
+	await click(window, '[data-testid="create-playlist-ok"]')
+	await sleep(1600)
+	const beforeDelete = await evaluate(
+		window,
+		`(async () => {
+			document.querySelector('[data-testid="playlist-back"]')?.click()
+			await new Promise((r) => setTimeout(r, 900))
+			return (await window.bbplayer.listPlaylists()).data.length
+		})()`,
+	)
+	const deleted = JSON.parse(
+		await evaluate(
+			window,
+			`(async () => {
+				// 删除有二次确认，探针里放行；量完必须还原，否则后面所有 confirm 都被吃掉
+				const original = window.confirm
+				window.confirm = () => true
+				const row = [...document.querySelectorAll('#playlist-list [data-playlist-id]')]
+					.find((r) => (r.textContent || '').includes('探针待删的歌单'))
+				if (!row) {
+					window.confirm = original
+					return JSON.stringify({ ok: false, reason: 'no-row' })
+				}
+				row.querySelector('[data-action="playlist-more"]').click()
+				const item = document.querySelector('[data-testid^="playlist-menu-delete-"]')
+				if (!item) {
+					window.confirm = original
+					return JSON.stringify({ ok: false, reason: 'no-delete-item' })
+				}
+				item.click()
+				await new Promise((r) => setTimeout(r, 2000))
+				window.confirm = original
+				const left = (await window.bbplayer.listPlaylists()).data
+				return JSON.stringify({
+					ok: true,
+					left: left.length,
+					titles: left.map((p) => p.title),
+					status: document.getElementById('status')?.textContent ?? '',
+				})
+			})()`,
+		),
+	)
+	check(
+		'从「⋯ › 删除歌单」删掉之后：库里真的少了一张，列表里也不再有它',
+		deleted.ok === true &&
+			deleted.left === beforeDelete - 1 &&
+			!deleted.titles.includes('探针待删的歌单'),
+		`${beforeDelete} → ${deleted.left}；` +
+			`还有：${(deleted.titles ?? []).join(' / ')}`,
+	)
+	check(
+		'删除结果如实报出歌单名（不是一句含糊的「已删除」）',
+		String(deleted.status).includes('已删除歌单') &&
+			String(deleted.status).includes('探针待删的歌单'),
+		String(deleted.status),
+	)
+
+	// ---------------------------------------------------------------
 	// 2.6 播放列表功能：随机播放 / 下一首播放 / 更改顺序
 	// ---------------------------------------------------------------
 	//
