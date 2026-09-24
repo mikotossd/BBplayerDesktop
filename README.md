@@ -108,9 +108,29 @@ pnpm shots:readme  # 重拍本文档的截图
 
 ## 平台与状态
 
-- **Windows / Linux** 的安装包均已构建并在真机验证；macOS 未适配。
+- **Windows**：Windows 10 / 11（x64），安装版与免安装版都有。
+- **Linux**：x86_64 + glibc，提供 `.deb` / `.rpm` / `.AppImage` 三种产物。
+  它们由 [CI](./.github/workflows/build-desktop.yml) 在真实 Linux 上构建，
+  并在 **Debian 12 / Ubuntu 22.04 / 24.04 / Debian 13 四个容器里**各装一遍、
+  跑一次产物自检 —— 因为"依赖里写的库名在这个发行版上存不存在"只有真装一次才知道
+  （`libasound2` 在 Ubuntu 24.04 起改名成 `libasound2t64`，这个坑就是这么暴露的）。
+- **macOS** 未适配，没做任何打包验证。
 - **安装包未签名**：Windows SmartScreen 会提示，属预期。
-- **外部歌单导入只支持网易云**：QQ 音乐的歌单接口需要 `uin` + zzc 签名，未登录拿不到完整列表。
+
+### Linux：发行版没覆盖到就自己构建
+
+`.deb` / `.rpm` / `.AppImage` 已经覆盖了绝大多数发行版，正常用上面的产物就行。
+但如果你想在没覆盖到的发行版上装成系统包（或者想自己改点东西），可以本地构建：
+
+```bash
+# 需要 Node 26 + pnpm；构建峰值内存约 4 GB，小内存机器先加 swap
+git clone https://github.com/mikotossd/BBplayerDesktop && cd BBplayerDesktop
+pnpm install
+pnpm --filter @bbplayer/desktop build:linux   # 产物在 apps/desktop/dist/
+```
+
+⚠️ 实测构建峰值会超过 3.8 GB 内存，2 GB 的 VPS 上必须补 swap 才跑得过 ——
+所以**不建议**把它当成常规安装方式，能用预编译包就用预编译包。
 
 ## 隐私与数据统计
 

@@ -1,6 +1,12 @@
 name: Build Desktop
 
-# 产出 Windows（NSIS + portable）与 Linux（deb / rpm / AppImage）安装包。
+# 产出 Windows（NSIS + portable）与 Linux（deb / rpm / AppImage）安装包，
+# 并在**真实发行版容器**里验证 deb 装得上、起得来。
+#
+# 为什么 Linux 产物交给 CI 而不是开发者本机：electron-builder 官方建议
+# 跨平台构建 Linux 目标走 docker，本机是 Windows 时根本产不出来。
+# 而"依赖名字对不对"这类问题**只有真的 `apt install` 一次才知道** ——
+# 见 `verify-deb` 那个 job（`libasound2` → `libasound2t64` 那次教训）。
 #
 # ⚠️ 未签名：Windows SmartScreen 会提示，属预期（见 docs/DESKTOP_PLAN.md Phase 5.3）。
 on:
@@ -52,3 +58,67 @@ jobs:
           name: bbplayer-desktop-${{ matrix.label }}
           path: ${{ matrix.artifact }}
           if-no-files-found: error
+
+  # ---------------------------------------------------------------
+  # deb 的真实安装验证
+  # ---------------------------------------------------------------
+  #
+  # 拦的是一类**只能靠真装一次才发现**的问题：依赖清单里写的库名在某些
+  # 发行版上不存在。实测踩到过一次 —— `Depends: libasound2` 在 Ubuntu 24.04
+  # 起找不到（该包改名成了 `libasound2t64`），`apt install ./xxx.deb` 直接失败；
+  # 而当时只在 Debian 12 上验过，那里旧名字还成立，所以一直是绿的。
+  #
+  # 所以这里**横向铺开四个发行版**，覆盖改名前后两代：
+  #   debian:12 / ubuntu:22.04 —— 旧名 libasound2
+  #   ubuntu:24.04 / debian:trixie(13) —— 新名 libasound2t64
+  #
+  # 判据不是"apt 退出码为 0"，而是装完之后**跑一次产物自检**并读它打印的
+  # `__SELFCHECK__` 行 —— 装上但起不来同样算失败。
+  verify-deb:
+    name: 🧪 deb on ${{ matrix.distro }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - debian:12
+          - ubuntu:22.04
+          - ubuntu:24.04
+          - debian:trixie
+    steps:
+      - name: 📥 Download deb
+        uses: actions/download-artifact@v4
+        with:
+          name: bbplayer-desktop-Linux
+          path: dist
+
+      - name: 🧪 Install and self-check on ${{ matrix.distro }}
+        run: |
+          set -euo pipefail
+          ls -l dist/
+
+          docker run --rm -v "$PWD/dist:/dist:ro" ${{ matrix.distro }} bash -lc '
+            set -euo pipefail
+
+            # xvfb 单独装、单独一步：Electron 即使 --headless 也要一个 display，
+            # 但把它和 deb 混在一条 apt 命令里会让"依赖解析失败"被别的输出淹没。
+            apt-get update -qq
+            apt-get install -y -qq xvfb
+
+            DEB=$(find /dist -name "*.deb" -print -quit)
+            echo "--- 安装 $DEB（依赖不可满足会在这里就非 0 退出）---"
+            apt-get install -y -qq "$DEB"
+
+            echo "--- 可执行文件 ---"
+            command -v bbplayer
+
+            echo "--- 依赖里的 ALSA（音乐播放器必须声明）---"
+            dpkg -s bbplayer | grep -i "^Depends" | tr "," "\n" | grep -i -E "asound|alsa" \
+              || { echo "⚠️ 依赖清单里没有 ALSA"; exit 1; }
+
+            echo "--- 产物自检 ---"
+            # -m1：拿到第一行就停，避免 grep|head 触发 SIGPIPE 把管道判成失败
+            xvfb-run -a bbplayer --no-sandbox --headless --selfcheck 2>&1 \
+              | grep -m1 -o "__SELFCHECK__.*"
+          '

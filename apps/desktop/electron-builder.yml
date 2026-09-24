@@ -131,6 +131,17 @@ linux:
 #
 # 一个**音乐播放器**没声明 ALSA 依赖说不过去，所以在 Debian 12 上实测到之后
 # 就补进清单里（`libasound2` 是 Debian/Ubuntu 的包名，RPM 系叫 `alsa-lib`）。
+#
+# ⚠️ **ALSA 那条必须写成替代依赖（`A | B`），不能只写 `libasound2`。**
+#
+# Ubuntu 24.04 起、Debian 13 起，`libasound2` 被改名为 `libasound2t64`
+# （64 位 time_t 迁移）；旧名字在这些发行版上**不存在**。只写旧名字的后果是
+# `apt install ./xxx.deb` 因为依赖不可满足而直接失败 —— 而它在 Debian 12
+# 上是好的，所以本机/VPS 那套 Debian 12 验收**永远发现不了**（实测踩到：
+# 当时只检查了"依赖清单里有没有 ALSA"，没检查"这个名字在当前发行版上存不存在"）。
+#
+# 用 Debian 的替代依赖语法同时列出两个名字，一个包就能覆盖新旧两代发行版；
+# 代价是不做版本约束（原来也没有），换来的是"不会因为库改名就装不上"。
 deb:
   depends:
     - libgtk-3-0
@@ -142,7 +153,8 @@ deb:
     - libatspi2.0-0
     - libuuid1
     - libsecret-1-0
-    - libasound2
+    # 旧名（≤ Debian 12 / ≤ Ubuntu 23.10）| 新名（≥ Debian 13 / ≥ Ubuntu 24.04）
+    - libasound2 | libasound2t64
 
 rpm:
   depends:
