@@ -45,11 +45,15 @@ jobs:
         run: pnpm --filter @bbplayer/desktop build:win
 
       - name: 📤 Upload installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: bbplayer-desktop-Windows
-          # 只传安装版；portable 会一并产出但本版不发布
-          path: dist/*-nsis-setup.exe
+          # ⚠️ 路径是相对**仓库根**的，不是相对 apps/desktop。
+          # electron-builder 的 `directories.output: dist` 是相对应用目录解析的，
+          # 所以产物落在 `apps/desktop/dist/`。第一版写成 `dist/*.exe`，
+          # 结果是 Build 成功、Upload 报 "No files were found" —— 整个 run 红掉。
+          # 只传安装版；portable 会一并产出但本版不发布。
+          path: apps/desktop/dist/*-nsis-setup.exe
           if-no-files-found: error
 
   linux:
@@ -74,13 +78,14 @@ jobs:
         run: pnpm --filter @bbplayer/desktop build:linux
 
       - name: 📤 Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: bbplayer-desktop-Linux
+          # 同 Windows：相对仓库根，产物在 apps/desktop/dist/
           path: |
-            dist/*.deb
-            dist/*.rpm
-            dist/*.AppImage
+            apps/desktop/dist/*.deb
+            apps/desktop/dist/*.rpm
+            apps/desktop/dist/*.AppImage
           if-no-files-found: error
 
   # ---------------------------------------------------------------
@@ -116,14 +121,15 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bbplayer-desktop-Linux
-          path: dist
+          # 下到构建产物同一个目录，下面 docker 挂的就是它
+          path: apps/desktop/dist
 
       - name: 🧪 Install and self-check on ${{ matrix.distro }}
         run: |
           set -euo pipefail
-          ls -l dist/
+          ls -l apps/desktop/dist/
 
-          docker run --rm -v "$PWD/dist:/dist:ro" ${{ matrix.distro }} bash -lc '
+          docker run --rm -v "$PWD/apps/desktop/dist:/dist:ro" ${{ matrix.distro }} bash -lc '
             set -euo pipefail
 
             # xvfb 单独装、单独一步：Electron 即使 --headless 也要一个 display，
