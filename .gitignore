@@ -11,9 +11,11 @@ dist/
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
 
 # macOS / Windows
 .DS_Store
+Thumbs.db
 
 # 本地环境文件与签名材料
 .env
@@ -23,6 +25,8 @@ yarn-error.*
 
 # IDE
 .idea
+# Obsidian 是本地笔记工具，vault 配置与工作区状态属于个人偏好，不进仓库
+.obsidian/
 
 # Agent 会话记录（DSH harness）
 .dsh-sessions/
@@ -31,6 +35,10 @@ yarn-error.*
 .desloppify/
 .tmp
 codedb.snapshot
+
+# 发布说明草稿：内容是给 GitHub Releases 粘贴的，仓库里不需要留一份
+# （随版本变化，留在仓库只会和实际 release 漂移）
+RELEASE_NOTES.md
 
 # 本地专用（只作对照，不进仓库）
 severs/
