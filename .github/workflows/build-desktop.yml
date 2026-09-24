@@ -1,0 +1,54 @@
+name: Build Desktop
+
+# 产出 Windows（NSIS + portable）与 Linux（deb / rpm / AppImage）安装包。
+#
+# ⚠️ 未签名：Windows SmartScreen 会提示，属预期（见 docs/DESKTOP_PLAN.md Phase 5.3）。
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: 📦 ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows
+            command: build:win
+            artifact: dist/*.exe
+          - os: ubuntu-latest
+            label: Linux
+            command: build:linux
+            artifact: |
+              dist/*.deb
+              dist/*.rpm
+              dist/*.AppImage
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v5
+
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@26
+          cache: true
+          install: true
+
+      - name: 🔧 Install rpm tooling
+        # electron-builder 打 rpm 需要系统里有 rpm
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: 🚀 Build
+        run: pnpm --filter @bbplayer/desktop ${{ matrix.command }}
+
+      - name: 📤 Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bbplayer-desktop-${{ matrix.label }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error

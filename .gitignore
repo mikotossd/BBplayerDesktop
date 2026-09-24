@@ -3,73 +3,37 @@
 # dependencies
 node_modules/
 
-# Expo
-.expo/
-.bbplayer-updates/
+# 构建产物
 dist/
-web-build/
-expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
+*.tsbuildinfo
 
 # debug
 npm-debug.*
 yarn-debug.*
 yarn-error.*
 
-# macOS
+# macOS / Windows
 .DS_Store
-*.pem
 
-# local env files
+# 本地环境文件与签名材料
+.env
 .env*.local
+*.pem
+*.key
 
-# typescript
-*.tsbuildinfo
-
-app-example
-
-# generated native folders
-/ios
-/android
-
-app-example
-temp-builds
-.yarn/install-state.gz
-**/.vscode/
-!/.vscode/
-!/.vscode/settings.json
-!/.vscode/extensions.json
-!/.vscode/tasks.json
-!/.vscode/launch.json
-
+# IDE
 .idea
 
-gha-creds-*.json
-.env
-apps/**/android
-apps/**/ios
+# Agent 会话记录（DSH harness）
+.dsh-sessions/
+
 # Desloppify
 .desloppify/
-external-playlist-experiment/
 .tmp
-bilibili_skin_exp
 codedb.snapshot
-#devlop test
+
+# 本地专用（只作对照，不进仓库）
 severs/
-# 安卓端实机截图（只作本地视觉对照，不进仓库）
 UIreferance/
-# 卡片化改造的参考图（用户手绘草图 + 网易云歌词截图；只作本地对照，不进仓库）
 ui_reference/
-# 歌词匹配命中率基准（本地实验：含三源真实候选池与 1MB+ 搜索缓存，不进仓库）
 lyrics_hit_rate_test_molde/

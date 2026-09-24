@@ -1,150 +1,99 @@
 <div align="center">
-<img src="./apps/mobile/assets/images/icon_large.png" alt="logo" width="50" />
-<h1>BBPlayer</h1>
+<h1>BBPlayer Desktop</h1>
 
-一款使用 React Native 构建的本地优先的 Bilibili 音频播放器。更轻量 & 舒服的听歌体验，远离臃肿卡顿的 Bilibili 客户端。
+Windows / Linux 桌面端 —— 播放 B 站音频、管理歌单、同步收藏夹、下载与 WebDAV 备份。
 
-[![GitHub Release](https://img.shields.io/github/v/release/yanyao2333/bbplayer?style=flat-square)](https://github.com/bbplayer-app/bbplayer/releases)
-![React Native](https://img.shields.io/badge/React%20Native-20232A?style=flat-square&logo=react&logoColor=sky)
-[![Website](https://img.shields.io/badge/Website-bbplayer.roitium.com-blue?style=flat-square)](https://bbplayer.roitium.com)
+基于 [Electron](https://www.electronjs.org/)，与 [BBPlayer](https://github.com/bbplayer-app/BBPlayer) 移动端共享
+[`packages/core`](./packages/core) 的平台无关逻辑，备份格式与数据库结构两端互通。
 
 </div>
 
 ---
 
-**[前往官网查看更多详情和上手指南 ➔](https://bbplayer.roitium.com)**
+## 功能
 
-## 屏幕截图
+- **播放**：播放 / 暂停、循环、随机、播放队列、响度均衡、断点续播、启动自动播放。
+  音频由主进程经自定义协议 `bbplayer-audio://` 代理（B 站主线 CDN 强制校验 `Referer`，渲染进程设不上去）。
+- **登录**：扫码 / 粘贴 Cookie / 密码三条路并存；凭据经 Electron `safeStorage` 加密落盘，cookie 从不到达渲染进程。
+- **搜索**：BV / AV 号、`b23.tv` 短链解析，收藏夹与本地歌单内搜索。
+- **歌单**：本地歌单增删改、收藏夹与 UP 合集同步、多选批量操作、跨端顺序互通（`sort_key`）。
+- **歌词**：SPL / LRC 解析、逐字进度、罗马音与翻译、偏移量调整；另有**无边框透明置顶独立歌词窗口**。
+- **外部歌单导入**：粘贴网易云歌单链接，逐首搜索、加权打分、负向词罚分后落库（QQ 音乐未做，接口需登录态签名）。
+- **共享歌单**：把歌单分享到 [`apps/backend`](./apps/backend)，他人订阅后双向同步（LWW + outbox 增量）。
+- **下载**：`.m4a` 落盘、HTTP `Range` 断点续传、完整性校验、备用地址回退。
+- **备份**：ZIP + 原始 SQLite 快照，与移动端格式互通（含两处会静默毁数据的迁移表 / `sort_key` 差异处理）。
+- **系统集成**：`navigator.mediaSession`（Windows SMTC / Linux MPRIS）、任务栏缩略图按钮（图标运行时零依赖生成）、可选硬件媒体键。
+- **界面**：Material Design 3 语义色（令牌由 [`packages/design-tokens`](./packages/design-tokens) 生成）、浅色 / 深色、封面主色背景、可拖拽左栏、播放列表浮层、热力图。
 
-|                  首页                  |                   播放器                   |                    播放列表                    |                    歌词页                    |                    库页面                    |
-| :------------------------------------: | :----------------------------------------: | :--------------------------------------------: | :------------------------------------------: | :------------------------------------------: |
-| ![home](./assets/screenshots/home.jpg) | ![player](./assets/screenshots/player.jpg) | ![playlist](./assets/screenshots/playlist.jpg) | ![download](./assets/screenshots/lyrics.jpg) | ![library](./assets/screenshots/library.jpg) |
+## UI 参考
 
-## 主要功能
+`assets/screenshots/` 下是**移动端**界面截图（1182×2560），保留在仓库里作为交互基线：
+桌面端阶段 6 的既定方法论是「先读移动端怎么做 → 再决定桌面端怎么做 → 写明为什么」，
+只在"鼠标 + 宽屏确实要求不同"的地方才改，不因为"桌面软件通常这样"就发明新惯例。
 
-### 核心播放体验
+桌面端自身的截图巡检产物在 `apps/desktop/probe-output/`（不入库，由 `pnpm verify:desktop:tour` 生成）。
 
-- **Bilibili 登录**: 支持通过**扫码**、**手机号（短信验证码）**或手动设置 Cookie 登录。
-- **播放源**: 自由添加本地播放列表，登录账号后也可直接访问账号内收藏夹、订阅合集等，兼顾快速与方便。
-- **导入外部歌单**: 支持从 **网易云音乐** 和 **QQ 音乐** 的歌单自动匹配到 B 站视频并保存为播放列表。
-- **全功能播放器**: 提供播放/暂停、循环、随机、播放队列、响度均衡、断点续播、启动自动播放等功能。
-- **搜索**: 智能搜索，支持 BV/AV 号、b23.tv 短链解析。同时提供收藏夹和本地播放列表内搜索。
+## 快速开始
 
-### 歌词系统
+```bash
+pnpm install
 
-- **支持 SPL**: 基于 [SPL 规范](https://bbplayer.roitium.com/SPL)，支持**逐字进度**、**罗马音注音**及**翻译歌词**展示。
-- **智能获取**: 支持自动匹配歌词（网易云/QQ 音乐/酷狗音乐），并支持手动搜索、粘贴 LRC/SPL 文本及偏移量调整。
-- **多样展示**: 支持桌面歌词（悬浮窗）、状态栏歌词。
+# 国内网络首次安装需要下载 Electron 二进制（约 142 MB，懒下载）
+ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/ pnpm install
 
-### 主题系统
+pnpm --filter @bbplayer/desktop start      # 开窗口运行
+```
 
-可以在软件内搜索并应用**任意**b 站主题装扮，支持：
+```bash
+pnpm lint          # oxlint --type-aware
+pnpm type-check    # tsgo --build --noEmit
+pnpm format        # oxfmt
+pnpm check:core    # packages/core 平台无关性守卫
+pnpm check:probes  # 探针脚本静态检查（已接 pre-commit）
+```
 
-- 导航栏
-- 开屏动画
-- 进度条拖拽图标
-- 点赞动画
-- 页面头部背景
-- 头像框
+打包：
 
-### 其他特性
+```bash
+pnpm --filter @bbplayer/desktop build:win     # NSIS + portable
+pnpm --filter @bbplayer/desktop build:linux   # deb + rpm + AppImage
+```
 
-- **下载与导出**: 支持缓存歌曲并离线播放，提供简单实用的下载管理。同时支持将已缓存的歌曲导出为带封面、元数据、内嵌歌词的 `.m4a` 文件到本地存储。
-- **UI**: 支持浅色/深色模式，UI 深度适配 Material Design 3 且支持莫奈取色。
-- **实用工具**: 提供定时关闭、播放历史统计（排行榜）等功能。
+完整验证套件（21 个脚本、1000+ 条断言）见 [`apps/desktop/README.md`](./apps/desktop/README.md)。
 
-还有更多功能和惊喜，欢迎到[官网](https://bbplayer.roitium.com)查看喵！
+## 仓库结构
 
-## 技术栈
+```
+apps/
+  desktop/   Electron 桌面端（主进程 CJS + 无打包器的渲染进程）
+  backend/   共享歌单后端（Cloudflare Worker + Hono + Drizzle + Postgres）
+packages/
+  core/          平台无关核心：DB schema / 迁移 / B 站与网易云 API / 歌词 / WebDAV / 备份格式
+  splash/        歌词解析与转换（SPL / LRC）
+  design-tokens/ Material Design 3 语义色与字阶
+scripts/         验证套件、探针静态检查、core 纯度守卫
+docs/            桌面端方案与各阶段施工图、进展与踩坑记录
+prototype/       卡片化改造的静态 HTML 原型（`prototype/pages/home.html` 等）
+assets/          移动端界面截图（交互对照用）
+```
 
-- **框架**: React Native, Expo
-- **状态管理**: Zustand
-- **数据请求**: React Query
-- **UI**: Material Design 3 (React Native Paper + ExpoUI)
-- **播放库**: [@bbplayer/orpheus](./packages/orpheus) (基于 Media3)
-- **ORM**: Drizzle ORM
+## 与上游 BBPlayer 的关系
 
-## 项目结构 (Monorepo)
+本仓库是 [bbplayer-app/BBPlayer](https://github.com/bbplayer-app/BBPlayer) monorepo 中**桌面端部分的独立拆分**，
+已剔除移动端（React Native）、文档站、热更新与发版工具等与桌面端无关的代码，历史也相应重写（已无上游 remote）。
 
-- **[apps/mobile](./apps/mobile)**: BBPlayer 移动端应用核心代码。
-- **[apps/backend](./apps/backend)**: 后端服务，提供歌单共享与软件更新查询（Cloudflare Worker）。
-- **[apps/docs](./apps/docs)**: 项目文档站点。
-- **[apps/update-publisher](./apps/update-publisher)**: 用于发布更新的工具。
-- **[packages/](./packages)**: 共享库与工具包。
-  - **[@bbplayer/splash](./packages/splash)**: 歌词解析与转换核心库。
-  - **[@bbplayer/eslint-plugin](./packages/eslint-plugin)**: BBPlayer 专用 lint 规则（通过 oxlint jsPlugins 运行）。
-  - **[@bbplayer/orpheus](./packages/orpheus)**: 基于 Media3 的音频播放引擎。
-  - **[@bbplayer/logs](./packages/logs)**: 日志库。
-  - **[@bbplayer/image-theme-colors](./packages/image-theme-colors)**: 封面颜色提取工具。
-  - **[@bbplayer/native](./packages/native)**: BBPlayer 原生能力集成模块。
-  - **[@bbplayer/heatmap](./packages/heatmap)**: 基于 SVG 的日期热力图组件。
-  - **[expo-wavy-slider](./packages/expo-wavy-slider)**: Jetpack Compose WavySlider 的 Expo 模块封装。
+因此代码注释与 `docs/` 里仍会看到 `apps/mobile` / `packages/orpheus` 这类**历史交叉引用** ——
+它们记录的是"这件事在移动端是怎么做的"，是有效的设计依据，不是失效链接。
 
-## IOS 支持
+`apps/backend` 是桌面端「共享歌单」功能所依赖的服务端，与移动端共用同一套协议。
 
-曾经对 IOS 进行了基础适配，但现在重心依旧在 Android 端上，IOS 端没有同步开发，不保证可以编译成功。
+## 隐私
 
-## 隐私与数据统计
-
-为了持续改进 BBPlayer，应用内集成了一套轻量级的匿名数据收集系统（包含 Firebase Analytics 和 Sentry）。
-
-### 我们收集什么？
-
-1. **使用数据**：功能使用频率、播放会话时长等。
-2. **崩溃报告**：应用崩溃时的堆栈信息，帮助我们修复 Bug。
-
-### 隐私承诺
-
-- **匿名**：所有数据均**不包含个人身份信息**。
-- **透明**：我们不会收集任何与账号隐私相关的信息（如 Cookie 内容、浏览历史明细等）。所有统计代码均开源可见。
-- **控制权**：你可以随时在「设置 -> 通用设置」中关闭「分享数据（崩溃报告 & 匿名统计）」开关，完全停止数据上传。
-
-## 捐赠支持
-
-如果你觉得 BBPlayer 对你有所帮助，欢迎考虑捐赠支持，你的所有捐赠都将用于让 Roitium 吃顿疯狂星期四或是买一部 GalGame！
-
-<table>
-<tr>
-<td align="center">
-<details>
-<summary>微信支付</summary>
-<br />
-<img src="./apps/mobile/assets/images/wechat.png" alt="WeChat Donation" width="200" />
-</details>
-</td>
-<td align="center">
-<details>
-<summary>支付宝</summary>
-<br />
-<img src="./apps/mobile/assets/images/alipay.jpg" alt="Alipay Donation" width="200" />
-</details>
-</td>
-</tr>
-</table>
-
-## 感谢
-
-本项目开发过程中很多功能和设计的灵感都来自前辈们，包括但不限于：
-
-- [AzusaPlayer](https://github.com/lovegaoshi/azusa-player-mobile)
-- [BiliSound](https://github.com/bilisound/client-mobile)
-- [Salt Player](https://github.com/Moriafly/SaltPlayerSource)
-- [Spotify](https://spotify.com)
-
-以及最重要的：[Bilibili](https://www.bilibili.com/)
-
-在此表示感谢！（鞠躬）
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=bbplayer-app%2FBBPlayer&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=bbplayer-app/BBPlayer&type=date&theme=dark&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=bbplayer-app/BBPlayer&type=date&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=bbplayer-app/BBPlayer&type=date&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
- </picture>
-</a>
+桌面端**不集成**任何统计或崩溃上报 SDK（移动端的 Firebase Analytics / Sentry 未带过来）。
+数据只落在本机 `userData` 下；登录凭据交给 Electron `safeStorage`。
+唯一的外部请求是 B 站 API、歌词来源（网易云 / QQ / 酷狗）、可自建的共享歌单后端，以及你自己配置的 WebDAV。
 
 ## 开源许可
 
-本项目采用 MIT 许可。
+本项目采用 MIT 许可，见 [LICENSE](./LICENSE)。
+原始项目版权归 [BBPlayer](https://github.com/bbplayer-app/BBPlayer) 作者所有。

@@ -1,35 +1,14 @@
 packages:
   - apps/*
-  - apps/*/web
   - packages/*
-  - packages/*/example
 allowBuilds:
-  '@firebase/util': true
-  '@sentry/cli': true
   electron: true
   esbuild: true
   lefthook: true
-  protobufjs: true
+  # wrangler(miniflare) 的图片处理依赖 —— apps/backend 本地开发要用
   sharp: true
+  # jest-resolve 的平台解析器 —— packages/splash 的测试要用
   unrs-resolver: true
   workerd: true
-  dtrace-provider: true
-  '@fails-components/webtransport-transport-http3-quiche': true
-  node-pty: true
-  tree-sitter: true
-  tree-sitter-javascript: true
-  tree-sitter-typescript: true
   # 只用于 Squirrel.Windows target；我们用 NSIS + portable，不需要它的构建脚本
   electron-winstaller: false
-
-minimumReleaseAgeExclude:
-  - expo-eas-client@57.0.3
-  - expo-updates@57.0.21
-  - lucide-react@1.39.0
-patchedDependencies:
-  '@ark/schema': patches/@ark__schema.patch
-  expo-updates@57.0.21: patches/expo-updates@57.0.21.patch
-  metro-runtime@0.84.5: patches/metro-runtime@0.84.5.patch
-  metro@0.84.5: patches/metro@0.84.5.patch
-  react-native-pager-view@9.0.4: patches/react-native-pager-view@9.0.4.patch
-  rn-newarch-svga-player@1.1.16: patches/rn-newarch-svga-player@1.1.16.patch

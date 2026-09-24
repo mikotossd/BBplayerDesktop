@@ -3,17 +3,8 @@
 	"references": [
 		{ "path": "./packages/core/tsconfig.json" },
 		{ "path": "./packages/design-tokens/tsconfig.json" },
-		{ "path": "./apps/mobile/tsconfig.json" },
-		{ "path": "./packages/orpheus/tsconfig.json" },
-		{ "path": "./packages/image-theme-colors/tsconfig.json" },
-		{ "path": "./apps/docs/tsconfig.json" },
 		{ "path": "./packages/splash/tsconfig.json" },
-		{ "path": "./packages/heatmap/tsconfig.json" },
-		{ "path": "./packages/logs/tsconfig.json" },
-		{ "path": "./apps/update-publisher/tsconfig.json" },
-		{ "path": "./apps/backend/tsconfig.json" },
-		{ "path": "./apps/update-server/web" },
-		{ "path": "./apps/hot-update-cli" }
+		{ "path": "./apps/backend/tsconfig.json" }
 	],
 	"compilerOptions": {
 		"skipLibCheck": true,

@@ -1,0 +1,40 @@
+name: 'PR Checks'
+
+on: pull_request
+
+env:
+  # CI 只做静态检查，不需要 Electron 二进制（140 MB+，懒下载）
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+jobs:
+  checks:
+    name: 🚨 Lint & Type Check
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v5
+
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@26
+          cache: true
+          install: true
+
+      - name: 🕵️ Check Dependencies
+        run: pnpm check:deps
+
+      - name: 🧱 Check core purity
+        # packages/core 必须保持平台无关（桌面端与其它端共用）
+        run: pnpm check:core
+
+      - name: 🔬 Check probe scripts
+        # 探针驱动跑在 Electron 主进程里：加载失败 = 应用起不来
+        run: pnpm check:probes
+
+      - name: 🚀 Run Lint
+        run: pnpm lint
+
+      - name: 🔎 Run Type Check
+        run: pnpm type-check

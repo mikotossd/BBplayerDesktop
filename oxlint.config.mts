@@ -30,7 +30,6 @@ export default defineConfig({
 		'**/dm.js',
 		'**/dist/**',
 		'**/build/**',
-		'**/.expo/**',
 		'**/node_modules/**',
 		'**/*.config.mjs',
 		/*
@@ -43,24 +42,12 @@ export default defineConfig({
 		 * 于是那批文件**从来没有被 lint 过**：`pnpm lint` 干净对它们是空的
 		 * （实测把 `share.js` / `player.js` 复制成 `.cjs` 再跑，会报出问题）。
 		 *
-		 * 现在只排除真正需要排除的那几个，逐个写明理由 —— 全仓库被它挡住的
-		 * JS 一共只有 7 个（移动端）+ 3 个（杂项），是可以点清的。
+		 * 现在只排除真正需要排除的那几个，逐个写明理由。
 		 */
-		'apps/mobile/expo-plugins/**', // Expo config plugin：跑在 Node 构建期，风格与 App 代码不同
-		'apps/mobile/drizzle/**', // drizzle-kit 生成的迁移索引
-		'apps/mobile/babel.config.js', // 构建配置（里面的 console 是构建日志）
-		'apps/mobile/metro.config.js', // 构建配置
-		'apps/mobile/index.js', // Expo 入口：`import 'expo-router/entry'` 是副作用导入
 		'packages/splash/jest.config.js', // 测试配置，不是产品代码
-		'packages/eslint-plugin/**', // 自定义 lint 规则本身（JS 写的插件，风格自成一派）
-		'packages/logs/**',
-		'packages/bottom-tabs-react-navigation/**',
-		'packages/react-native-bottom-tabs/**',
-		'**/worker-configuration.d.ts',
+		'**/worker-configuration.d.ts', // wrangler 生成的类型
 		'**/package-lock.json',
 		'**/pnpm-lock.yaml',
-		'.agents/**',
-		'apps/update-server/web/src/components/ui/**', // shadcn/ui 组件，不考虑它的报错
 	],
 	rules: {
 		'react/react-in-jsx-scope': 'off',
@@ -86,39 +73,6 @@ export default defineConfig({
 		'no-underscore-dangle': ['error', { allow: ['__csrf'] }],
 		'react/no-unstable-nested-components': 'off',
 
-		// tanstack query
-		'@tanstack/query/exhaustive-deps': 'error',
-		'@tanstack/query/no-rest-destructuring': 'warn',
-		'@tanstack/query/stable-query-client': 'error',
-		'@tanstack/query/no-unstable-deps': 'error',
-		'@tanstack/query/infinite-query-property-order': 'error',
-		'@tanstack/query/no-void-query-fn': 'error',
-		'@tanstack/query/mutation-property-order': 'error',
-
-		// react-compiler
-		'react-compiler/react-compiler': 'error',
-
-		// bbplayer
-		'bbplayer/no-navigate-after-modal-close': 'error',
-
-		// react-hooks-extra
-		'react-hooks-extra/no-direct-set-state-in-use-effect': 'off',
-		'react-hooks-extra/no-unnecessary-use-prefix': 'error',
-		'react-hooks-extra/prefer-use-state-lazy-initialization': 'error',
-
-		// react-you-might-not-need-an-effect
-		'react-you-might-not-need-an-effect/no-empty-effect': 'warn',
-		'react-you-might-not-need-an-effect/no-adjust-state-on-prop-change': 'warn',
-		'react-you-might-not-need-an-effect/no-reset-all-state-on-prop-change':
-			'warn',
-		'react-you-might-not-need-an-effect/no-event-handler': 'warn',
-		'react-you-might-not-need-an-effect/no-pass-live-state-to-parent': 'warn',
-		'react-you-might-not-need-an-effect/no-pass-data-to-parent': 'warn',
-		'react-you-might-not-need-an-effect/no-manage-parent': 'warn',
-		'react-you-might-not-need-an-effect/no-initialize-state': 'warn',
-		'react-you-might-not-need-an-effect/no-chain-state-updates': 'warn',
-		'react-you-might-not-need-an-effect/no-derived-state': 'warn',
-
 		'eslint/no-await-in-loop': 'error',
 		'always-return': 'allow',
 		'no-array-sort': 'allow',
@@ -132,18 +86,6 @@ export default defineConfig({
 			version: '19.2',
 		},
 	},
-	jsPlugins: [
-		'@tanstack/eslint-plugin-query',
-		'eslint-plugin-react-compiler',
-		{ name: 'bbplayer', specifier: './packages/eslint-plugin/index.js' },
-		'eslint-plugin-react-hooks-extra',
-		'eslint-plugin-react-you-might-not-need-an-effect',
-		{ name: 'drizzle-js', specifier: 'eslint-plugin-drizzle' },
-		{
-			name: 'import-alias',
-			specifier: './oxlint-plugins/import-alias.mjs',
-		},
-	],
 	overrides: [
 		{
 			/**
@@ -207,27 +149,7 @@ export default defineConfig({
 			},
 		},
 		{
-			files: ['apps/mobile/src/**/*.{ts,tsx,mts,cts}'],
-			rules: {
-				'import-alias/prefer-alias': [
-					'error',
-					{
-						alias: {
-							'@': './apps/mobile/src',
-						},
-						aliasForSubpaths: true,
-					},
-				],
-			},
-		},
-		{
 			files: ['packages/**/*.{ts,tsx,js,jsx}'],
-			rules: {
-				'no-console': 'allow',
-			},
-		},
-		{
-			files: ['apps/hot-update-cli/**/*.{ts,js}'],
 			rules: {
 				'no-console': 'allow',
 			},

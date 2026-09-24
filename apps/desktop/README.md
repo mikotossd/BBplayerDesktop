@@ -8,6 +8,10 @@ Windows / Linux 桌面端。**Phase 0–5 已完成**：播放 / 搜索 / 歌单
 
 方案与阶段划分见 [`docs/DESKTOP_PLAN.md`](../../docs/DESKTOP_PLAN.md)。
 
+> 本仓库是 BBPlayer monorepo 拆分出的桌面端独立仓库。下文与源码注释里的 `apps/mobile` /
+> `packages/orpheus` / `packages/heatmap` 等路径是拆分前的**历史交叉引用** ——
+> 它们说明"这件事在移动端是怎么做的"，是设计依据，不是失效链接。
+
 ---
 
 ## 快速开始
