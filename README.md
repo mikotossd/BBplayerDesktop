@@ -86,11 +86,11 @@ ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/ pnpm install
 pnpm --filter @bbplayer/desktop start      # 开窗口运行
 ```
 
-打包（Windows 出 NSIS + portable，Linux 出 deb / rpm / AppImage）：
+打包：
 
 ```bash
-pnpm --filter @bbplayer/desktop build:win
-pnpm --filter @bbplayer/desktop build:linux
+pnpm --filter @bbplayer/desktop build:win     # NSIS 安装版（+ portable，暂不发布）
+pnpm --filter @bbplayer/desktop build:linux   # deb / rpm / AppImage（配置在，但未验证，见 TODO）
 ```
 
 质量检查：
@@ -108,29 +108,41 @@ pnpm shots:readme  # 重拍本文档的截图
 
 ## 平台与状态
 
-- **Windows**：Windows 10 / 11（x64），安装版与免安装版都有。
-- **Linux**：x86_64 + glibc，提供 `.deb` / `.rpm` / `.AppImage` 三种产物。
-  它们由 [CI](./.github/workflows/build-desktop.yml) 在真实 Linux 上构建，
-  并在 **Debian 12 / Ubuntu 22.04 / 24.04 / Debian 13 四个容器里**各装一遍、
-  跑一次产物自检 —— 因为"依赖里写的库名在这个发行版上存不存在"只有真装一次才知道
-  （`libasound2` 在 Ubuntu 24.04 起改名成 `libasound2t64`，这个坑就是这么暴露的）。
-- **macOS** 未适配，没做任何打包验证。
-- **安装包未签名**：Windows SmartScreen 会提示，属预期。
+**目前只发布 Windows 安装版一个产物。** 其它平台与打包格式都还没到能发的程度，
+列在下面的 TODO 里。
 
-### Linux：发行版没覆盖到就自己构建
+- **Windows 10 / 11（x64）**：`BBPlayer-<版本>-win-x64-nsis-setup.exe`，安装版，
+  可选安装目录、建桌面与开始菜单快捷方式、在「应用和功能」里注册卸载项。
+- **未签名**：SmartScreen 会提示「Windows 已保护你的电脑」→「更多信息」→「仍要运行」。
+- 数据在 `%APPDATA%\BBPlayer`；**卸载不会删它**，要彻底清干净得手动删。
 
-`.deb` / `.rpm` / `.AppImage` 已经覆盖了绝大多数发行版，正常用上面的产物就行。
-但如果你想在没覆盖到的发行版上装成系统包（或者想自己改点东西），可以本地构建：
+## TODO（后续计划）
 
-```bash
-# 需要 Node 26 + pnpm；构建峰值内存约 4 GB，小内存机器先加 swap
-git clone https://github.com/mikotossd/BBplayerDesktop && cd BBplayerDesktop
-pnpm install
-pnpm --filter @bbplayer/desktop build:linux   # 产物在 apps/desktop/dist/
-```
+按优先级排，做完了就往下挪。产品层面的已知限制另见
+[`apps/desktop/README.md` 的「已知限制 / 下一步」](./apps/desktop/README.md#已知限制--下一步)。
 
-⚠️ 实测构建峰值会超过 3.8 GB 内存，2 GB 的 VPS 上必须补 swap 才跑得过 ——
-所以**不建议**把它当成常规安装方式，能用预编译包就用预编译包。
+- [ ] **Linux 产物**（`.deb` / `.rpm` / `.AppImage`）
+  - 构建配置在 `apps/desktop/electron-builder.yml` 里是齐的，`build:linux` 能出包，
+    也曾在 Debian 12 的 VPS 上真机验过安装 / 运行 / 卸载；
+  - **但没发**，因为缺跨发行版验证。已经修掉一个有代表性的坑：
+    ALSA 依赖名在新旧发行版之间改过（`libasound2` → `libasound2t64`），
+    `deb.depends` 现在写成替代依赖 `libasound2 | libasound2t64`；
+  - `.github/workflows/build-desktop.yml` 里那套「构建 + 在
+    Debian 12 / Ubuntu 22.04 / 24.04 / Debian 13 四个容器里各装一遍再跑自检」
+    **已经写好但一次都没跑过**（开发机是 Windows，没有 docker / WSL），
+    所以它现在只在手动触发且显式选择时才跑，不参与发版；
+  - 要开始做这一项，第一步就是把它跑绿，绿了再谈发布。
+  - 自己构建的话：需要 Node 26 + pnpm，**构建峰值内存超过 3.8 GB**
+    （实测 2 GB 的 VPS 必须先补 swap），所以它不适合当常规安装方式。
+- [ ] **macOS**：完全没适配，也没做任何打包验证。
+- [ ] **代码签名**：Windows 的 NSIS 包未签名，Linux 包同样；签名策略见
+      [`docs/DESKTOP_PLAN.md`](./docs/DESKTOP_PLAN.md) Phase 5.3。
+- [ ] **自动更新**：`electron-builder.yml` 里有 `publish: generic` 的占位配置，
+      electron-builder 也会生成 `latest.yml` / `.blockmap`，但应用**还没接
+      `electron-updater`**（依赖里没有它，代码里也没有 `autoUpdater`）。
+      在这些接上之前，那两个文件没有任何用途，别传进 release。
+- [ ] **portable 免安装版**：`build:win` 会一并产出
+      `BBPlayer-<版本>-win-x64-portable.exe`，本版**不发布**。
 
 ## 隐私与数据统计
 

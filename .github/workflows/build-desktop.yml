@@ -1,39 +1,61 @@
 name: Build Desktop
 
-# 产出 Windows（NSIS + portable）与 Linux（deb / rpm / AppImage）安装包，
-# 并在**真实发行版容器**里验证 deb 装得上、起得来。
+# 默认只构建 **Windows 安装版**：v0.1.0 只发这一个产物。
 #
-# 为什么 Linux 产物交给 CI 而不是开发者本机：electron-builder 官方建议
-# 跨平台构建 Linux 目标走 docker，本机是 Windows 时根本产不出来。
-# 而"依赖名字对不对"这类问题**只有真的 `apt install` 一次才知道** ——
-# 见 `verify-deb` 那个 job（`libasound2` → `libasound2t64` 那次教训）。
+# Linux（deb / rpm / AppImage）**属于 TODO，不参与发版**，所以：
+#   * tag 触发时只跑 windows job；
+#   * linux 与 verify-deb 只在手动触发且显式选 `windows+linux` 时才跑。
+# 原因见 README 的 TODO 与 apps/desktop/README.md 的「已知限制 / 下一步」：
+# Linux 那套构建配置是齐的（也曾在 Debian 12 真机验过），但缺**跨发行版**验证 ——
+# ALSA 依赖名改过（`libasound2` → `libasound2t64`），
+# 而下面 verify-deb 这套四发行版容器实测**一次都没跑过**（开发机是 Windows，
+# 没有 docker / WSL）。跑绿之前不要把它接进发版流程。
 #
 # ⚠️ 未签名：Windows SmartScreen 会提示，属预期（见 docs/DESKTOP_PLAN.md Phase 5.3）。
 on:
   workflow_dispatch:
+    inputs:
+      targets:
+        description: '构建目标'
+        required: true
+        default: windows
+        type: choice
+        options:
+          - windows
+          - windows+linux
   push:
     tags:
       - 'v*'
 
 jobs:
-  build:
-    name: 📦 ${{ matrix.label }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            label: Windows
-            command: build:win
-            artifact: dist/*.exe
-          - os: ubuntu-latest
-            label: Linux
-            command: build:linux
-            artifact: |
-              dist/*.deb
-              dist/*.rpm
-              dist/*.AppImage
+  windows:
+    name: 📦 Windows
+    runs-on: windows-latest
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v5
+
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@26
+          cache: true
+          install: true
+
+      - name: 🚀 Build
+        run: pnpm --filter @bbplayer/desktop build:win
+
+      - name: 📤 Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: bbplayer-desktop-Windows
+          # 只传安装版；portable 会一并产出但本版不发布
+          path: dist/*-nsis-setup.exe
+          if-no-files-found: error
+
+  linux:
+    name: 📦 Linux（TODO，未验证）
+    if: github.event_name == 'workflow_dispatch' && inputs.targets == 'windows+linux'
+    runs-on: ubuntu-latest
     steps:
       - name: 🏗 Setup repo
         uses: actions/checkout@v5
@@ -46,21 +68,23 @@ jobs:
 
       - name: 🔧 Install rpm tooling
         # electron-builder 打 rpm 需要系统里有 rpm
-        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y rpm
 
       - name: 🚀 Build
-        run: pnpm --filter @bbplayer/desktop ${{ matrix.command }}
+        run: pnpm --filter @bbplayer/desktop build:linux
 
       - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: bbplayer-desktop-${{ matrix.label }}
-          path: ${{ matrix.artifact }}
+          name: bbplayer-desktop-Linux
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
           if-no-files-found: error
 
   # ---------------------------------------------------------------
-  # deb 的真实安装验证
+  # deb 的真实安装验证（TODO 的一部分，未跑过）
   # ---------------------------------------------------------------
   #
   # 拦的是一类**只能靠真装一次才发现**的问题：依赖清单里写的库名在某些
@@ -76,7 +100,8 @@ jobs:
   # `__SELFCHECK__` 行 —— 装上但起不来同样算失败。
   verify-deb:
     name: 🧪 deb on ${{ matrix.distro }}
-    needs: build
+    needs: linux
+    if: github.event_name == 'workflow_dispatch' && inputs.targets == 'windows+linux'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

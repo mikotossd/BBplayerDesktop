@@ -620,6 +620,19 @@ pnpm verify:desktop:shared
   「主界面集成」这一层。详见 [`docs/LYRICS.md`](../../docs/LYRICS.md) §6。
   验证脚本把它记为**警告**而不是通过 —— 不用「状态正确」掩盖「DOM 没渲染」。
   独立歌词窗口走的是另一份渲染实现，**没有这个问题**，可作为绕过路径。
+- **Linux 产物未发布（TODO）**：`electron-builder.yml` 里 deb / rpm / AppImage 的配置
+  是齐的，`build:linux` 能出包，也曾在 Debian 12 的 VPS 上真机验过安装 / 运行 / 卸载。
+  **v0.1.0 不发**，缺的是**跨发行版**验证 —— ALSA 依赖名在新旧发行版之间改过
+  （`libasound2` → `libasound2t64`，Ubuntu 24.04+ / Debian 13+），
+  `deb.depends` 已改成替代依赖 `libasound2 | libasound2t64`，
+  但"这个名字在该发行版上到底存不存在"只有真装一次才知道。
+  `.github/workflows/build-desktop.yml` 里那套「构建 + 四个发行版容器各装一遍再跑自检」
+  **写好了但一次都没跑过**（开发机是 Windows，没有 docker / WSL），
+  所以它现在只在手动触发且显式选择时才跑，不参与发版。要做这一项，第一步先把它跑绿。
+- **自动更新未接**：`electron-builder.yml` 有 `publish: generic` 占位配置，
+  构建也会产出 `latest.yml` / `.blockmap`，但依赖里没有 `electron-updater`、
+  代码里也没有 `autoUpdater` —— 在接上之前那两个文件没有任何用途，别传进 release。
+- **portable 免安装版不发布**：`build:win` 会一并产出 `*-portable.exe`，本版只发 NSIS 安装版。
 - Phase 5.3（代码签名）未做：Windows 的 NSIS 包未签名，SmartScreen 会提示；
   Linux 包也未签名。
 - 外部歌单导入只支持**网易云**；QQ 音乐未做（接口需登录态签名）。
