@@ -16,17 +16,15 @@
 与 [BBPlayer](https://github.com/bbplayer-app/BBPlayer) 移动端共享 [`packages/core`](./packages/core) 的平台无关逻辑，
 **数据库结构与备份格式两端互通** —— 桌面端的备份可以直接在手机上恢复，反之亦然。
 
+> 本仓库是 [@roitium](https://github.com/roitium) 的 [bbplayer-app/BBPlayer](https://github.com/bbplayer-app/BBPlayer)
+> 中**桌面端部分的独立拆分**，版权归原作者所有（见 [开源许可](#开源许可)）。
+> 移动端（React Native）与其余组件仍在上游仓库维护。
+
 ## 屏幕截图
 
 |                  首页                  |                     播放器                     |                 播放列表                 |                    搜索                    |                    音乐库                    |                      设置                      |
 | :------------------------------------: | :--------------------------------------------: | :--------------------------------------: | :----------------------------------------: | :------------------------------------------: | :--------------------------------------------: |
 | ![home](./assets/screenshots/home.png) | ![player](./assets/screenshots/nowplaying.png) | ![queue](./assets/screenshots/queue.png) | ![search](./assets/screenshots/search.png) | ![library](./assets/screenshots/library.png) | ![settings](./assets/screenshots/settings.png) |
-
-> 上面六张由 `pnpm shots:readme` 在真实的 Electron 窗口里现拍（真实 B 站数据、真实歌词匹配），
-> 不是手绘稿也不是拼图。要重拍就再跑一次那条命令；每张图拍的是什么见
-> [`assets/screenshots/manifest.json`](./assets/screenshots/manifest.json)。
->
-> 另有移动端界面截图在 [`assets/screenshots-mobile/`](./assets/screenshots-mobile)，作为桌面端对齐交互时的对照基线。
 
 ## 主要功能
 
@@ -113,11 +111,10 @@ pnpm shots:readme  # 重拍本文档的截图
 - **Windows / Linux** 的安装包均已构建并在真机验证；macOS 未适配。
 - **安装包未签名**：Windows SmartScreen 会提示，属预期。
 - **外部歌单导入只支持网易云**：QQ 音乐的歌单接口需要 `uin` + zzc 签名，未登录拿不到完整列表。
-- **歌词面板有一处未定位的缺陷**：主界面里歌词状态正确、DOM 也更新了，但行元素有时不渲染。独立歌词窗口走另一份实现，没有这个问题。详见 [`docs/LYRICS.md`](./docs/LYRICS.md)。
 
 ## 隐私与数据统计
 
-桌面端**不集成**任何统计或崩溃上报 SDK（移动端的 Firebase Analytics / Sentry 没有带过来）。
+桌面端**不集成**任何统计或崩溃上报 SDK。
 
 ### 数据流向
 
@@ -150,5 +147,9 @@ pnpm shots:readme  # 重拍本文档的截图
 
 本项目采用 MIT 许可，见 [LICENSE](./LICENSE)。
 
-本仓库是 [bbplayer-app/BBPlayer](https://github.com/bbplayer-app/BBPlayer) 中**桌面端部分的独立拆分**，
-原始项目版权归其作者所有。
+原始项目 [BBPlayer](https://github.com/bbplayer-app/BBPlayer) 由 [@roitium](https://github.com/roitium) 创建，
+**版权归原作者所有** —— [`LICENSE`](./LICENSE) 里的版权声明（`Copyright (c) 2025 Roitium.`）原样保留，
+未做任何改动。本仓库只是其中**桌面端部分的独立拆分**：移动端（React Native）、文档站、
+热更新与发版工具等仍在上游仓库维护。
+
+上游仓库：<https://github.com/bbplayer-app/BBPlayer> · 作者主页：<https://github.com/roitium>

@@ -406,7 +406,14 @@
   - `33-search-empty-result` 实际拍到了 20 条结果 —— 搜 `zzzz…` 仍返回内容，
     **「无结果」空状态从未被覆盖**；
   - `06-library-back` 与 `02` 画面几乎相同，**「返回」态没有被覆盖**。
-- **待做**：应用图标与 README 截图重拍。
+- ~~**待做**：应用图标与 README 截图重拍。~~ —— **✅ 已完成**：
+  - 应用图标换成上游的原始图标（`assets/icon.png`，版权归原作者）。
+    原来那份是 `build-icons.mjs` 用代码画的 M3 圆角方块 + 播放三角，
+    看着就是个**默认 Electron 图标**；现在这个脚本只做「校验 + 复制」，
+    不再画图，另外 `main.cjs` 补了 `BrowserWindow.icon`（不设的话
+    **开发期**窗口用的就是 Electron 自己的图标）。
+  - 截图由 `pnpm shots:readme` 重拍（6 张，见 `assets/screenshots/`），
+    驱动是 `apps/desktop/src/readme-shots-driver.cjs`。
 
 #### 原始计划（阶段 5）
 

@@ -180,6 +180,23 @@ if (PROBE_ENABLED) {
 
 const SHOT_DIR = path.join(__dirname, '..', 'probe-output')
 
+/**
+ * 窗口图标（见 `new BrowserWindow` 里的说明）。
+ *
+ * 两个候选，按顺序取第一个存在的：
+ *  1. `apps/desktop/build/icon.png` —— `build:prepare` 从 `assets/icon.png`
+ *     复制过去的，**已打进 asar**，所以打包后走的就是它；
+ *  2. 仓库根的 `assets/icon.png` —— 上游的原始图标。它在打包范围之外，
+ *     只用来兜底"开发期还没跑过 build:prepare"这一种情况。
+ *
+ * 两个都没有时是 `undefined`，Electron 会忽略 `icon` 并退回默认图标
+ * （不崩，但那时看到的就不是本项目的图标了）。
+ */
+const WINDOW_ICON = [
+	path.join(__dirname, '..', 'build', 'icon.png'),
+	path.join(__dirname, '..', '..', '..', 'assets', 'icon.png'),
+].find((candidate) => fs.existsSync(candidate))
+
 // 自定义协议必须在 app ready 之前声明特权：
 //  - standard: 让 URL 解析行为与 http 一致
 //  - stream:   允许流式响应（音频必须）
@@ -392,6 +409,17 @@ function createWindow() {
 		 * 永远不会跟着主题走。
 		 */
 		backgroundColor: windowBackgroundColor(),
+		/*
+		 * 窗口图标。
+		 *
+		 * ⚠️ **不设这个的话，开发期窗口用的就是 Electron 自己的默认图标** ——
+		 * 打包后 exe 的图标来自 `electron-builder.yml` 的 `win.icon`，
+		 * 但 `pnpm start`（未打包）时那是 `electron.exe` 的图标，用户看到的
+		 * 就是一个和自己项目无关的图标（实测被指出过）。
+		 *
+		 * 候选与理由见 `WINDOW_ICON` 的定义。
+		 */
+		icon: WINDOW_ICON,
 		show: !silent,
 		skipTaskbar: silent,
 		webPreferences: {
