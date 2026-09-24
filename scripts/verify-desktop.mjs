@@ -18,6 +18,7 @@
  */
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 
@@ -25,6 +26,18 @@ const ROOT = path.resolve(import.meta.dirname, '..')
 const DESKTOP = path.join(ROOT, 'apps', 'desktop')
 const OUTPUT = path.join(DESKTOP, 'probe-output')
 const RESULT_FILE = path.join(OUTPUT, 'report.json')
+
+/**
+ * 用**独立的临时数据目录**，避免污染真实库。
+ *
+ * ⚠️ 原来这里没有设 `BBPLAYER_DATA_DIR`，于是这个套件读写的是
+ * `%APPDATA%\BBPlayer` —— **打包后的应用读的是同一个目录**
+ * （`app.setName('BBPlayer')` 定的，卸载也不会清理它）。
+ * 后果实测发生过：安装好的应用里躺着一堆探针建的歌单与播放记录。
+ * `main.cjs` 现在会在探针模式缺这个变量时**拒绝启动**，这里是配套的修复。
+ */
+const DATA_DIR = path.join(os.tmpdir(), `bbplayer-verify-${Date.now()}`)
+fs.mkdirSync(DATA_DIR, { recursive: true })
 
 /** 在 main.cjs 里被 require 的探针钩子：通过环境变量启用 */
 const PROBE_DRIVER = path.join(DESKTOP, 'src', 'probe-driver.cjs')
@@ -83,7 +96,11 @@ async function main() {
 
 	const child = spawn(binary, ['.', '--probe'], {
 		cwd: DESKTOP,
-		env: { ...process.env, BBPLAYER_PROBE_DRIVER: PROBE_DRIVER },
+		env: {
+			...process.env,
+			BBPLAYER_DATA_DIR: DATA_DIR,
+			BBPLAYER_PROBE_DRIVER: PROBE_DRIVER,
+		},
 		stdio: ['ignore', 'pipe', 'pipe'],
 	})
 

@@ -143,6 +143,9 @@ jobs:
               || { echo "⚠️ 依赖清单里没有 ALSA"; exit 1; }
 
             echo "--- 产物自检 ---"
+            # 探针模式必须隔离数据目录：main.cjs 在没设 BBPLAYER_DATA_DIR 时会
+            # 直接退出码 2（不给的话它会写进真实的 ~/.config/BBPlayer）。
+            export BBPLAYER_DATA_DIR="$(mktemp -d)"
             # -m1：拿到第一行就停，避免 grep|head 触发 SIGPIPE 把管道判成失败
             xvfb-run -a bbplayer --no-sandbox --headless --selfcheck 2>&1 \
               | grep -m1 -o "__SELFCHECK__.*"

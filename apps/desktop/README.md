@@ -30,6 +30,41 @@ ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/ pnpm install
 > Electron ≥ 42 移除了 `postinstall`，二进制是**懒下载**的 —— 所以刚装完
 > `dist/` 是空的属于正常现象。实测走镜像约 24 s，直连约 50 min。
 
+### ⚠️ 数据目录：开发期、探针、装好的应用**是同一个**
+
+`main.cjs` 开头 `app.setName('BBPlayer')`，所以数据目录固定是：
+
+| 系统    | 路径                 |
+| ------- | -------------------- |
+| Windows | `%APPDATA%\BBPlayer` |
+| Linux   | `~/.config/BBPlayer` |
+
+**手动 `pnpm start`、探针套件、以及安装包装出来的应用，读写的都是这一个目录。**
+而 NSIS 卸载器（和 `apt purge`）**不会**清理它 —— 于是会出现这种现象：
+
+> 刚装好的应用，一进去里面躺着「探针新建的歌单」、测试用的歌单、
+> 一堆播放记录，甚至一份登录态 cookie。
+
+那不是安装包有问题，是这台机器上**之前跑过探针 / 手动开发**留下的。
+（实测踩到过：用户装完新包后报"里面怎么有探针建的歌单"。）
+
+**想要干净的首次运行体验**，把那个目录挪走即可（可逆）：
+
+```powershell
+# Windows：先关掉应用，再改名（不要直接删，里面可能有你要的 cookie）
+Rename-Item "$env:APPDATA\BBPlayer" "BBPlayer.bak-$(Get-Date -Format yyyyMMddHHmm)"
+```
+
+```bash
+# Linux
+mv ~/.config/BBPlayer ~/.config/BBPlayer.bak-$(date +%Y%m%d%H%M)
+```
+
+**探针侧已经有闸**：`main.cjs` 在探针模式下如果没看到 `BBPLAYER_DATA_DIR`
+会**直接以退出码 2 拒绝启动**，并把该设的路径打出来 —— 这样"探针写进真实
+数据目录"这类事故不会再无声发生。所有随仓库发布的驱动脚本都会自己建一个
+临时目录；要手敲探针命令就自己设一个空目录。
+
 ---
 
 ## 验证套件

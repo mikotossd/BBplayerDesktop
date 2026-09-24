@@ -22,6 +22,17 @@ const OUTPUT = path.join(DESKTOP, 'probe-output')
 const COMPARISON = path.join(OUTPUT, 'comparison.json')
 const AGGREGATE = path.join(OUTPUT, 'strategy-comparison.json')
 
+/**
+ * 独立临时数据目录。
+ *
+ * ⚠️ 原来这里没设 `BBPLAYER_DATA_DIR`，于是 `--compare` 打开的是**真实的**
+ * `%APPDATA%\BBPlayer` —— 与打包后的应用同一个目录，卸载也不会清理，
+ * 而这个驱动会初始化数据库并真的播几首。`main.cjs` 现在会拒绝这种启动，
+ * 这里是配套的修复。
+ */
+const DATA_DIR = path.join(os.tmpdir(), `bbplayer-compare-${Date.now()}`)
+fs.mkdirSync(DATA_DIR, { recursive: true })
+
 function electronBinary() {
 	const pnpmDir = path.join(ROOT, 'node_modules', '.pnpm')
 	const match = fs
@@ -48,6 +59,7 @@ async function runCase(binary, args, label, extraElectronArgs = []) {
 
 	const child = spawn(binary, [...extraElectronArgs, '.', ...args], {
 		cwd: DESKTOP,
+		env: { ...process.env, BBPLAYER_DATA_DIR: DATA_DIR },
 		stdio: ['ignore', 'pipe', 'pipe'],
 	})
 

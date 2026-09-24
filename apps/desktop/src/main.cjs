@@ -148,6 +148,41 @@ const PROBE_ENABLED = [
 ].some((flag) => process.argv.includes(flag))
 
 /**
+ * ⚠️ **探针模式必须指定 `BBPLAYER_DATA_DIR`，否则拒绝启动。**
+ *
+ * 为什么要有这道闸：探针会真的建歌单、写播放历史、甚至播放曲目。而这个应用
+ * 的数据目录是 `app.setName('BBPlayer')` 定的 `%APPDATA%\BBPlayer` ——
+ * **开发期的探针、手动 `pnpm start`、以及打包安装后的应用读的是同一个目录**，
+ * 而且 NSIS 卸载器**不会**清理它。
+ *
+ * 实测踩到过（用户装完新包之后报的）：安装好的应用一进去，里面躺着
+ * 「探针新建的歌单」×3、`test`、`歌`，还有 92 首曲目与 32 条播放记录，
+ * 以及一份登录态的 cookie —— 全都是之前在这台机器上跑探针 / 手动开发留下的。
+ * 用户的直觉是"这批安装包有问题"，实际是数据目录被共用了。
+ *
+ * 为什么是**拒绝启动**而不是"自动改用临时目录"：静默改路径能避免污染，
+ * 但会掩盖调用方的错误（比如本该指向某个 fixture 目录却拼错了）。
+ * 现在是**响亮地失败**，并打出可直接照抄的命令。
+ *
+ * 所有随仓库发布的驱动脚本都已经设了这个变量；漏设的是
+ * `verify-desktop.mjs` 与 `compare-audio-strategies.mjs`，已一并修掉。
+ */
+if (PROBE_ENABLED && !process.env.BBPLAYER_DATA_DIR) {
+	console.error(
+		'\n✗ 探针模式必须隔离数据目录：环境变量 BBPLAYER_DATA_DIR 没有设置。\n\n' +
+			'  不设的话探针会读写你**真实的**数据目录，而打包后的应用读的是同一个：\n' +
+			`    ${app.getPath('userData')}\n` +
+			'  于是歌单 / 播放历史会被真实地改掉，卸载应用也**不会**清理它。\n\n' +
+			'  用仓库里现成的脚本（它们都已经设好）：\n' +
+			'    pnpm verify:desktop / verify:desktop:ui / verify:desktop:history / …\n\n' +
+			'  要自己手敲的话，先建一个空目录再指过去：\n' +
+			'    PowerShell: $env:BBPLAYER_DATA_DIR="$env:TEMP\\bb-probe-$(Get-Random)"; pnpm --filter @bbplayer/desktop start -- --ui-probe\n' +
+			'    bash:       BBPLAYER_DATA_DIR="$(mktemp -d)" electron . --ui-probe\n',
+	)
+	process.exit(2)
+}
+
+/**
  * ⚠️ 探针**中途抛异常**时必须让进程以非 0 退出。
  *
  * 原来每个探针块都是 `.catch((e) => console.error(...))` 然后
